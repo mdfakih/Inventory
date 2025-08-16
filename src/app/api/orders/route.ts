@@ -5,6 +5,30 @@ import Stone from '@/models/Stone';
 import Paper from '@/models/Paper';
 import { getCurrentUser } from '@/lib/auth';
 
+// Type for creating orders via API
+interface CreateOrderData {
+  type: 'internal' | 'out';
+  customerName: string;
+  phone: string;
+  designId: string;
+  stonesUsed: Array<{ stoneId: string; quantity: number }>;
+  paperUsed: {
+    sizeInInch: number;
+    quantityInPcs: number;
+    paperWeightPerPc: number;
+  };
+  calculatedWeight: number;
+  createdBy: string;
+  receivedMaterials?: {
+    stones: Array<{ stoneId: string; quantity: number }>;
+    paper: {
+      sizeInInch: number;
+      quantityInPcs: number;
+      paperWeightPerPc: number;
+    };
+  };
+}
+
 export async function GET() {
   try {
     await dbConnect();
@@ -88,7 +112,7 @@ export async function POST(request: NextRequest) {
     );
     const calculatedWeight = paperWeight + stoneWeight;
 
-    const orderData: any = {
+    const orderData: CreateOrderData = {
       type,
       customerName,
       phone,
@@ -100,12 +124,8 @@ export async function POST(request: NextRequest) {
       },
       calculatedWeight,
       createdBy: user.id,
+      ...(type === 'out' && receivedMaterials && { receivedMaterials }),
     };
-
-    // For out orders, track received materials
-    if (type === 'out' && receivedMaterials) {
-      orderData.receivedMaterials = receivedMaterials;
-    }
 
     const order = new Order(orderData);
     await order.save();

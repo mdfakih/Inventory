@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Card,
@@ -9,10 +10,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import PaperTable from '@/components/inventory/paper-table';
+import { Spinner } from '@/components/ui/spinner';
 
-export default function PaperPage() {
+function PaperPageContent() {
   const searchParams = useSearchParams();
-  const inventoryType = searchParams.get('type') || 'internal';
+  const inventoryType = (searchParams.get('type') || 'internal') as
+    | 'internal'
+    | 'out';
 
   const isOutJob = inventoryType === 'out';
   const title = isOutJob
@@ -43,5 +47,13 @@ export default function PaperPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function PaperPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-8"><Spinner size="lg" /></div>}>
+      <PaperPageContent />
+    </Suspense>
   );
 }

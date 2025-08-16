@@ -38,7 +38,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
-import { Package, Plus, Edit, Trash2 } from 'lucide-react';
+import { Package, Plus } from 'lucide-react';
 
 interface Stone {
   _id: string;

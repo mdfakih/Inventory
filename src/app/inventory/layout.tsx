@@ -122,9 +122,6 @@ export default function InventoryLayout({
           <div className="space-y-4">
             {inventoryItems.map((section) => {
               const SectionIcon = section.icon;
-              const isSectionActive = section.items.some((item) =>
-                pathname.includes(item.href.split('?')[0]),
-              );
 
               return (
                 <div

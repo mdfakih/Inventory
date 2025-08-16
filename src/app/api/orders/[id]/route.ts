@@ -79,6 +79,7 @@ export async function PUT(
     // Track changes for audit trail
     const updateHistory = [];
     const oldValues = order.toObject();
+    const updateData: Record<string, unknown> = {};
 
     // Check for changes and add to history
     if (type !== oldValues.type) {
@@ -218,7 +219,7 @@ export async function PUT(
 
         // Calculate total received stones
         const totalReceivedStones = order.receivedMaterials.stones.reduce(
-          (total, stone) => total + stone.quantity,
+          (total: number, stone: { quantity: number }) => total + stone.quantity,
           0,
         );
 
@@ -289,7 +290,7 @@ export async function PUT(
     }
 
     // Update order
-    const updateData: Record<string, unknown> = {
+    Object.assign(updateData, {
       type,
       customerName,
       phone,
@@ -311,7 +312,7 @@ export async function PUT(
       discrepancyPercentage,
       status,
       updatedBy: user.id,
-    };
+    });
 
     if (finalTotalWeight !== undefined) {
       updateData.finalTotalWeight = finalTotalWeight;

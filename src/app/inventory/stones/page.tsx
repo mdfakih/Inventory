@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Card,
@@ -9,10 +10,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import StonesTable from '@/components/inventory/stones-table';
+import { Spinner } from '@/components/ui/spinner';
 
-export default function StonesPage() {
+function StonesPageContent() {
   const searchParams = useSearchParams();
-  const inventoryType = searchParams.get('type') || 'internal';
+  const inventoryType = (searchParams.get('type') || 'internal') as
+    | 'internal'
+    | 'out';
 
   const isOutJob = inventoryType === 'out';
   const title = isOutJob
@@ -39,5 +43,13 @@ export default function StonesPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function StonesPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-8"><Spinner size="lg" /></div>}>
+      <StonesPageContent />
+    </Suspense>
   );
 }

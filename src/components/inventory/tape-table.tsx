@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,11 +44,7 @@ export default function TapeTable() {
   });
   const { showSuccess, showError } = useSnackbarHelpers();
 
-  useEffect(() => {
-    fetchTapes();
-  }, []);
-
-  const fetchTapes = async () => {
+  const fetchTapes = useCallback(async () => {
     try {
       const response = await fetch('/api/inventory/tape');
       const data = await response.json();
@@ -63,7 +59,11 @@ export default function TapeTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    fetchTapes();
+  }, [fetchTapes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
