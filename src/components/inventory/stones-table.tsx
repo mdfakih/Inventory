@@ -71,14 +71,23 @@ export default function StonesTable({
 
   const fetchStones = useCallback(async () => {
     try {
+      setLoading(true);
       const response = await fetch(
         `/api/inventory/stones?type=${inventoryType}`,
       );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       if (data.success) {
         setStones(data.data);
       } else {
-        showError('Data Loading Error', 'Failed to load stones data.');
+        showError(
+          'Data Loading Error',
+          data.message || 'Failed to load stones data.',
+        );
       }
     } catch (error) {
       console.error('Error fetching stones:', error);
@@ -89,7 +98,8 @@ export default function StonesTable({
     } finally {
       setLoading(false);
     }
-  }, [showError, inventoryType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventoryType]);
 
   useEffect(() => {
     fetchStones();
@@ -110,6 +120,10 @@ export default function StonesTable({
           quantity: parseFloat(formData.quantity),
         }),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const data = await response.json();
       if (data.success) {
@@ -146,6 +160,10 @@ export default function StonesTable({
         },
         body: JSON.stringify({ quantity: newQuantity }),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const data = await response.json();
       if (data.success) {

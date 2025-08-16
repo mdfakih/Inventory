@@ -87,7 +87,7 @@ function InventoryLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex min-h-[calc(100vh-4rem)]">
       {/* Sidebar */}
       <div
         className={`${
@@ -187,7 +187,7 @@ function InventoryLayoutContent({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        <div className="p-6">{children}</div>
+        <div className="container mx-auto px-4 py-4 sm:py-8">{children}</div>
       </div>
     </div>
   );

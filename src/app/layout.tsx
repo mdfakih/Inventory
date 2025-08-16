@@ -33,9 +33,7 @@ export default function RootLayout({
           <SnackbarProvider>
             <AuthProvider>
               <Navigation />
-              <main className="container mx-auto px-4 py-4 sm:py-8">
-                {children}
-              </main>
+              <main className="min-h-[calc(100vh-4rem)]">{children}</main>
             </AuthProvider>
           </SnackbarProvider>
         </ThemeProvider>

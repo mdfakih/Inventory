@@ -29,6 +29,15 @@ export async function PATCH(
       );
     }
 
+    // First get the old value
+    const existingStone = await Stone.findById(id);
+    if (!existingStone) {
+      return NextResponse.json(
+        { success: false, message: 'Stone not found' },
+        { status: 404 },
+      );
+    }
+
     const stone = await Stone.findByIdAndUpdate(
       id,
       {
@@ -37,7 +46,7 @@ export async function PATCH(
         $push: {
           updateHistory: {
             field: 'quantity',
-            oldValue: (await Stone.findById(id))?.quantity,
+            oldValue: existingStone.quantity,
             newValue: quantity,
             updatedBy: user.id,
             updatedAt: new Date(),
@@ -46,13 +55,6 @@ export async function PATCH(
       },
       { new: true },
     );
-
-    if (!stone) {
-      return NextResponse.json(
-        { success: false, message: 'Stone not found' },
-        { status: 404 },
-      );
-    }
 
     return NextResponse.json({
       success: true,

@@ -151,7 +151,8 @@ export default function DesignsPage() {
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     fetchData();

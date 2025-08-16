@@ -77,7 +77,8 @@ export default function PaperTable({
     } finally {
       setLoading(false);
     }
-  }, [showError, inventoryType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventoryType]);
 
   useEffect(() => {
     fetchPapers();

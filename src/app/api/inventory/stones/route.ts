@@ -18,6 +18,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'internal';
 
+    // Validate inventory type
+    if (!['internal', 'out'].includes(type)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid inventory type' },
+        { status: 400 },
+      );
+    }
+
     const stones = await Stone.find({ inventoryType: type }).sort({ name: 1 });
 
     return NextResponse.json({
@@ -38,6 +46,12 @@ export async function GET(request: NextRequest) {
       if (error.message.includes('MONGODB_URI')) {
         return NextResponse.json(
           { success: false, message: 'Database configuration error. Please check environment variables.' },
+          { status: 500 },
+        );
+      }
+      if (error.message.includes('MongoNetworkError')) {
+        return NextResponse.json(
+          { success: false, message: 'Database network error. Please check your connection.' },
           { status: 500 },
         );
       }
@@ -74,6 +88,7 @@ export async function POST(request: NextRequest) {
       inventoryType = 'internal',
     } = body;
 
+    // Validate required fields
     if (
       !name ||
       !number ||
@@ -84,6 +99,30 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { success: false, message: 'All fields are required' },
+        { status: 400 },
+      );
+    }
+
+    // Validate inventory type
+    if (!['internal', 'out'].includes(inventoryType)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid inventory type' },
+        { status: 400 },
+      );
+    }
+
+    // Validate unit
+    if (!['g', 'kg'].includes(unit)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid unit. Must be g or kg' },
+        { status: 400 },
+      );
+    }
+
+    // Validate quantity
+    if (typeof quantity !== 'number' || quantity < 0) {
+      return NextResponse.json(
+        { success: false, message: 'Quantity must be a positive number' },
         { status: 400 },
       );
     }

@@ -29,6 +29,15 @@ export async function PATCH(
       );
     }
 
+    // First get the old value
+    const existingPaper = await Paper.findById(id);
+    if (!existingPaper) {
+      return NextResponse.json(
+        { success: false, message: 'Paper not found' },
+        { status: 404 },
+      );
+    }
+
     const paper = await Paper.findByIdAndUpdate(
       id,
       {
@@ -37,7 +46,7 @@ export async function PATCH(
         $push: {
           updateHistory: {
             field: 'quantity',
-            oldValue: (await Paper.findById(id))?.quantity,
+            oldValue: existingPaper.quantity,
             newValue: quantity,
             updatedBy: user.id,
             updatedAt: new Date(),
@@ -46,13 +55,6 @@ export async function PATCH(
       },
       { new: true },
     );
-
-    if (!paper) {
-      return NextResponse.json(
-        { success: false, message: 'Paper not found' },
-        { status: 404 },
-      );
-    }
 
     return NextResponse.json({
       success: true,

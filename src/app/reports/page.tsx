@@ -149,7 +149,8 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!authLoading) {
@@ -166,7 +167,7 @@ export default function ReportsPage() {
 
       loadReportData();
     }
-  }, [authLoading, isAuthenticated, user, router, showError, loadReportData]);
+  }, [authLoading, isAuthenticated, user, loadReportData]);
 
   const handleGenerateReport = async () => {
     try {

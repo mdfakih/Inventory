@@ -84,6 +84,7 @@ const paperSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Ensure unique width per inventory type
 paperSchema.index({ width: 1, inventoryType: 1 }, { unique: true });
 const Paper = mongoose.model('Paper', paperSchema);
 
@@ -398,7 +399,7 @@ async function setupDatabase() {
     console.log('Creating sample internal stones...');
     const internalStones = [
       {
-        name: 'Red Stone',
+        name: 'Ruby Stone',
         number: 'RS001',
         color: 'Red',
         size: 'Small',
@@ -407,8 +408,8 @@ async function setupDatabase() {
         inventoryType: 'internal',
       },
       {
-        name: 'Blue Stone',
-        number: 'BS001',
+        name: 'Sapphire Stone',
+        number: 'SS001',
         color: 'Blue',
         size: 'Medium',
         quantity: 300,
@@ -416,8 +417,8 @@ async function setupDatabase() {
         inventoryType: 'internal',
       },
       {
-        name: 'Green Stone',
-        number: 'GS001',
+        name: 'Emerald Stone',
+        number: 'ES001',
         color: 'Green',
         size: 'Large',
         quantity: 200,
@@ -425,8 +426,8 @@ async function setupDatabase() {
         inventoryType: 'internal',
       },
       {
-        name: 'Yellow Stone',
-        number: 'YS001',
+        name: 'Topaz Stone',
+        number: 'TS001',
         color: 'Yellow',
         size: 'Small',
         quantity: 400,
@@ -434,11 +435,29 @@ async function setupDatabase() {
         inventoryType: 'internal',
       },
       {
-        name: 'Purple Stone',
-        number: 'PS001',
+        name: 'Amethyst Stone',
+        number: 'AS001',
         color: 'Purple',
         size: 'Medium',
         quantity: 250,
+        unit: 'g',
+        inventoryType: 'internal',
+      },
+      {
+        name: 'Diamond Stone',
+        number: 'DS001',
+        color: 'White',
+        size: 'Large',
+        quantity: 150,
+        unit: 'g',
+        inventoryType: 'internal',
+      },
+      {
+        name: 'Garnet Stone',
+        number: 'GS001',
+        color: 'Dark Red',
+        size: 'Medium',
+        quantity: 350,
         unit: 'g',
         inventoryType: 'internal',
       },
@@ -455,7 +474,7 @@ async function setupDatabase() {
     console.log('Creating sample out job stones...');
     const outStones = [
       {
-        name: 'Customer Red Stone',
+        name: 'Customer Ruby Stone',
         number: 'CRS001',
         color: 'Red',
         size: 'Small',
@@ -464,11 +483,29 @@ async function setupDatabase() {
         inventoryType: 'out',
       },
       {
-        name: 'Customer Blue Stone',
-        number: 'CBS001',
+        name: 'Customer Sapphire Stone',
+        number: 'CSS001',
         color: 'Blue',
         size: 'Medium',
         quantity: 150,
+        unit: 'g',
+        inventoryType: 'out',
+      },
+      {
+        name: 'Customer Emerald Stone',
+        number: 'CES001',
+        color: 'Green',
+        size: 'Large',
+        quantity: 75,
+        unit: 'kg',
+        inventoryType: 'out',
+      },
+      {
+        name: 'Customer Topaz Stone',
+        number: 'CTS001',
+        color: 'Yellow',
+        size: 'Small',
+        quantity: 80,
         unit: 'g',
         inventoryType: 'out',
       },
@@ -623,8 +660,8 @@ async function setupDatabase() {
     console.log('- Manager: manager@example.com / admin123');
     console.log('- Employee: employee@example.com / admin123');
     console.log('\nSample data created:');
-    console.log('- 5 internal stones');
-    console.log('- 2 out job stones');
+    console.log('- 7 internal stones');
+    console.log('- 4 out job stones');
     console.log('- 6 internal paper types (with weights)');
     console.log('- 2 out job paper types');
     console.log('- 5 plastic types');
