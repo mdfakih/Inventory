@@ -3,10 +3,14 @@ import dbConnect from '@/lib/db';
 import Paper from '@/models/Paper';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await dbConnect();
-    const papers = await Paper.find().sort({ width: 1 });
+
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type') || 'internal';
+
+    const papers = await Paper.find({ inventoryType: type }).sort({ width: 1 });
 
     return NextResponse.json({
       success: true,
@@ -34,7 +38,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { width, quantity, piecesPerRoll, weightPerPiece } = body;
+    const {
+      width,
+      quantity,
+      piecesPerRoll,
+      weightPerPiece,
+      inventoryType = 'internal',
+    } = body;
 
     if (
       !width ||
@@ -48,11 +58,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if paper width already exists
-    const existingPaper = await Paper.findOne({ width });
+    // Check if paper width already exists for the same inventory type
+    const existingPaper = await Paper.findOne({ width, inventoryType });
     if (existingPaper) {
       return NextResponse.json(
-        { success: false, message: 'Paper width already exists' },
+        {
+          success: false,
+          message: 'Paper width already exists for this inventory type',
+        },
         { status: 400 },
       );
     }
@@ -62,7 +75,8 @@ export async function POST(request: NextRequest) {
       quantity,
       piecesPerRoll,
       weightPerPiece,
-      createdBy: user.id,
+      inventoryType,
+      updatedBy: user.id,
     });
 
     await paper.save();

@@ -41,11 +41,18 @@ interface Stone {
   size: string;
   quantity: number;
   unit: 'g' | 'kg';
+  inventoryType: 'internal' | 'out';
   createdAt: string;
   updatedAt: string;
 }
 
-export default function StonesTable() {
+interface StonesTableProps {
+  inventoryType?: 'internal' | 'out';
+}
+
+export default function StonesTable({
+  inventoryType = 'internal',
+}: StonesTableProps) {
   const [stones, setStones] = useState<Stone[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -58,12 +65,15 @@ export default function StonesTable() {
     size: '',
     quantity: '',
     unit: 'g' as 'g' | 'kg',
+    inventoryType: inventoryType as 'internal' | 'out',
   });
   const { showSuccess, showError } = useSnackbarHelpers();
 
   const fetchStones = useCallback(async () => {
     try {
-      const response = await fetch('/api/inventory/stones');
+      const response = await fetch(
+        `/api/inventory/stones?type=${inventoryType}`,
+      );
       const data = await response.json();
       if (data.success) {
         setStones(data.data);
@@ -79,11 +89,12 @@ export default function StonesTable() {
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+  }, [showError, inventoryType]);
 
   useEffect(() => {
     fetchStones();
-  }, [fetchStones]);
+    setFormData((prev) => ({ ...prev, inventoryType }));
+  }, [fetchStones, inventoryType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +122,7 @@ export default function StonesTable() {
           size: '',
           quantity: '',
           unit: 'g',
+          inventoryType,
         });
         fetchStones();
       } else {
@@ -159,6 +171,9 @@ export default function StonesTable() {
     }
   };
 
+  const isOutJob = inventoryType === 'out';
+  const title = isOutJob ? 'Out Job Stones' : 'Internal Stones';
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -171,9 +186,11 @@ export default function StonesTable() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-semibold">Stones Inventory</h3>
+          <h3 className="text-lg font-semibold">{title} Inventory</h3>
           <p className="text-sm text-muted-foreground">
-            Manage stone inventory with quantity tracking
+            {isOutJob
+              ? 'Manage stones received from customers for out jobs'
+              : 'Manage internal stone inventory with quantity tracking'}
           </p>
         </div>
         <Dialog
@@ -188,7 +205,7 @@ export default function StonesTable() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Stone</DialogTitle>
+              <DialogTitle>Add New {title} Stone</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={handleSubmit}
@@ -299,12 +316,12 @@ export default function StonesTable() {
       {stones.length === 0 ? (
         <EmptyState
           icon={Gem}
-          title="No Stones Found"
-          description="Get started by adding your first stone. Stone inventory will appear here once added."
+          title={`No ${title} Found`}
+          description={`Get started by adding your first ${title.toLowerCase()}. ${title} inventory will appear here once added.`}
           action={
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Add First Stone
+              Add First {title} Stone
             </Button>
           }
         />

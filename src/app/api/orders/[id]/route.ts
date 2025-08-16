@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import Paper from '@/models/Paper';
+import Stone from '@/models/Stone';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
@@ -14,6 +15,7 @@ export async function GET(
     const order = await Order.findById(id)
       .populate('designId')
       .populate('stonesUsed.stoneId')
+      .populate('receivedMaterials.stones.stoneId')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
@@ -62,6 +64,7 @@ export async function PUT(
       paperUsed,
       finalTotalWeight,
       status,
+      isFinalized,
     } = body;
     const { id } = await params;
 
@@ -138,7 +141,10 @@ export async function PUT(
       (paperUsed.sizeInInch !== oldValues.paperUsed.sizeInInch ||
         paperUsed.quantityInPcs !== oldValues.paperUsed.quantityInPcs)
     ) {
-      const paper = await Paper.findOne({ width: paperUsed.sizeInInch });
+      const paper = await Paper.findOne({
+        width: paperUsed.sizeInInch,
+        inventoryType: type === 'out' ? 'out' : 'internal',
+      });
       if (paper) {
         const paperWeight = paper.weightPerPiece * paperUsed.quantityInPcs;
         const stoneWeight = stonesUsed.reduce(
@@ -165,6 +171,7 @@ export async function PUT(
     ) {
       const paper = await Paper.findOne({
         width: paperUsed?.sizeInInch || oldValues.paperUsed.sizeInInch,
+        inventoryType: type === 'out' ? 'out' : 'internal',
       });
       if (paper) {
         const paperWeight =
@@ -201,6 +208,84 @@ export async function PUT(
         updatedBy: user.id,
         updatedAt: new Date(),
       });
+
+      // For out orders, calculate stone usage and balance
+      if (order.type === 'out' && order.receivedMaterials) {
+        const paperWeight =
+          order.receivedMaterials.paper.paperWeightPerPc *
+          order.receivedMaterials.paper.quantityInPcs;
+        const stoneUsed = finalTotalWeight - paperWeight;
+
+        // Calculate total received stones
+        const totalReceivedStones = order.receivedMaterials.stones.reduce(
+          (total, stone) => total + stone.quantity,
+          0,
+        );
+
+        // Calculate balance and loss
+        const stoneBalance = Math.max(0, totalReceivedStones - stoneUsed);
+        const stoneLoss = Math.max(0, stoneUsed - totalReceivedStones);
+
+        // Calculate paper balance and loss
+        const paperUsed = order.paperUsed.quantityInPcs;
+        const paperBalance = Math.max(
+          0,
+          order.receivedMaterials.paper.quantityInPcs - paperUsed,
+        );
+        const paperLoss = Math.max(
+          0,
+          paperUsed - order.receivedMaterials.paper.quantityInPcs,
+        );
+
+        updateData.stoneUsed = stoneUsed;
+        updateData.stoneBalance = stoneBalance;
+        updateData.stoneLoss = stoneLoss;
+        updateData.paperBalance = paperBalance;
+        updateData.paperLoss = paperLoss;
+
+        updateHistory.push({
+          field: 'stoneUsage',
+          oldValue: oldValues.stoneUsed,
+          newValue: stoneUsed,
+          updatedBy: user.id,
+          updatedAt: new Date(),
+        });
+      }
+    }
+
+    // Handle order finalization for out orders
+    if (isFinalized && !order.isFinalized && order.type === 'out') {
+      // Deduct consumed materials from out inventory
+      for (const stoneUsage of stonesUsed) {
+        const outStone = await Stone.findOne({
+          number: stoneUsage.stoneId.number || stoneUsage.stoneId,
+          inventoryType: 'out',
+        });
+        if (outStone) {
+          await Stone.findByIdAndUpdate(outStone._id, {
+            $inc: { quantity: -stoneUsage.quantity },
+          });
+        }
+      }
+
+      // Deduct consumed paper from out inventory
+      const outPaper = await Paper.findOne({
+        width: paperUsed.sizeInInch,
+        inventoryType: 'out',
+      });
+      if (outPaper) {
+        await Paper.findByIdAndUpdate(outPaper._id, {
+          $inc: { quantity: -paperUsed.quantityInPcs },
+        });
+      }
+
+      updateHistory.push({
+        field: 'isFinalized',
+        oldValue: false,
+        newValue: true,
+        updatedBy: user.id,
+        updatedAt: new Date(),
+      });
     }
 
     // Update order
@@ -214,7 +299,10 @@ export async function PUT(
         ? {
             ...paperUsed,
             paperWeightPerPc: (
-              await Paper.findOne({ width: paperUsed.sizeInInch })
+              await Paper.findOne({
+                width: paperUsed.sizeInInch,
+                inventoryType: type === 'out' ? 'out' : 'internal',
+              })
             )?.weightPerPiece,
           }
         : order.paperUsed,
@@ -229,6 +317,11 @@ export async function PUT(
       updateData.finalTotalWeight = finalTotalWeight;
     }
 
+    if (isFinalized && !order.isFinalized) {
+      updateData.isFinalized = true;
+      updateData.finalizedAt = new Date();
+    }
+
     // Add to existing history
     updateData.updateHistory = [
       ...(order.updateHistory || []),
@@ -240,6 +333,7 @@ export async function PUT(
     })
       .populate('designId')
       .populate('stonesUsed.stoneId')
+      .populate('receivedMaterials.stones.stoneId')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 

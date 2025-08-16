@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Stone from '@/models/Stone';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await dbConnect();
-    const stones = await Stone.find().sort({ name: 1 });
+
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type') || 'internal';
+
+    const stones = await Stone.find({ inventoryType: type }).sort({ name: 1 });
 
     return NextResponse.json({
       success: true,
@@ -25,7 +29,15 @@ export async function POST(request: NextRequest) {
     await dbConnect();
 
     const body = await request.json();
-    const { name, number, color, size, quantity, unit } = body;
+    const {
+      name,
+      number,
+      color,
+      size,
+      quantity,
+      unit,
+      inventoryType = 'internal',
+    } = body;
 
     if (
       !name ||
@@ -41,11 +53,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if stone number already exists
-    const existingStone = await Stone.findOne({ number });
+    // Check if stone number already exists for the same inventory type
+    const existingStone = await Stone.findOne({ number, inventoryType });
     if (existingStone) {
       return NextResponse.json(
-        { success: false, message: 'Stone number already exists' },
+        {
+          success: false,
+          message: 'Stone number already exists for this inventory type',
+        },
         { status: 400 },
       );
     }
@@ -57,6 +72,7 @@ export async function POST(request: NextRequest) {
       size,
       quantity,
       unit,
+      inventoryType,
     });
 
     await stone.save();

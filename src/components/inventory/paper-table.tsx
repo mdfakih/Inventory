@@ -39,9 +39,16 @@ interface Paper {
   quantity: number;
   piecesPerRoll: number;
   weightPerPiece: number;
+  inventoryType: 'internal' | 'out';
 }
 
-export default function PaperTable() {
+interface PaperTableProps {
+  inventoryType?: 'internal' | 'out';
+}
+
+export default function PaperTable({
+  inventoryType = 'internal',
+}: PaperTableProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -51,12 +58,15 @@ export default function PaperTable() {
     quantity: '',
     piecesPerRoll: '',
     weightPerPiece: '',
+    inventoryType: inventoryType as 'internal' | 'out',
   });
   const { showSuccess, showError } = useSnackbarHelpers();
 
   const fetchPapers = useCallback(async () => {
     try {
-      const response = await fetch('/api/inventory/paper');
+      const response = await fetch(
+        `/api/inventory/paper?type=${inventoryType}`,
+      );
       const data = await response.json();
       if (data.success) {
         setPapers(data.data);
@@ -67,11 +77,12 @@ export default function PaperTable() {
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+  }, [showError, inventoryType]);
 
   useEffect(() => {
     fetchPapers();
-  }, [fetchPapers]);
+    setFormData((prev) => ({ ...prev, inventoryType }));
+  }, [fetchPapers, inventoryType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +114,7 @@ export default function PaperTable() {
           quantity: '',
           piecesPerRoll: '',
           weightPerPiece: '',
+          inventoryType,
         });
         fetchPapers();
       } else {
@@ -119,6 +131,9 @@ export default function PaperTable() {
     }
   };
 
+  const isOutJob = inventoryType === 'out';
+  const title = isOutJob ? 'Out Job Paper' : 'Internal Paper';
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -130,7 +145,16 @@ export default function PaperTable() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Paper Rolls ({papers.length})</h3>
+        <div>
+          <h3 className="text-lg font-semibold">
+            {title} Rolls ({papers.length})
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {isOutJob
+              ? 'Manage paper received from customers for out jobs'
+              : 'Manage internal paper inventory with quantity tracking'}
+          </p>
+        </div>
         <Dialog
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
@@ -143,7 +167,7 @@ export default function PaperTable() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Paper Roll</DialogTitle>
+              <DialogTitle>Add New {title} Roll</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={handleSubmit}
@@ -242,12 +266,12 @@ export default function PaperTable() {
       {papers.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No Paper Rolls Found"
-          description="Get started by adding your first paper roll. Paper inventory will appear here once added."
+          title={`No ${title} Rolls Found`}
+          description={`Get started by adding your first ${title.toLowerCase()} roll. ${title} inventory will appear here once added.`}
           action={
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Add First Paper Roll
+              Add First {title} Roll
             </Button>
           }
         />
