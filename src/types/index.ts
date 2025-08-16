@@ -30,8 +30,8 @@ export interface Paper {
   updatedBy?: string;
   updateHistory: Array<{
     field: string;
-    oldValue: any;
-    newValue: any;
+    oldValue: string | number | boolean | Date;
+    newValue: string | number | boolean | Date;
     updatedBy: string;
     updatedAt: Date;
   }>;
@@ -76,8 +76,8 @@ export interface Design {
   updatedBy?: string;
   updateHistory: Array<{
     field: string;
-    oldValue: any;
-    newValue: any;
+    oldValue: string | number | boolean | Date;
+    newValue: string | number | boolean | Date;
     updatedBy: string;
     updatedAt: Date;
   }>;
@@ -111,8 +111,8 @@ export interface Order {
   updatedBy?: string;
   updateHistory: Array<{
     field: string;
-    oldValue: any;
-    newValue: any;
+    oldValue: string | number | boolean | Date;
+    newValue: string | number | boolean | Date;
     updatedBy: string;
     updatedAt: Date;
   }>;
@@ -136,7 +136,7 @@ export interface LoginResponse {
   };
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message: string;
   data?: T;

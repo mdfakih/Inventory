@@ -11,13 +11,34 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SpinnerPage } from '@/components/ui/spinner';
+import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 
+interface Stone {
+  _id: string;
+  name: string;
+  quantity: number;
+}
+
+interface Paper {
+  _id: string;
+  width: number;
+  quantity: number;
+}
+
+interface Order {
+  _id: string;
+  type: 'internal' | 'out';
+  customerName: string;
+  phone: string;
+  createdAt: string;
+}
+
 interface DashboardData {
-  stones: any[];
-  papers: any[];
-  orders: any[];
-  recentOrders: any[];
+  stones: Stone[];
+  papers: Paper[];
+  orders: Order[];
+  recentOrders: Order[];
 }
 
 export default function EmployeeDashboard() {
@@ -28,10 +49,13 @@ export default function EmployeeDashboard() {
     recentOrders: [],
   });
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (isAuthenticated) {
+      fetchDashboardData();
+    }
+  }, [isAuthenticated]);
 
   const fetchDashboardData = async () => {
     try {
@@ -73,7 +97,7 @@ export default function EmployeeDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {data.stones.reduce(
-                (sum: number, stone: any) => sum + stone.quantity,
+                (sum: number, stone: Stone) => sum + stone.quantity,
                 0,
               )}
             </div>
@@ -93,7 +117,7 @@ export default function EmployeeDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {data.papers.reduce(
-                (sum: number, paper: any) => sum + paper.quantity,
+                (sum: number, paper: Paper) => sum + paper.quantity,
                 0,
               )}
             </div>
@@ -122,7 +146,7 @@ export default function EmployeeDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {
-                data.orders.filter((order: any) => {
+                data.orders.filter((order: Order) => {
                   const orderDate = new Date(order.createdAt);
                   const weekAgo = new Date();
                   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -176,7 +200,7 @@ export default function EmployeeDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {data.recentOrders.map((order: any) => (
+              {data.recentOrders.map((order: Order) => (
                 <div
                   key={order._id}
                   className="flex items-center justify-between p-2 border rounded"

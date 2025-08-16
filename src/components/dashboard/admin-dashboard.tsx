@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SpinnerPage } from '@/components/ui/spinner';
+import { useAuth } from '@/lib/auth-context';
 import {
   BarChart,
   Bar,
@@ -24,21 +25,33 @@ import {
   Cell,
 } from 'recharts';
 
-interface DashboardData {
-  stones: any[];
-  papers: any[];
-  orders: any[];
-  recentOrders: any[];
+interface Stone {
+  _id: string;
+  name: string;
+  color: string;
+  quantity: number;
 }
 
-const COLORS = [
-  '#0088FE',
-  '#00C49F',
-  '#FFBB28',
-  '#FF8042',
-  '#8884D8',
-  '#82CA9D',
-];
+interface Paper {
+  _id: string;
+  width: number;
+  quantity: number;
+}
+
+interface Order {
+  _id: string;
+  type: 'internal' | 'out';
+  customerName: string;
+  phone: string;
+  createdAt: string;
+}
+
+interface DashboardData {
+  stones: Stone[];
+  papers: Paper[];
+  orders: Order[];
+  recentOrders: Order[];
+}
 
 export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData>({
@@ -48,10 +61,13 @@ export default function AdminDashboard() {
     recentOrders: [],
   });
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (isAuthenticated) {
+      fetchDashboardData();
+    }
+  }, [isAuthenticated]);
 
   const fetchDashboardData = async () => {
     try {
@@ -80,10 +96,10 @@ export default function AdminDashboard() {
 
   const getOrderTypeData = () => {
     const internalCount = data.orders.filter(
-      (order: any) => order.type === 'internal',
+      (order: Order) => order.type === 'internal',
     ).length;
     const outCount = data.orders.filter(
-      (order: any) => order.type === 'out',
+      (order: Order) => order.type === 'out',
     ).length;
 
     return [
@@ -93,7 +109,7 @@ export default function AdminDashboard() {
   };
 
   const getStoneStockData = () => {
-    return data.stones.map((stone: any) => ({
+    return data.stones.map((stone: Stone) => ({
       name: stone.name,
       stock: stone.quantity,
       color: stone.color,
@@ -101,7 +117,7 @@ export default function AdminDashboard() {
   };
 
   const getPaperStockData = () => {
-    return data.papers.map((paper: any) => ({
+    return data.papers.map((paper: Paper) => ({
       name: `${paper.width}&quot;`,
       pcs: paper.quantity,
     }));
@@ -190,7 +206,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {data.stones.reduce(
-                (sum: number, stone: any) => sum + stone.quantity,
+                (sum: number, stone: Stone) => sum + stone.quantity,
                 0,
               )}
             </div>
@@ -210,7 +226,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {data.papers.reduce(
-                (sum: number, paper: any) => sum + paper.quantity,
+                (sum: number, paper: Paper) => sum + paper.quantity,
                 0,
               )}
             </div>
@@ -239,7 +255,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {
-                data.orders.filter((order: any) => {
+                data.orders.filter((order: Order) => {
                   const orderDate = new Date(order.createdAt);
                   const weekAgo = new Date();
                   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -270,7 +286,7 @@ export default function AdminDashboard() {
                   cy="50%"
                   labelLine={false}
                   label={({ name, percent }) =>
-                    `${name} ${(percent * 100).toFixed(0)}%`
+                    `${name} ${((percent || 0) * 100).toFixed(0)}%`
                   }
                   outerRadius={80}
                   fill="#8884d8"
@@ -347,7 +363,7 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {data.recentOrders.map((order: any) => (
+            {data.recentOrders.map((order: Order) => (
               <div
                 key={order._id}
                 className="flex items-center justify-between p-4 border rounded-lg"

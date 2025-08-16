@@ -8,28 +8,40 @@ import Paper from '@/models/Paper';
 import Plastic from '@/models/Plastic';
 import Tape from '@/models/Tape';
 
-export async function GET(request: NextRequest) {
+async function generateReport(request: NextRequest) {
   try {
     // Check authentication and authorization
-    const user = requireRole(request, ['admin']);
+    requireRole(request, ['admin']);
 
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'all';
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    let type = 'all';
+    let startDate = null;
+    let endDate = null;
+
+    // Handle both GET and POST requests
+    if (request.method === 'GET') {
+      const { searchParams } = new URL(request.url);
+      type = searchParams.get('type') || 'all';
+      startDate = searchParams.get('startDate');
+      endDate = searchParams.get('endDate');
+    } else if (request.method === 'POST') {
+      const body = await request.json();
+      type = body.type || 'all';
+      startDate = body.dateRange?.startDate;
+      endDate = body.dateRange?.endDate;
+    }
 
     await dbConnect();
 
     // Build date filter
-    const dateFilter: any = {};
+    const dateFilter: Record<string, unknown> = {};
     if (startDate && endDate) {
       dateFilter.createdAt = {
         $gte: new Date(startDate),
-        $lte: new Date(endDate + 'T23:59:59.999Z')
+        $lte: new Date(endDate + 'T23:59:59.999Z'),
       };
     }
 
-    let reportData: any = {};
+    let reportData: Record<string, unknown> = {};
 
     switch (type) {
       case 'inventory':
@@ -37,7 +49,7 @@ export async function GET(request: NextRequest) {
           Stone.find({}),
           Paper.find({}),
           Plastic.find({}),
-          Tape.find({})
+          Tape.find({}),
         ]);
         reportData = { stones, papers, plastics, tapes };
         break;
@@ -51,29 +63,52 @@ export async function GET(request: NextRequest) {
         break;
 
       case 'users':
-        const users = await User.find({}).select('-password').sort({ createdAt: -1 });
+        const users = await User.find({})
+          .select('-password')
+          .sort({ createdAt: -1 });
         reportData = { users };
         break;
 
       case 'analytics':
-        const [analyticsOrders, analyticsStones, analyticsPapers] = await Promise.all([
-          Order.find(dateFilter).populate('designId', 'name'),
-          Stone.find({}),
-          Paper.find({})
-        ]);
-        reportData = { orders: analyticsOrders, stones: analyticsStones, papers: analyticsPapers };
+        const [analyticsOrders, analyticsStones, analyticsPapers] =
+          await Promise.all([
+            Order.find(dateFilter).populate('designId', 'name'),
+            Stone.find({}),
+            Paper.find({}),
+          ]);
+        reportData = {
+          orders: analyticsOrders,
+          stones: analyticsStones,
+          papers: analyticsPapers,
+        };
         break;
 
       default: // 'all'
-        const [allOrders, allUsers, allStones, allPapers, allPlastics, allTapes] = await Promise.all([
-          Order.find(dateFilter).populate('designId', 'name number').populate('stonesUsed.stoneId', 'name'),
+        const [
+          allOrders,
+          allUsers,
+          allStones,
+          allPapers,
+          allPlastics,
+          allTapes,
+        ] = await Promise.all([
+          Order.find(dateFilter)
+            .populate('designId', 'name number')
+            .populate('stonesUsed.stoneId', 'name'),
           User.find({}).select('-password'),
           Stone.find({}),
           Paper.find({}),
           Plastic.find({}),
-          Tape.find({})
+          Tape.find({}),
         ]);
-        reportData = { orders: allOrders, users: allUsers, stones: allStones, papers: allPapers, plastics: allPlastics, tapes: allTapes };
+        reportData = {
+          orders: allOrders,
+          users: allUsers,
+          stones: allStones,
+          papers: allPapers,
+          plastics: allPlastics,
+          tapes: allTapes,
+        };
     }
 
     return NextResponse.json({
@@ -84,7 +119,15 @@ export async function GET(request: NextRequest) {
     console.error('Error generating report:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to generate report' },
-      { status: 500 }
+      { status: 500 },
     );
   }
+}
+
+export async function GET(request: NextRequest) {
+  return generateReport(request);
+}
+
+export async function POST(request: NextRequest) {
+  return generateReport(request);
 }

@@ -38,7 +38,7 @@ export async function getCurrentUser(request: NextRequest) {
     if (!authUser) return null;
 
     await dbConnect();
-    const user = await User.findById(authUser.id).select('-password');
+    const user = await User.findById(authUser.userId).select('-password');
     return user;
   } catch (error) {
     console.error('Error getting current user:', error);

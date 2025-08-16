@@ -1,36 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import AdminDashboard from '@/components/dashboard/admin-dashboard';
 import ManagerDashboard from '@/components/dashboard/manager-dashboard';
 import EmployeeDashboard from '@/components/dashboard/employee-dashboard';
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading, isAuthenticated } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-        } else {
-          router.push('/login');
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        router.push('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [router]);
+    if (!loading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [loading, isAuthenticated, router]);
 
   if (loading) {
     return (

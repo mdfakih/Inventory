@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +9,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
+interface Plastic {
+  _id: string;
+  width: number;
+  quantity: number;
+}
+
 export default function PlasticTable() {
-  const [plastics, setPlastics] = useState<any[]>([]);
+  const [plastics, setPlastics] = useState<Plastic[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -18,11 +24,7 @@ export default function PlasticTable() {
     quantity: '',
   });
 
-  useEffect(() => {
-    fetchPlastics();
-  }, []);
-
-  const fetchPlastics = async () => {
+  const fetchPlastics = useCallback(async () => {
     try {
       const response = await fetch('/api/inventory/plastic');
       const data = await response.json();
@@ -34,7 +36,11 @@ export default function PlasticTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchPlastics();
+  }, [fetchPlastics]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +141,7 @@ export default function PlasticTable() {
           <TableBody>
             {plastics.map((plastic) => (
               <TableRow key={plastic._id}>
-                <TableCell className="font-medium">{plastic.width}"</TableCell>
+                <TableCell className="font-medium">{plastic.width}&quot;</TableCell>
                 <TableCell>{plastic.quantity}</TableCell>
                 <TableCell>
                   <Badge variant={plastic.quantity < 10 ? 'destructive' : 'default'}>

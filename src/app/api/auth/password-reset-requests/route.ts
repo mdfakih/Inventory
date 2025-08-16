@@ -3,7 +3,7 @@ import dbConnect from '@/lib/db';
 import User from '@/models/User';
 import { generateRandomPassword } from '@/lib/auth';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
 

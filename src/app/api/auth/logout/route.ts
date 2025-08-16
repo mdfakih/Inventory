@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { clearAuthCookie } from '@/lib/jwt';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const response = NextResponse.json({
       success: true,

@@ -11,7 +11,7 @@ import Tape from '@/models/Tape';
 export async function GET(request: NextRequest) {
   try {
     // Check authentication and authorization
-    const user = requireRole(request, ['admin']);
+    requireRole(request, ['admin']);
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'all';
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     await dbConnect();
 
     // Build date filter
-    const dateFilter: any = {};
+    const dateFilter: Record<string, unknown> = {};
     if (startDate && endDate) {
       dateFilter.createdAt = {
         $gte: new Date(startDate),
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    let data: any[] = [];
+    let data: Record<string, unknown>[] = [];
     let headers: string[] = [];
 
     switch (type) {
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         
         // Combine all inventory data
         data = [
-          ...stones.map((stone: any) => ({
+          ...stones.map((stone: { name: string; number: string; color: string; size: string; quantity: number; unit: string }) => ({
             type: 'Stone',
             name: stone.name,
             number: stone.number,
@@ -53,19 +53,19 @@ export async function GET(request: NextRequest) {
             quantity: stone.quantity,
             unit: stone.unit
           })),
-          ...papers.map((paper: any) => ({
+          ...papers.map((paper: { width: number; quantity: number; piecesPerRoll: number }) => ({
             type: 'Paper',
             width: `${paper.width}"`,
             quantity: paper.quantity,
             piecesPerRoll: paper.piecesPerRoll,
             totalPieces: paper.quantity * paper.piecesPerRoll
           })),
-          ...plastics.map((plastic: any) => ({
+          ...plastics.map((plastic: { width: number; quantity: number }) => ({
             type: 'Plastic',
             width: `${plastic.width}"`,
             quantity: plastic.quantity
           })),
-          ...tapes.map((tape: any) => ({
+          ...tapes.map((tape: { quantity: number }) => ({
             type: 'Tape',
             quantity: tape.quantity
           }))
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
           .populate('stonesUsed.stoneId', 'name')
           .sort({ createdAt: -1 });
         
-        data = orders.map((order: any) => ({
+        data = orders.map((order: { _id: string; type: string; customerName: string; phone: string; designId: { name: string }; finalTotalWeight: number; createdAt: Date; stonesUsed: Array<{ stoneId: { name: string }; quantity: number }> }) => ({
           orderId: order._id.toString().slice(-6),
           type: order.type,
           customerName: order.customerName,
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
           design: order.designId?.name || 'N/A',
           totalWeight: order.finalTotalWeight,
           date: new Date(order.createdAt).toLocaleDateString(),
-          stonesUsed: order.stonesUsed.map((s: any) => `${s.stoneId?.name} (${s.quantity})`).join(', ')
+          stonesUsed: order.stonesUsed.map((s: { stoneId: { name: string }; quantity: number }) => `${s.stoneId?.name} (${s.quantity})`).join(', ')
         }));
         headers = ['Order ID', 'Type', 'Customer', 'Phone', 'Design', 'Total Weight (kg)', 'Date', 'Stones Used'];
         break;
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
       case 'users':
         const users = await User.find({}).select('-password').sort({ createdAt: -1 });
         
-        data = users.map((user: any) => ({
+        data = users.map((user: { name: string; email: string; role: string; createdAt: Date }) => ({
           name: user.name,
           email: user.email,
           role: user.role,
@@ -119,16 +119,16 @@ export async function GET(request: NextRequest) {
           {
             category: 'Orders',
             total: allOrders.length,
-            internal: allOrders.filter((o: any) => o.type === 'internal').length,
-            external: allOrders.filter((o: any) => o.type === 'out').length,
-            totalWeight: allOrders.reduce((sum: number, o: any) => sum + (o.finalTotalWeight || 0), 0)
+            internal: allOrders.filter((o: { type: string }) => o.type === 'internal').length,
+            external: allOrders.filter((o: { type: string }) => o.type === 'out').length,
+            totalWeight: allOrders.reduce((sum: number, o: { finalTotalWeight: number }) => sum + (o.finalTotalWeight || 0), 0)
           },
           {
             category: 'Users',
             total: allUsers.length,
-            admin: allUsers.filter((u: any) => u.role === 'admin').length,
-            manager: allUsers.filter((u: any) => u.role === 'manager').length,
-            employee: allUsers.filter((u: any) => u.role === 'employee').length
+            admin: allUsers.filter((u: { role: string }) => u.role === 'admin').length,
+            manager: allUsers.filter((u: { role: string }) => u.role === 'manager').length,
+            employee: allUsers.filter((u: { role: string }) => u.role === 'employee').length
           },
           {
             category: 'Inventory',
@@ -173,7 +173,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function generateCSV(data: any[], headers: string[]): string {
+function generateCSV(data: Record<string, unknown>[], headers: string[]): string {
   const csvHeaders = headers.join(',');
   const csvRows = data.map(row => {
     return headers.map(header => {

@@ -1,53 +1,80 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Spinner } from '@/components/ui/spinner';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useRouter } from 'next/navigation';
-import { 
-  BarChart3, 
-  PieChart, 
-  TrendingUp, 
-  Download, 
-  Calendar,
+import { useAuth } from '@/lib/auth-context';
+import {
+  BarChart3,
   Package,
   Users,
   FileText,
-  DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  Download,
+  Calendar,
+  TrendingUp,
 } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line
-} from 'recharts';
 
-interface ReportData {
-  inventory: any[];
-  orders: any[];
-  users: any[];
-  stones: any[];
-  papers: any[];
-  plastics: any[];
-  tapes: any[];
+interface Stone {
+  _id: string;
+  name: string;
+  quantity: number;
+  color?: string;
+  size?: string;
+  unit?: string;
+}
+
+interface Paper {
+  _id: string;
+  width: number;
+  quantity: number;
+  piecesPerRoll?: number;
+}
+
+interface Plastic {
+  _id: string;
+  width: number;
+  quantity: number;
+}
+
+interface Tape {
+  _id: string;
+  quantity: number;
+}
+
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
 }
 
 interface Order {
@@ -62,6 +89,16 @@ interface Order {
   paperUsed: { sizeInInch: number; quantityInPcs: number };
 }
 
+interface ReportData {
+  inventory: unknown[];
+  orders: Order[];
+  users: User[];
+  stones: Stone[];
+  papers: Paper[];
+  plastics: Plastic[];
+  tapes: Tape[];
+}
+
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [reportData, setReportData] = useState<ReportData>({
@@ -71,111 +108,119 @@ export default function ReportsPage() {
     stones: [],
     papers: [],
     plastics: [],
-    tapes: []
+    tapes: [],
   });
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string>('');
   const [dateRange, setDateRange] = useState({
     startDate: '',
-    endDate: ''
+    endDate: '',
   });
   const [reportType, setReportType] = useState('all');
   const router = useRouter();
-  const { showSuccess, showError, showWarning } = useSnackbarHelpers();
+  const { showSuccess, showError } = useSnackbarHelpers();
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    checkAuthAndLoadData();
-  }, []);
-
-  const checkAuthAndLoadData = async () => {
+  const loadReportData = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me');
+      // Use the reports generate API to get all data at once
+      const response = await fetch('/api/reports/generate?type=all');
+
       if (response.ok) {
         const data = await response.json();
-        if (data.user.role !== 'admin') {
-          showError('Access Denied', 'Only administrators can access reports.');
-          router.push('/dashboard');
-          return;
+        if (data.success) {
+          setReportData({
+            inventory: [],
+            orders: data.data.orders || [],
+            users: data.data.users || [],
+            stones: data.data.stones || [],
+            papers: data.data.papers || [],
+            plastics: data.data.plastics || [],
+            tapes: data.data.tapes || [],
+          });
+        } else {
+          showError('Data Loading Error', 'Failed to load report data.');
         }
-        setUserRole(data.user.role);
-        await loadReportData();
       } else {
-        router.push('/login');
+        showError('Data Loading Error', 'Failed to load report data.');
       }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      showError('Authentication Error', 'Failed to verify authentication.');
-      router.push('/login');
-    }
-  };
-
-  const loadReportData = async () => {
-    try {
-      const [inventoryRes, ordersRes, usersRes, stonesRes, papersRes, plasticsRes, tapesRes] =
-        await Promise.all([
-          fetch('/api/inventory'),
-          fetch('/api/orders'),
-          fetch('/api/masters/users'),
-          fetch('/api/inventory/stones'),
-          fetch('/api/inventory/paper'),
-          fetch('/api/inventory/plastic'),
-          fetch('/api/inventory/tape'),
-        ]);
-
-      const inventoryData = await inventoryRes.json();
-      const ordersData = await ordersRes.json();
-      const usersData = await usersRes.json();
-      const stonesData = await stonesRes.json();
-      const papersData = await papersRes.json();
-      const plasticsData = await plasticsRes.json();
-      const tapesData = await tapesRes.json();
-
-      setReportData({
-        inventory: inventoryData.success ? inventoryData.data : [],
-        orders: ordersData.success ? ordersData.data : [],
-        users: usersData.success ? usersData.data : [],
-        stones: stonesData.success ? stonesData.data : [],
-        papers: papersData.success ? papersData.data : [],
-        plastics: plasticsData.success ? plasticsData.data : [],
-        tapes: tapesData.success ? tapesData.data : [],
-      });
     } catch (error) {
       console.error('Error loading report data:', error);
       showError('Data Loading Error', 'Failed to load report data.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        router.push('/login');
+        return;
+      }
+
+      if (user?.role !== 'admin') {
+        showError('Access Denied', 'Only administrators can access reports.');
+        router.push('/dashboard');
+        return;
+      }
+
+      loadReportData();
+    }
+  }, [authLoading, isAuthenticated, user, router, showError, loadReportData]);
 
   const handleGenerateReport = async () => {
     try {
-      const response = await fetch('/api/reports/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: reportType,
-          dateRange,
-        }),
+      const params = new URLSearchParams({
+        type: reportType,
+        ...(dateRange.startDate && { startDate: dateRange.startDate }),
+        ...(dateRange.endDate && { endDate: dateRange.endDate }),
+      });
+
+      const response = await fetch(`/api/reports/generate?${params}`, {
+        method: 'GET',
       });
 
       const data = await response.json();
       if (data.success) {
-        showSuccess('Report Generated', 'Report has been generated successfully.');
-        // Handle report download or display
+        showSuccess(
+          'Report Generated',
+          'Report has been generated successfully.',
+        );
+        // Update the report data with the new filtered data
+        setReportData((prev) => ({
+          ...prev,
+          orders: data.data.orders || prev.orders,
+          users: data.data.users || prev.users,
+          stones: data.data.stones || prev.stones,
+          papers: data.data.papers || prev.papers,
+          plastics: data.data.plastics || prev.plastics,
+          tapes: data.data.tapes || prev.tapes,
+        }));
       } else {
-        showError('Report Generation Failed', data.message || 'Failed to generate report.');
+        showError(
+          'Report Generation Failed',
+          data.message || 'Failed to generate report.',
+        );
       }
     } catch (error) {
       console.error('Error generating report:', error);
-      showError('Network Error', 'Failed to generate report. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to generate report. Please try again.',
+      );
     }
   };
 
   const handleExportData = async (type: string) => {
     try {
-      const response = await fetch(`/api/reports/export?type=${type}`, {
+      const params = new URLSearchParams({
+        type,
+        format: 'csv',
+        ...(dateRange.startDate && { startDate: dateRange.startDate }),
+        ...(dateRange.endDate && { endDate: dateRange.endDate }),
+      });
+
+      const response = await fetch(`/api/reports/export?${params}`, {
         method: 'GET',
       });
 
@@ -184,12 +229,17 @@ export default function ReportsPage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${type}_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+        a.download = `${type}_report_${
+          new Date().toISOString().split('T')[0]
+        }.csv`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        showSuccess('Export Successful', `${type} data has been exported successfully.`);
+        showSuccess(
+          'Export Successful',
+          `${type} data has been exported successfully.`,
+        );
       } else {
         showError('Export Failed', 'Failed to export data.');
       }
@@ -201,16 +251,23 @@ export default function ReportsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Spinner size="lg" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Spinner
+            size="lg"
+            className="mx-auto mb-4"
+          />
+          <p className="text-muted-foreground">Loading reports...</p>
+        </div>
       </div>
     );
   }
 
-  if (userRole !== 'admin') {
+  if (user?.role !== 'admin') {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-red-600 mb-2">
             Access Denied
           </h2>
@@ -230,42 +287,66 @@ export default function ReportsPage() {
   const totalPlastics = reportData.plastics.length;
   const totalTapes = reportData.tapes.length;
 
-  const lowStockItems = reportData.stones.filter(stone => stone.quantity < 100).length;
-  const recentOrders = reportData.orders.filter(order => {
+  const lowStockItems = reportData.stones.filter(
+    (stone) => stone.quantity < 100,
+  ).length;
+  const recentOrders = reportData.orders.filter((order) => {
     const orderDate = new Date(order.createdAt);
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     return orderDate >= weekAgo;
   }).length;
 
+  const totalInventoryItems =
+    totalStones + totalPapers + totalPlastics + totalTapes;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Reports & Analytics</h1>
-        <p className="text-gray-600">Generate reports and view system analytics</p>
+    <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Reports & Analytics
+          </h1>
+          <p className="text-muted-foreground">
+            Generate reports and view system analytics
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            {new Date().toLocaleDateString()}
+          </span>
+        </div>
       </div>
 
       {/* Report Generation Controls */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Generate Reports</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Generate Reports
+          </CardTitle>
           <CardDescription>
             Generate and export reports based on your criteria
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="reportType">Report Type</Label>
-              <Select value={reportType} onValueChange={setReportType}>
+              <Select
+                value={reportType}
+                onValueChange={setReportType}
+              >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select report type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Data</SelectItem>
                   <SelectItem value="inventory">Inventory</SelectItem>
                   <SelectItem value="orders">Orders</SelectItem>
                   <SelectItem value="users">Users</SelectItem>
+                  <SelectItem value="analytics">Analytics</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -275,7 +356,9 @@ export default function ReportsPage() {
                 id="startDate"
                 type="date"
                 value={dateRange.startDate}
-                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                onChange={(e) =>
+                  setDateRange({ ...dateRange, startDate: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2">
@@ -284,12 +367,17 @@ export default function ReportsPage() {
                 id="endDate"
                 type="date"
                 value={dateRange.endDate}
-                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                onChange={(e) =>
+                  setDateRange({ ...dateRange, endDate: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2">
               <Label>&nbsp;</Label>
-              <Button onClick={handleGenerateReport} className="w-full">
+              <Button
+                onClick={handleGenerateReport}
+                className="w-full"
+              >
                 <FileText className="h-4 w-4 mr-2" />
                 Generate Report
               </Button>
@@ -299,53 +387,58 @@ export default function ReportsPage() {
       </Card>
 
       {/* Quick Export Buttons */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Quick Export</CardTitle>
-          <CardDescription>
-            Export data in different formats
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Quick Export
+          </CardTitle>
+          <CardDescription>Export data in different formats</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Button
               variant="outline"
               onClick={() => handleExportData('inventory')}
-              className="flex flex-col items-center space-y-2 p-4"
+              className="flex flex-col items-center space-y-2 p-6 h-auto"
             >
-              <Package className="h-6 w-6" />
-              <span>Inventory</span>
+              <Package className="h-8 w-8" />
+              <span className="font-medium">Inventory</span>
             </Button>
             <Button
               variant="outline"
               onClick={() => handleExportData('orders')}
-              className="flex flex-col items-center space-y-2 p-4"
+              className="flex flex-col items-center space-y-2 p-6 h-auto"
             >
-              <FileText className="h-6 w-6" />
-              <span>Orders</span>
+              <FileText className="h-8 w-8" />
+              <span className="font-medium">Orders</span>
             </Button>
             <Button
               variant="outline"
               onClick={() => handleExportData('users')}
-              className="flex flex-col items-center space-y-2 p-4"
+              className="flex flex-col items-center space-y-2 p-6 h-auto"
             >
-              <Users className="h-6 w-6" />
-              <span>Users</span>
+              <Users className="h-8 w-8" />
+              <span className="font-medium">Users</span>
             </Button>
             <Button
               variant="outline"
               onClick={() => handleExportData('analytics')}
-              className="flex flex-col items-center space-y-2 p-4"
+              className="flex flex-col items-center space-y-2 p-6 h-auto"
             >
-              <BarChart3 className="h-6 w-6" />
-              <span>Analytics</span>
+              <BarChart3 className="h-8 w-8" />
+              <span className="font-medium">Analytics</span>
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Analytics Dashboard */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
@@ -353,50 +446,60 @@ export default function ReportsPage() {
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
+        <TabsContent
+          value="overview"
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Total Orders
+                </CardTitle>
                 <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalOrders}</div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
                   {recentOrders} this week
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Total Users
+                </CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalUsers}</div>
-                <p className="text-xs text-muted-foreground">
-                  Active users
-                </p>
+                <p className="text-xs text-muted-foreground">Active users</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Inventory Items</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Inventory Items
+                </CardTitle>
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalStones + totalPapers + totalPlastics + totalTapes}</div>
+                <div className="text-2xl font-bold">{totalInventoryItems}</div>
                 <p className="text-xs text-muted-foreground">
                   {lowStockItems} low stock
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">System Health</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  System Health
+                </CardTitle>
                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -408,93 +511,275 @@ export default function ReportsPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {lowStockItems > 0 ? 'Items need attention' : 'All systems operational'}
+                  {lowStockItems > 0
+                    ? 'Items need attention'
+                    : 'All systems operational'}
                 </p>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        <TabsContent value="inventory" className="space-y-4">
-          <Card>
+          {/* Recent Activity */}
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Inventory Summary</CardTitle>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>
+                Latest system activities and updates
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalStones}</div>
-                  <p className="text-sm text-muted-foreground">Stones</p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm">System is running normally</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Just now
+                  </span>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalPapers}</div>
-                  <p className="text-sm text-muted-foreground">Papers</p>
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm">
+                      {recentOrders} new orders this week
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    This week
+                  </span>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalPlastics}</div>
-                  <p className="text-sm text-muted-foreground">Plastics</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalTapes}</div>
-                  <p className="text-sm text-muted-foreground">Tapes</p>
-                </div>
+                {lowStockItems > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                      <span className="text-sm">
+                        {lowStockItems} items need restocking
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Attention needed
+                    </span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="orders" className="space-y-4">
-          <Card>
+        <TabsContent
+          value="inventory"
+          className="space-y-6"
+        >
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
+              <CardTitle>Inventory Summary</CardTitle>
+              <CardDescription>
+                Overview of all inventory categories
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Design</TableHead>
-                    <TableHead>Weight</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reportData.orders.slice(0, 10).map((order) => (
-                    <TableRow key={order._id}>
-                      <TableCell className="font-medium">{order.customerName}</TableCell>
-                      <TableCell>
-                        <Badge variant={order.type === 'internal' ? 'default' : 'secondary'}>
-                          {order.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{order.designId?.name || 'N/A'}</TableCell>
-                      <TableCell>{order.finalTotalWeight}g</TableCell>
-                      <TableCell>
-                        {new Date(order.createdAt).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <div className="text-3xl font-bold text-blue-600">
+                    {totalStones}
+                  </div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Stones
+                  </p>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-3xl font-bold text-green-600">
+                    {totalPapers}
+                  </div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Papers
+                  </p>
+                </div>
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  <div className="text-3xl font-bold text-purple-600">
+                    {totalPlastics}
+                  </div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Plastics
+                  </p>
+                </div>
+                <div className="text-center p-4 bg-orange-50 rounded-lg">
+                  <div className="text-3xl font-bold text-orange-600">
+                    {totalTapes}
+                  </div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Tapes
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Low Stock Alert */}
+          {lowStockItems > 0 && (
+            <Card className="shadow-sm border-yellow-200 bg-yellow-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-yellow-800">
+                  <AlertTriangle className="h-5 w-5" />
+                  Low Stock Alert
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-yellow-700">
+                  {lowStockItems} items have low stock levels and may need
+                  restocking.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent
+          value="orders"
+          className="space-y-6"
+        >
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>Recent Orders</CardTitle>
+              <CardDescription>Latest orders in the system</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {reportData.orders.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Design</TableHead>
+                        <TableHead>Weight</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.orders.slice(0, 10).map((order) => (
+                        <TableRow key={order._id}>
+                          <TableCell className="font-medium">
+                            {order.customerName}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                order.type === 'internal'
+                                  ? 'default'
+                                  : 'secondary'
+                              }
+                            >
+                              {order.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{order.designId?.name || 'N/A'}</TableCell>
+                          <TableCell>{order.finalTotalWeight}g</TableCell>
+                          <TableCell>
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No orders found</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-4">
-          <Card>
+        <TabsContent
+          value="analytics"
+          className="space-y-6"
+        >
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Order Trends</CardTitle>
+              <CardDescription>
+                Visualization of order patterns and trends
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-64 flex items-center justify-center text-muted-foreground">
                 <div className="text-center">
                   <BarChart3 className="h-12 w-12 mx-auto mb-4" />
                   <p>Chart visualization will be implemented here</p>
+                  <p className="text-sm">Order analytics and trend analysis</p>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Analytics Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Order Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Internal Orders</span>
+                    <span className="font-medium">
+                      {
+                        reportData.orders.filter((o) => o.type === 'internal')
+                          .length
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">External Orders</span>
+                    <span className="font-medium">
+                      {reportData.orders.filter((o) => o.type === 'out').length}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">User Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Admins</span>
+                    <span className="font-medium">
+                      {
+                        reportData.users.filter((u) => u.role === 'admin')
+                          .length
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Managers</span>
+                    <span className="font-medium">
+                      {
+                        reportData.users.filter((u) => u.role === 'manager')
+                          .length
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Employees</span>
+                    <span className="font-medium">
+                      {
+                        reportData.users.filter((u) => u.role === 'employee')
+                          .length
+                      }
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

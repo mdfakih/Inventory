@@ -3,7 +3,7 @@ import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
     const designs = await Design.find()

@@ -4,6 +4,7 @@ import './globals.css';
 import Navigation from '@/components/navigation';
 import { ThemeProvider } from '@/components/theme-provider';
 import { SnackbarProvider } from '@/components/ui/snackbar';
+import { AuthProvider } from '@/lib/auth-context';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -30,10 +31,12 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SnackbarProvider>
-            <Navigation />
-            <main className="container mx-auto px-4 py-4 sm:py-8">
-              {children}
-            </main>
+            <AuthProvider>
+              <Navigation />
+              <main className="container mx-auto px-4 py-4 sm:py-8">
+                {children}
+              </main>
+            </AuthProvider>
           </SnackbarProvider>
         </ThemeProvider>
       </body>

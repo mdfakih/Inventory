@@ -3,10 +3,9 @@ import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import Stone from '@/models/Stone';
 import Paper from '@/models/Paper';
-import Design from '@/models/Design';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
     const orders = await Order.find()
@@ -69,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate weights
     const paperWeight = paper.weightPerPiece * paperUsed.quantityInPcs;
-    const stoneWeight = stonesUsed.reduce((total: number, stone: any) => {
+    const stoneWeight = stonesUsed.reduce((total: number, stone: { quantity: number }) => {
       return total + (stone.quantity || 0);
     }, 0);
     const calculatedWeight = paperWeight + stoneWeight;

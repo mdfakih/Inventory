@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,8 +17,7 @@ import {
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const { showSuccess, showError, showInfo } = useSnackbarHelpers();
+  const { showSuccess, showError } = useSnackbarHelpers();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +43,7 @@ export default function ForgotPasswordPage() {
       } else {
         showError('Request Failed', data.message || 'Failed to submit request');
       }
-    } catch (error) {
+    } catch {
       showError('Connection Error', 'Unable to connect to the server. Please try again.');
     } finally {
       setLoading(false);

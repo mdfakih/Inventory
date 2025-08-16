@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,8 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 
+interface Paper {
+  _id: string;
+  width: number;
+  quantity: number;
+  piecesPerRoll: number;
+  weightPerPiece: number;
+}
+
 export default function PaperTable() {
-  const [papers, setPapers] = useState<any[]>([]);
+  const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,11 +30,7 @@ export default function PaperTable() {
   });
   const { showSuccess, showError } = useSnackbarHelpers();
 
-  useEffect(() => {
-    fetchPapers();
-  }, []);
-
-  const fetchPapers = async () => {
+  const fetchPapers = useCallback(async () => {
     try {
       const response = await fetch('/api/inventory/paper');
       const data = await response.json();
@@ -39,7 +43,11 @@ export default function PaperTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    fetchPapers();
+  }, [fetchPapers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,7 +180,7 @@ export default function PaperTable() {
           <TableBody>
             {papers.map((paper) => (
               <TableRow key={paper._id}>
-                <TableCell className="font-medium">{paper.width}"</TableCell>
+                <TableCell className="font-medium">{paper.width}&quot;</TableCell>
                 <TableCell>{paper.quantity}</TableCell>
                 <TableCell>{paper.piecesPerRoll}</TableCell>
                 <TableCell>{paper.weightPerPiece}g</TableCell>

@@ -3,16 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Package, 
-  FileText, 
-  Layers, 
+import {
+  Package,
+  FileText,
+  Layers,
   Scissors,
   ChevronRight,
-  Plus
 } from 'lucide-react';
 
 const inventoryItems = [
@@ -21,29 +18,29 @@ const inventoryItems = [
     label: 'Stones',
     href: '/inventory/stones',
     icon: Package,
-    description: 'Manage stone inventory'
+    description: 'Manage stone inventory',
   },
   {
     id: 'paper',
     label: 'Paper',
     href: '/inventory/paper',
     icon: FileText,
-    description: 'Manage paper rolls'
+    description: 'Manage paper rolls',
   },
   {
     id: 'plastic',
     label: 'Plastic',
     href: '/inventory/plastic',
     icon: Layers,
-    description: 'Manage packaging plastic'
+    description: 'Manage packaging plastic',
   },
   {
     id: 'tape',
     label: 'Tape',
     href: '/inventory/tape',
     icon: Scissors,
-    description: 'Manage cello tape'
-  }
+    description: 'Manage cello tape',
+  },
 ];
 
 export default function InventoryLayout({
@@ -57,7 +54,11 @@ export default function InventoryLayout({
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <div className={`${isSidebarOpen ? 'w-64' : 'w-16'} bg-background border-r transition-all duration-300 flex flex-col`}>
+      <div
+        className={`${
+          isSidebarOpen ? 'w-64' : 'w-16'
+        } bg-background border-r transition-all duration-300 flex flex-col`}
+      >
         <div className="p-4 border-b">
           <div className="flex items-center justify-between">
             {isSidebarOpen && (
@@ -69,7 +70,11 @@ export default function InventoryLayout({
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="ml-auto"
             >
-              <ChevronRight className={`h-4 w-4 transition-transform ${isSidebarOpen ? 'rotate-180' : ''}`} />
+              <ChevronRight
+                className={`h-4 w-4 transition-transform ${
+                  isSidebarOpen ? 'rotate-180' : ''
+                }`}
+              />
             </Button>
           </div>
         </div>
@@ -79,9 +84,12 @@ export default function InventoryLayout({
             {inventoryItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
-              
+
               return (
-                <Link key={item.id} href={item.href}>
+                <Link
+                  key={item.id}
+                  href={item.href}
+                >
                   <div
                     className={`flex items-center p-3 rounded-lg transition-colors cursor-pointer group ${
                       isActive
@@ -112,9 +120,7 @@ export default function InventoryLayout({
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        <div className="p-6">
-          {children}
-        </div>
+        <div className="p-6">{children}</div>
       </div>
     </div>
   );

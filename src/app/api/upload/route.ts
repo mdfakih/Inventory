@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/auth';
 export async function POST(request: NextRequest) {
   try {
     // Check authentication and authorization
-    const user = requireRole(request, ['admin', 'manager']);
+    requireRole(request, ['admin', 'manager']);
 
     const formData = await request.formData();
     const file = formData.get('file') as File;

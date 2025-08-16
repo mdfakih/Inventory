@@ -3,13 +3,33 @@ import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
 import { getCurrentUser } from '@/lib/auth';
 
+interface DesignUpdateData {
+  name: string;
+  number: string;
+  imageUrl: string;
+  defaultStones: Array<{ stoneId: string; quantity: number }>;
+  paperConfigurations: Array<{
+    paperSize: number;
+    defaultStones: Array<{ stoneId: string; quantity: number }>;
+  }>;
+  updatedBy: string;
+  updateHistory: Array<{
+    field: string;
+    oldValue: unknown;
+    newValue: unknown;
+    updatedBy: string;
+    updatedAt: Date;
+  }>;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    const design = await Design.findById(params.id)
+    const { id } = await params;
+    const design = await Design.findById(id)
       .populate('defaultStones.stoneId')
       .populate('paperConfigurations.defaultStones.stoneId')
       .populate('createdBy', 'name email')
@@ -18,7 +38,7 @@ export async function GET(
     if (!design) {
       return NextResponse.json(
         { success: false, message: 'Design not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -30,34 +50,35 @@ export async function GET(
     console.error('Get design error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    
+
     const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     const body = await request.json();
     const { name, number, imageUrl, defaultStones, paperConfigurations } = body;
+    const { id } = await params;
 
-    const design = await Design.findById(params.id);
+    const design = await Design.findById(id);
     if (!design) {
       return NextResponse.json(
         { success: false, message: 'Design not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -96,7 +117,9 @@ export async function PUT(
       });
     }
 
-    if (JSON.stringify(defaultStones) !== JSON.stringify(oldValues.defaultStones)) {
+    if (
+      JSON.stringify(defaultStones) !== JSON.stringify(oldValues.defaultStones)
+    ) {
       updateHistory.push({
         field: 'defaultStones',
         oldValue: oldValues.defaultStones,
@@ -106,7 +129,10 @@ export async function PUT(
       });
     }
 
-    if (JSON.stringify(paperConfigurations) !== JSON.stringify(oldValues.paperConfigurations)) {
+    if (
+      JSON.stringify(paperConfigurations) !==
+      JSON.stringify(oldValues.paperConfigurations)
+    ) {
       updateHistory.push({
         field: 'paperConfigurations',
         oldValue: oldValues.paperConfigurations,
@@ -117,26 +143,23 @@ export async function PUT(
     }
 
     // Update design
-    const updateData = {
+    const updateData: DesignUpdateData = {
       name,
       number,
       imageUrl,
       defaultStones: defaultStones || [],
       paperConfigurations: paperConfigurations || [],
       updatedBy: user.id,
+      updateHistory: [...(design.updateHistory || []), ...updateHistory],
     };
 
-    // Add to existing history
-    updateData.updateHistory = [...(design.updateHistory || []), ...updateHistory];
-
-    const updatedDesign = await Design.findByIdAndUpdate(
-      params.id,
-      updateData,
-      { new: true }
-    ).populate('defaultStones.stoneId')
-     .populate('paperConfigurations.defaultStones.stoneId')
-     .populate('createdBy', 'name email')
-     .populate('updatedBy', 'name email');
+    const updatedDesign = await Design.findByIdAndUpdate(id, updateData, {
+      new: true,
+    })
+      .populate('defaultStones.stoneId')
+      .populate('paperConfigurations.defaultStones.stoneId')
+      .populate('createdBy', 'name email')
+      .populate('updatedBy', 'name email');
 
     return NextResponse.json({
       success: true,
@@ -147,23 +170,23 @@ export async function PUT(
     console.error('Update design error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    
+
     const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -171,15 +194,16 @@ export async function DELETE(
     if (user.role !== 'admin') {
       return NextResponse.json(
         { success: false, message: 'Only admin can delete designs' },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
-    const design = await Design.findByIdAndDelete(params.id);
+    const { id } = await params;
+    const design = await Design.findByIdAndDelete(id);
     if (!design) {
       return NextResponse.json(
         { success: false, message: 'Design not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -191,7 +215,7 @@ export async function DELETE(
     console.error('Delete design error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

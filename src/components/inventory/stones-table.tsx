@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,13 +27,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 
@@ -63,11 +56,7 @@ export default function StonesTable() {
   });
   const { showSuccess, showError } = useSnackbarHelpers();
 
-  useEffect(() => {
-    fetchStones();
-  }, []);
-
-  const fetchStones = async () => {
+  const fetchStones = useCallback(async () => {
     try {
       const response = await fetch('/api/inventory/stones');
       const data = await response.json();
@@ -82,7 +71,11 @@ export default function StonesTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    fetchStones();
+  }, [fetchStones]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

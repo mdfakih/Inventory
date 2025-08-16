@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -116,12 +116,7 @@ export default function DesignsPage() {
   });
   const { showSuccess, showError } = useSnackbarHelpers();
 
-  useEffect(() => {
-    fetchData();
-    fetchUser();
-  }, []);
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me');
       if (response.ok) {
@@ -131,9 +126,9 @@ export default function DesignsPage() {
     } catch (error) {
       console.error('Error fetching user:', error);
     }
-  };
+  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [designsRes, stonesRes] = await Promise.all([
         fetch('/api/designs'),
@@ -151,7 +146,12 @@ export default function DesignsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    fetchData();
+    fetchUser();
+  }, [fetchData, fetchUser]);
 
   const handleImageUpload = async (file: File) => {
     setUploading(true);
@@ -166,7 +166,10 @@ export default function DesignsPage() {
 
       const data = await response.json();
       if (data.success) {
-        showSuccess('Image Uploaded', 'Design image has been uploaded successfully.');
+        showSuccess(
+          'Image Uploaded',
+          'Design image has been uploaded successfully.',
+        );
         setFormData((prev) => ({ ...prev, imageUrl: data.data.url }));
       } else {
         showError('Upload Failed', data.message || 'Failed to upload image.');
@@ -192,7 +195,10 @@ export default function DesignsPage() {
 
       const data = await response.json();
       if (data.success) {
-        showSuccess('Design Created', 'New design has been created successfully.');
+        showSuccess(
+          'Design Created',
+          'New design has been created successfully.',
+        );
         setIsCreateDialogOpen(false);
         setFormData({
           name: '',
@@ -203,7 +209,10 @@ export default function DesignsPage() {
         });
         fetchData();
       } else {
-        showError('Creation Failed', data.message || 'Failed to create design.');
+        showError(
+          'Creation Failed',
+          data.message || 'Failed to create design.',
+        );
       }
     } catch (error) {
       console.error('Error creating design:', error);
@@ -241,7 +250,7 @@ export default function DesignsPage() {
 
   const handleDelete = async (designId: string) => {
     if (!confirm('Are you sure you want to delete this design?')) return;
-    
+
     try {
       const response = await fetch(`/api/designs/${designId}`, {
         method: 'DELETE',
@@ -252,7 +261,10 @@ export default function DesignsPage() {
         showSuccess('Design Deleted', 'Design has been deleted successfully.');
         fetchData();
       } else {
-        showError('Deletion Failed', data.message || 'Failed to delete design.');
+        showError(
+          'Deletion Failed',
+          data.message || 'Failed to delete design.',
+        );
       }
     } catch (error) {
       console.error('Error deleting design:', error);
@@ -266,16 +278,16 @@ export default function DesignsPage() {
       name: design.name,
       number: design.number,
       imageUrl: design.imageUrl,
-      defaultStones: design.defaultStones.map(stone => ({
+      defaultStones: design.defaultStones.map((stone) => ({
         stoneId: stone.stoneId._id,
-        quantity: stone.quantity
+        quantity: stone.quantity,
       })),
-      paperConfigurations: design.paperConfigurations.map(config => ({
+      paperConfigurations: design.paperConfigurations.map((config) => ({
         paperSize: config.paperSize,
-        defaultStones: config.defaultStones.map(stone => ({
+        defaultStones: config.defaultStones.map((stone) => ({
           stoneId: stone.stoneId._id,
-          quantity: stone.quantity
-        }))
+          quantity: stone.quantity,
+        })),
       })),
     });
     setIsEditDialogOpen(true);
@@ -287,25 +299,29 @@ export default function DesignsPage() {
   };
 
   const addDefaultStone = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      defaultStones: [...prev.defaultStones, { stoneId: '', quantity: 0 }]
+      defaultStones: [...prev.defaultStones, { stoneId: '', quantity: 0 }],
     }));
   };
 
   const removeDefaultStone = (index: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      defaultStones: prev.defaultStones.filter((_, i) => i !== index)
+      defaultStones: prev.defaultStones.filter((_, i) => i !== index),
     }));
   };
 
-  const updateDefaultStone = (index: number, field: string, value: string | number) => {
-    setFormData(prev => ({
+  const updateDefaultStone = (
+    index: number,
+    field: string,
+    value: string | number,
+  ) => {
+    setFormData((prev) => ({
       ...prev,
-      defaultStones: prev.defaultStones.map((stone, i) => 
-        i === index ? { ...stone, [field]: value } : stone
-      )
+      defaultStones: prev.defaultStones.map((stone, i) =>
+        i === index ? { ...stone, [field]: value } : stone,
+      ),
     }));
   };
 
@@ -321,7 +337,9 @@ export default function DesignsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Designs Management</h1>
-        <p className="text-gray-600">Manage design templates and configurations</p>
+        <p className="text-gray-600">
+          Manage design templates and configurations
+        </p>
       </div>
 
       <div className="flex justify-between items-center">
@@ -331,7 +349,10 @@ export default function DesignsPage() {
             Manage design templates and their default stone configurations
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog
+          open={isCreateDialogOpen}
+          onOpenChange={setIsCreateDialogOpen}
+        >
           <DialogTrigger asChild>
             <Button>Add Design</Button>
           </DialogTrigger>
@@ -339,14 +360,19 @@ export default function DesignsPage() {
             <DialogHeader>
               <DialogTitle>Add New Design</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleCreateSubmit} className="space-y-4">
+            <form
+              onSubmit={handleCreateSubmit}
+              className="space-y-4"
+            >
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Design Name</Label>
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -355,27 +381,33 @@ export default function DesignsPage() {
                   <Input
                     id="number"
                     value={formData.number}
-                    onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, number: e.target.value })
+                    }
                     required
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Design Image</Label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   {formData.imageUrl ? (
                     <div className="space-y-2">
-                      <img
+                      <Image
                         src={formData.imageUrl}
                         alt="Design preview"
+                        width={128}
+                        height={128}
                         className="mx-auto max-h-32 object-contain"
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                        onClick={() =>
+                          setFormData({ ...formData, imageUrl: '' })
+                        }
                       >
                         <X className="h-4 w-4 mr-2" />
                         Remove Image
@@ -393,7 +425,10 @@ export default function DesignsPage() {
                         >
                           {uploading ? (
                             <>
-                              <Spinner size="sm" className="mr-2" />
+                              <Spinner
+                                size="sm"
+                                className="mr-2"
+                              />
                               Uploading...
                             </>
                           ) : (
@@ -427,25 +462,38 @@ export default function DesignsPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <Label>Default Stones</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addDefaultStone}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addDefaultStone}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Stone
                   </Button>
                 </div>
                 {formData.defaultStones.map((stone, index) => (
-                  <div key={index} className="grid grid-cols-3 gap-4 items-end">
+                  <div
+                    key={index}
+                    className="grid grid-cols-3 gap-4 items-end"
+                  >
                     <div>
                       <Label>Stone</Label>
                       <Select
                         value={stone.stoneId}
-                        onValueChange={(value) => updateDefaultStone(index, 'stoneId', value)}
+                        onValueChange={(value) =>
+                          updateDefaultStone(index, 'stoneId', value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select stone" />
                         </SelectTrigger>
                         <SelectContent>
                           {stones.map((s) => (
-                            <SelectItem key={s._id} value={s._id}>
+                            <SelectItem
+                              key={s._id}
+                              value={s._id}
+                            >
                               {s.name}
                             </SelectItem>
                           ))}
@@ -457,7 +505,13 @@ export default function DesignsPage() {
                       <Input
                         type="number"
                         value={stone.quantity}
-                        onChange={(e) => updateDefaultStone(index, 'quantity', parseInt(e.target.value))}
+                        onChange={(e) =>
+                          updateDefaultStone(
+                            index,
+                            'quantity',
+                            parseInt(e.target.value),
+                          )
+                        }
                         min="0"
                       />
                     </div>
@@ -474,7 +528,11 @@ export default function DesignsPage() {
               </div>
 
               <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="submit">Create Design</Button>
@@ -503,9 +561,11 @@ export default function DesignsPage() {
                 <TableRow key={design._id}>
                   <TableCell>
                     {design.imageUrl ? (
-                      <img
+                      <Image
                         src={design.imageUrl}
                         alt={design.name}
+                        width={48}
+                        height={48}
                         className="h-12 w-12 object-cover rounded"
                       />
                     ) : (
@@ -520,7 +580,11 @@ export default function DesignsPage() {
                     {design.defaultStones.length > 0 ? (
                       <div className="space-y-1">
                         {design.defaultStones.map((stone, index) => (
-                          <Badge key={index} variant="outline" className="mr-1">
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="mr-1"
+                          >
                             {stone.stoneId.name}: {stone.quantity}g
                           </Badge>
                         ))}
@@ -533,8 +597,13 @@ export default function DesignsPage() {
                     {design.paperConfigurations.length > 0 ? (
                       <div className="space-y-1">
                         {design.paperConfigurations.map((config, index) => (
-                          <Badge key={index} variant="secondary" className="mr-1">
-                            {config.paperSize}&quot;: {config.defaultStones.length} stones
+                          <Badge
+                            key={index}
+                            variant="secondary"
+                            className="mr-1"
+                          >
+                            {config.paperSize}&quot;:{' '}
+                            {config.defaultStones.length} stones
                           </Badge>
                         ))}
                       </div>
@@ -580,19 +649,27 @@ export default function DesignsPage() {
       </Card>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      >
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Design</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
+          <form
+            onSubmit={handleEditSubmit}
+            className="space-y-4"
+          >
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-name">Design Name</Label>
                 <Input
                   id="edit-name"
                   value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, name: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -601,27 +678,33 @@ export default function DesignsPage() {
                 <Input
                   id="edit-number"
                   value={editFormData.number}
-                  onChange={(e) => setEditFormData({ ...editFormData, number: e.target.value })}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, number: e.target.value })
+                  }
                   required
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label>Design Image</Label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                 {editFormData.imageUrl ? (
                   <div className="space-y-2">
-                    <img
+                    <Image
                       src={editFormData.imageUrl}
                       alt="Design preview"
+                      width={128}
+                      height={128}
                       className="mx-auto max-h-32 object-contain"
                     />
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setEditFormData({ ...editFormData, imageUrl: '' })}
+                      onClick={() =>
+                        setEditFormData({ ...editFormData, imageUrl: '' })
+                      }
                     >
                       <X className="h-4 w-4 mr-2" />
                       Remove Image
@@ -639,7 +722,10 @@ export default function DesignsPage() {
                       >
                         {uploading ? (
                           <>
-                            <Spinner size="sm" className="mr-2" />
+                            <Spinner
+                              size="sm"
+                              className="mr-2"
+                            />
                             Uploading...
                           </>
                         ) : (
@@ -661,38 +747,51 @@ export default function DesignsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <Label>Default Stones</Label>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setEditFormData(prev => ({
-                    ...prev,
-                    defaultStones: [...prev.defaultStones, { stoneId: '', quantity: 0 }]
-                  }))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setEditFormData((prev) => ({
+                      ...prev,
+                      defaultStones: [
+                        ...prev.defaultStones,
+                        { stoneId: '', quantity: 0 },
+                      ],
+                    }))
+                  }
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Stone
                 </Button>
               </div>
               {editFormData.defaultStones.map((stone, index) => (
-                <div key={index} className="grid grid-cols-3 gap-4 items-end">
+                <div
+                  key={index}
+                  className="grid grid-cols-3 gap-4 items-end"
+                >
                   <div>
                     <Label>Stone</Label>
                     <Select
                       value={stone.stoneId}
-                      onValueChange={(value) => setEditFormData(prev => ({
-                        ...prev,
-                        defaultStones: prev.defaultStones.map((s, i) => 
-                          i === index ? { ...s, stoneId: value } : s
-                        )
-                      }))}
+                      onValueChange={(value) =>
+                        setEditFormData((prev) => ({
+                          ...prev,
+                          defaultStones: prev.defaultStones.map((s, i) =>
+                            i === index ? { ...s, stoneId: value } : s,
+                          ),
+                        }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select stone" />
                       </SelectTrigger>
                       <SelectContent>
                         {stones.map((s) => (
-                          <SelectItem key={s._id} value={s._id}>
+                          <SelectItem
+                            key={s._id}
+                            value={s._id}
+                          >
                             {s.name}
                           </SelectItem>
                         ))}
@@ -704,12 +803,16 @@ export default function DesignsPage() {
                     <Input
                       type="number"
                       value={stone.quantity}
-                      onChange={(e) => setEditFormData(prev => ({
-                        ...prev,
-                        defaultStones: prev.defaultStones.map((s, i) => 
-                          i === index ? { ...s, quantity: parseInt(e.target.value) } : s
-                        )
-                      }))}
+                      onChange={(e) =>
+                        setEditFormData((prev) => ({
+                          ...prev,
+                          defaultStones: prev.defaultStones.map((s, i) =>
+                            i === index
+                              ? { ...s, quantity: parseInt(e.target.value) }
+                              : s,
+                          ),
+                        }))
+                      }
                       min="0"
                     />
                   </div>
@@ -717,10 +820,14 @@ export default function DesignsPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setEditFormData(prev => ({
-                      ...prev,
-                      defaultStones: prev.defaultStones.filter((_, i) => i !== index)
-                    }))}
+                    onClick={() =>
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        defaultStones: prev.defaultStones.filter(
+                          (_, i) => i !== index,
+                        ),
+                      }))
+                    }
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -729,7 +836,11 @@ export default function DesignsPage() {
             </div>
 
             <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit">Update Design</Button>
@@ -739,7 +850,10 @@ export default function DesignsPage() {
       </Dialog>
 
       {/* View Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+      <Dialog
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Design Details</DialogTitle>
@@ -759,9 +873,11 @@ export default function DesignsPage() {
               <div>
                 <Label className="font-semibold">Design Image</Label>
                 {selectedDesign.imageUrl ? (
-                  <img
+                  <Image
                     src={selectedDesign.imageUrl}
                     alt={selectedDesign.name}
+                    width={192}
+                    height={192}
                     className="mt-2 max-h-48 object-contain rounded"
                   />
                 ) : (
@@ -773,7 +889,10 @@ export default function DesignsPage() {
                 {selectedDesign.defaultStones.length > 0 ? (
                   <div className="space-y-2 mt-2">
                     {selectedDesign.defaultStones.map((stone, index) => (
-                      <div key={index} className="flex justify-between">
+                      <div
+                        key={index}
+                        className="flex justify-between"
+                      >
                         <span>{stone.stoneId.name}</span>
                         <span>{stone.quantity}g</span>
                       </div>
@@ -788,11 +907,19 @@ export default function DesignsPage() {
                 {selectedDesign.paperConfigurations.length > 0 ? (
                   <div className="space-y-2 mt-2">
                     {selectedDesign.paperConfigurations.map((config, index) => (
-                      <div key={index} className="border rounded p-3">
-                        <div className="font-medium mb-2">{config.paperSize}&quot; Paper</div>
+                      <div
+                        key={index}
+                        className="border rounded p-3"
+                      >
+                        <div className="font-medium mb-2">
+                          {config.paperSize}&quot; Paper
+                        </div>
                         <div className="space-y-1">
                           {config.defaultStones.map((stone, stoneIndex) => (
-                            <div key={stoneIndex} className="flex justify-between text-sm">
+                            <div
+                              key={stoneIndex}
+                              className="flex justify-between text-sm"
+                            >
                               <span>{stone.stoneId.name}</span>
                               <span>{stone.quantity}g</span>
                             </div>

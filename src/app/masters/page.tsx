@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -39,7 +39,17 @@ import {
 import { Spinner, SpinnerPage } from '@/components/ui/spinner';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useRouter } from 'next/navigation';
-import { Plus, Users, Package, Palette, Settings, Eye, EyeOff, Lock, Unlock, Key } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
+import {
+  Plus,
+  Users,
+  Package,
+  Palette,
+  Settings,
+  Lock,
+  Unlock,
+  Key,
+} from 'lucide-react';
 
 interface User {
   _id: string;
@@ -102,54 +112,36 @@ interface Tape {
 export default function MastersPage() {
   const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState<User[]>([]);
-  const [passwordResetRequests, setPasswordResetRequests] = useState<PasswordResetRequest[]>([]);
+  const [passwordResetRequests, setPasswordResetRequests] = useState<
+    PasswordResetRequest[]
+  >([]);
   const [stones, setStones] = useState<Stone[]>([]);
   const [papers, setPapers] = useState<Paper[]>([]);
   const [plastics, setPlastics] = useState<Plastic[]>([]);
   const [tapes, setTapes] = useState<Tape[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string>('');
   const router = useRouter();
-  const { showSuccess, showError, showWarning, showInfo } = useSnackbarHelpers();
+  const { showSuccess, showError, showWarning } = useSnackbarHelpers();
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    checkAuthAndLoadData();
-  }, []);
-
-  const checkAuthAndLoadData = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.user.role !== 'admin') {
-          showError('Access Denied', 'Only administrators can access this page.');
-          router.push('/dashboard');
-          return;
-        }
-        setUserRole(data.user.role);
-        await loadAllData();
-      } else {
-        router.push('/login');
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      showError('Authentication Error', 'Failed to verify authentication.');
-      router.push('/login');
-    }
-  };
-
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     try {
       // Load all master data
-      const [usersRes, passwordResetRes, stonesRes, papersRes, plasticsRes, tapesRes] =
-        await Promise.all([
-          fetch('/api/masters/users'),
-          fetch('/api/auth/password-reset-requests'),
-          fetch('/api/inventory/stones'),
-          fetch('/api/inventory/paper'),
-          fetch('/api/inventory/plastic'),
-          fetch('/api/inventory/tape'),
-        ]);
+      const [
+        usersRes,
+        passwordResetRes,
+        stonesRes,
+        papersRes,
+        plasticsRes,
+        tapesRes,
+      ] = await Promise.all([
+        fetch('/api/masters/users'),
+        fetch('/api/auth/password-reset-requests'),
+        fetch('/api/inventory/stones'),
+        fetch('/api/inventory/paper'),
+        fetch('/api/inventory/plastic'),
+        fetch('/api/inventory/tape'),
+      ]);
 
       if (usersRes.ok) {
         const usersData = await usersRes.json();
@@ -186,9 +178,29 @@ export default function MastersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
 
-  const handleToggleUserStatus = async (userId: string, currentStatus: string) => {
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        router.push('/login');
+        return;
+      }
+
+      if (user?.role !== 'admin') {
+        showError('Access Denied', 'Only administrators can access this page.');
+        router.push('/dashboard');
+        return;
+      }
+
+      loadAllData();
+    }
+  }, [authLoading, isAuthenticated, user, router, showError, loadAllData]);
+
+  const handleToggleUserStatus = async (
+    userId: string,
+    currentStatus: string,
+  ) => {
     try {
       const response = await fetch(`/api/masters/users/${userId}`, {
         method: 'PATCH',
@@ -197,10 +209,12 @@ export default function MastersPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        await response.json();
         showSuccess(
           'User Status Updated',
-          `User has been ${currentStatus === 'active' ? 'blocked' : 'activated'} successfully.`
+          `User has been ${
+            currentStatus === 'active' ? 'blocked' : 'activated'
+          } successfully.`,
         );
         await loadAllData();
       } else {
@@ -208,11 +222,17 @@ export default function MastersPage() {
       }
     } catch (error) {
       console.error('Error toggling user status:', error);
-      showError('Network Error', 'Failed to update user status. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to update user status. Please try again.',
+      );
     }
   };
 
-  const handlePasswordResetRequest = async (userId: string, action: 'approve' | 'reject') => {
+  const handlePasswordResetRequest = async (
+    userId: string,
+    action: 'approve' | 'reject',
+  ) => {
     try {
       const response = await fetch('/api/auth/password-reset-requests', {
         method: 'POST',
@@ -225,10 +245,13 @@ export default function MastersPage() {
         if (action === 'approve') {
           showSuccess(
             'Password Reset Approved',
-            `New password: ${data.newPassword}. Please share this with the user securely.`
+            `New password: ${data.newPassword}. Please share this with the user securely.`,
           );
         } else {
-          showWarning('Request Rejected', 'Password reset request has been rejected.');
+          showWarning(
+            'Request Rejected',
+            'Password reset request has been rejected.',
+          );
         }
         await loadAllData();
       } else {
@@ -236,7 +259,10 @@ export default function MastersPage() {
       }
     } catch (error) {
       console.error('Error processing password reset request:', error);
-      showError('Network Error', 'Failed to process request. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to process request. Please try again.',
+      );
     }
   };
 
@@ -244,7 +270,7 @@ export default function MastersPage() {
     return <SpinnerPage />;
   }
 
-  if (userRole !== 'admin') {
+  if (user?.role !== 'admin') {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -383,7 +409,11 @@ export default function MastersPage() {
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={user.status === 'active' ? 'default' : 'destructive'}
+                              variant={
+                                user.status === 'active'
+                                  ? 'default'
+                                  : 'destructive'
+                              }
                             >
                               {user.status}
                             </Badge>
@@ -396,7 +426,9 @@ export default function MastersPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleToggleUserStatus(user._id, user.status)}
+                                onClick={() =>
+                                  handleToggleUserStatus(user._id, user.status)
+                                }
                               >
                                 {user.status === 'active' ? (
                                   <>
@@ -412,16 +444,24 @@ export default function MastersPage() {
                               </Button>
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button variant="outline" size="sm">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                  >
                                     <Key className="h-4 w-4 mr-1" />
                                     Change Password
                                   </Button>
                                 </DialogTrigger>
                                 <DialogContent>
                                   <DialogHeader>
-                                    <DialogTitle>Change Password for {user.name}</DialogTitle>
+                                    <DialogTitle>
+                                      Change Password for {user.name}
+                                    </DialogTitle>
                                   </DialogHeader>
-                                  <ChangePasswordForm userId={user._id} onSuccess={loadAllData} />
+                                  <ChangePasswordForm
+                                    userId={user._id}
+                                    onSuccess={loadAllData}
+                                  />
                                 </DialogContent>
                               </Dialog>
                             </div>
@@ -452,7 +492,9 @@ export default function MastersPage() {
             <CardContent>
               {passwordResetRequests.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No pending password reset requests</p>
+                  <p className="text-muted-foreground">
+                    No pending password reset requests
+                  </p>
                 </div>
               ) : (
                 <div className="border rounded-lg overflow-hidden">
@@ -474,21 +516,33 @@ export default function MastersPage() {
                             </TableCell>
                             <TableCell>{request.email}</TableCell>
                             <TableCell>
-                              {new Date(request.passwordResetRequest.requestedAt).toLocaleString()}
+                              {new Date(
+                                request.passwordResetRequest.requestedAt,
+                              ).toLocaleString()}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
                                 <Button
                                   variant="default"
                                   size="sm"
-                                  onClick={() => handlePasswordResetRequest(request._id, 'approve')}
+                                  onClick={() =>
+                                    handlePasswordResetRequest(
+                                      request._id,
+                                      'approve',
+                                    )
+                                  }
                                 >
                                   Approve
                                 </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handlePasswordResetRequest(request._id, 'reject')}
+                                  onClick={() =>
+                                    handlePasswordResetRequest(
+                                      request._id,
+                                      'reject',
+                                    )
+                                  }
                                 >
                                   Reject
                                 </Button>
@@ -873,10 +927,16 @@ function UserForm({ onSuccess }: { onSuccess: () => void }) {
         </Select>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button type="submit" disabled={loading}>
+        <Button
+          type="submit"
+          disabled={loading}
+        >
           {loading ? (
             <>
-              <Spinner size="sm" className="mr-2" />
+              <Spinner
+                size="sm"
+                className="mr-2"
+              />
               Adding User...
             </>
           ) : (
@@ -888,7 +948,13 @@ function UserForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function ChangePasswordForm({ userId, onSuccess }: { userId: string; onSuccess: () => void }) {
+function ChangePasswordForm({
+  userId,
+  onSuccess,
+}: {
+  userId: string;
+  onSuccess: () => void;
+}) {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { showSuccess, showError } = useSnackbarHelpers();
@@ -904,23 +970,35 @@ function ChangePasswordForm({ userId, onSuccess }: { userId: string; onSuccess: 
       });
 
       if (response.ok) {
-        showSuccess('Password Changed', 'User password has been updated successfully.');
+        showSuccess(
+          'Password Changed',
+          'User password has been updated successfully.',
+        );
         onSuccess();
         setNewPassword('');
       } else {
         const data = await response.json();
-        showError('Update Failed', data.message || 'Failed to change password.');
+        showError(
+          'Update Failed',
+          data.message || 'Failed to change password.',
+        );
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      showError('Network Error', 'Failed to change password. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to change password. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4"
+    >
       <div className="space-y-2">
         <Label htmlFor="newPassword">
           New Password <span className="text-red-500">*</span>
@@ -934,10 +1012,16 @@ function ChangePasswordForm({ userId, onSuccess }: { userId: string; onSuccess: 
         />
       </div>
       <div className="flex justify-end space-x-2">
-        <Button type="submit" disabled={loading}>
+        <Button
+          type="submit"
+          disabled={loading}
+        >
           {loading ? (
             <>
-              <Spinner size="sm" className="mr-2" />
+              <Spinner
+                size="sm"
+                className="mr-2"
+              />
               Changing Password...
             </>
           ) : (
@@ -971,12 +1055,18 @@ function StoneForm({ onSuccess }: { onSuccess: () => void }) {
       });
 
       if (response.ok) {
-        showSuccess('Stone Type Added', 'New stone type has been added successfully.');
+        showSuccess(
+          'Stone Type Added',
+          'New stone type has been added successfully.',
+        );
         onSuccess();
         setFormData({ name: '', number: '', color: '', size: '', unit: 'g' });
       } else {
         const data = await response.json();
-        showError('Creation Failed', data.message || 'Failed to add stone type.');
+        showError(
+          'Creation Failed',
+          data.message || 'Failed to add stone type.',
+        );
       }
     } catch (error) {
       console.error('Error creating stone:', error);
@@ -1067,10 +1157,16 @@ function StoneForm({ onSuccess }: { onSuccess: () => void }) {
         </Select>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button type="submit" disabled={loading}>
+        <Button
+          type="submit"
+          disabled={loading}
+        >
           {loading ? (
             <>
-              <Spinner size="sm" className="mr-2" />
+              <Spinner
+                size="sm"
+                className="mr-2"
+              />
               Adding Stone Type...
             </>
           ) : (
@@ -1105,12 +1201,18 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
       });
 
       if (response.ok) {
-        showSuccess('Paper Type Added', 'New paper type has been added successfully.');
+        showSuccess(
+          'Paper Type Added',
+          'New paper type has been added successfully.',
+        );
         onSuccess();
         setFormData({ width: '', piecesPerRoll: '' });
       } else {
         const data = await response.json();
-        showError('Creation Failed', data.message || 'Failed to add paper type.');
+        showError(
+          'Creation Failed',
+          data.message || 'Failed to add paper type.',
+        );
       }
     } catch (error) {
       console.error('Error creating paper:', error);
@@ -1166,10 +1268,16 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button type="submit" disabled={loading}>
+        <Button
+          type="submit"
+          disabled={loading}
+        >
           {loading ? (
             <>
-              <Spinner size="sm" className="mr-2" />
+              <Spinner
+                size="sm"
+                className="mr-2"
+              />
               Adding Paper Type...
             </>
           ) : (
@@ -1202,16 +1310,25 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
       });
 
       if (response.ok) {
-        showSuccess('Plastic Type Added', 'New plastic type has been added successfully.');
+        showSuccess(
+          'Plastic Type Added',
+          'New plastic type has been added successfully.',
+        );
         onSuccess();
         setFormData({ width: '' });
       } else {
         const data = await response.json();
-        showError('Creation Failed', data.message || 'Failed to add plastic type.');
+        showError(
+          'Creation Failed',
+          data.message || 'Failed to add plastic type.',
+        );
       }
     } catch (error) {
       console.error('Error creating plastic:', error);
-      showError('Network Error', 'Failed to add plastic type. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to add plastic type. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -1243,10 +1360,16 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
         </Select>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button type="submit" disabled={loading}>
+        <Button
+          type="submit"
+          disabled={loading}
+        >
           {loading ? (
             <>
-              <Spinner size="sm" className="mr-2" />
+              <Spinner
+                size="sm"
+                className="mr-2"
+              />
               Adding Plastic Type...
             </>
           ) : (
@@ -1273,11 +1396,17 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
       });
 
       if (response.ok) {
-        showSuccess('Tape Type Added', 'Cello tape type has been added successfully.');
+        showSuccess(
+          'Tape Type Added',
+          'Cello tape type has been added successfully.',
+        );
         onSuccess();
       } else {
         const data = await response.json();
-        showError('Creation Failed', data.message || 'Failed to add tape type.');
+        showError(
+          'Creation Failed',
+          data.message || 'Failed to add tape type.',
+        );
       }
     } catch (error) {
       console.error('Error creating tape:', error);
@@ -1298,10 +1427,16 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
         </p>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button type="submit" disabled={loading}>
+        <Button
+          type="submit"
+          disabled={loading}
+        >
           {loading ? (
             <>
-              <Spinner size="sm" className="mr-2" />
+              <Spinner
+                size="sm"
+                className="mr-2"
+              />
               Adding Tape Type...
             </>
           ) : (

@@ -6,11 +6,12 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    const order = await Order.findById(params.id)
+    const { id } = await params;
+    const order = await Order.findById(id)
       .populate('designId')
       .populate('stonesUsed.stoneId')
       .populate('createdBy', 'name email')
@@ -19,7 +20,7 @@ export async function GET(
     if (!order) {
       return NextResponse.json(
         { success: false, message: 'Order not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -31,23 +32,23 @@ export async function GET(
     console.error('Get order error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    
+
     const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -62,12 +63,13 @@ export async function PUT(
       finalTotalWeight,
       status,
     } = body;
+    const { id } = await params;
 
-    const order = await Order.findById(params.id);
+    const order = await Order.findById(id);
     if (!order) {
       return NextResponse.json(
         { success: false, message: 'Order not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -131,14 +133,20 @@ export async function PUT(
     let weightDiscrepancy = 0;
     let discrepancyPercentage = 0;
 
-    if (paperUsed && (paperUsed.sizeInInch !== oldValues.paperUsed.sizeInInch || 
-                     paperUsed.quantityInPcs !== oldValues.paperUsed.quantityInPcs)) {
+    if (
+      paperUsed &&
+      (paperUsed.sizeInInch !== oldValues.paperUsed.sizeInInch ||
+        paperUsed.quantityInPcs !== oldValues.paperUsed.quantityInPcs)
+    ) {
       const paper = await Paper.findOne({ width: paperUsed.sizeInInch });
       if (paper) {
         const paperWeight = paper.weightPerPiece * paperUsed.quantityInPcs;
-        const stoneWeight = stonesUsed.reduce((total: number, stone: any) => {
-          return total + (stone.quantity || 0);
-        }, 0);
+        const stoneWeight = stonesUsed.reduce(
+          (total: number, stone: { quantity: number }) => {
+            return total + (stone.quantity || 0);
+          },
+          0,
+        );
         calculatedWeight = paperWeight + stoneWeight;
 
         updateHistory.push({
@@ -151,13 +159,23 @@ export async function PUT(
       }
     }
 
-    if (stonesUsed && JSON.stringify(stonesUsed) !== JSON.stringify(oldValues.stonesUsed)) {
-      const paper = await Paper.findOne({ width: paperUsed?.sizeInInch || oldValues.paperUsed.sizeInInch });
+    if (
+      stonesUsed &&
+      JSON.stringify(stonesUsed) !== JSON.stringify(oldValues.stonesUsed)
+    ) {
+      const paper = await Paper.findOne({
+        width: paperUsed?.sizeInInch || oldValues.paperUsed.sizeInInch,
+      });
       if (paper) {
-        const paperWeight = paper.weightPerPiece * (paperUsed?.quantityInPcs || oldValues.paperUsed.quantityInPcs);
-        const stoneWeight = stonesUsed.reduce((total: number, stone: any) => {
-          return total + (stone.quantity || 0);
-        }, 0);
+        const paperWeight =
+          paper.weightPerPiece *
+          (paperUsed?.quantityInPcs || oldValues.paperUsed.quantityInPcs);
+        const stoneWeight = stonesUsed.reduce(
+          (total: number, stone: { quantity: number }) => {
+            return total + (stone.quantity || 0);
+          },
+          0,
+        );
         calculatedWeight = paperWeight + stoneWeight;
 
         updateHistory.push({
@@ -173,7 +191,8 @@ export async function PUT(
     // Calculate discrepancy if final weight is provided
     if (finalTotalWeight !== undefined) {
       weightDiscrepancy = finalTotalWeight - calculatedWeight;
-      discrepancyPercentage = calculatedWeight > 0 ? (weightDiscrepancy / calculatedWeight) * 100 : 0;
+      discrepancyPercentage =
+        calculatedWeight > 0 ? (weightDiscrepancy / calculatedWeight) * 100 : 0;
 
       updateHistory.push({
         field: 'finalTotalWeight',
@@ -185,16 +204,20 @@ export async function PUT(
     }
 
     // Update order
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       type,
       customerName,
       phone,
       designId,
       stonesUsed,
-      paperUsed: paperUsed ? {
-        ...paperUsed,
-        paperWeightPerPc: (await Paper.findOne({ width: paperUsed.sizeInInch }))?.weightPerPiece,
-      } : order.paperUsed,
+      paperUsed: paperUsed
+        ? {
+            ...paperUsed,
+            paperWeightPerPc: (
+              await Paper.findOne({ width: paperUsed.sizeInInch })
+            )?.weightPerPiece,
+          }
+        : order.paperUsed,
       calculatedWeight,
       weightDiscrepancy,
       discrepancyPercentage,
@@ -207,16 +230,18 @@ export async function PUT(
     }
 
     // Add to existing history
-    updateData.updateHistory = [...(order.updateHistory || []), ...updateHistory];
+    updateData.updateHistory = [
+      ...(order.updateHistory || []),
+      ...updateHistory,
+    ];
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-      params.id,
-      updateData,
-      { new: true }
-    ).populate('designId')
-     .populate('stonesUsed.stoneId')
-     .populate('createdBy', 'name email')
-     .populate('updatedBy', 'name email');
+    const updatedOrder = await Order.findByIdAndUpdate(id, updateData, {
+      new: true,
+    })
+      .populate('designId')
+      .populate('stonesUsed.stoneId')
+      .populate('createdBy', 'name email')
+      .populate('updatedBy', 'name email');
 
     return NextResponse.json({
       success: true,
@@ -227,23 +252,23 @@ export async function PUT(
     console.error('Update order error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    
+
     const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -251,15 +276,16 @@ export async function DELETE(
     if (user.role !== 'admin') {
       return NextResponse.json(
         { success: false, message: 'Only admin can delete orders' },
-        { status: 403 }
+        { status: 403 },
       );
     }
+    const { id } = await params;
 
-    const order = await Order.findByIdAndDelete(params.id);
+    const order = await Order.findByIdAndDelete(id);
     if (!order) {
       return NextResponse.json(
         { success: false, message: 'Order not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -271,7 +297,7 @@ export async function DELETE(
     console.error('Delete order error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

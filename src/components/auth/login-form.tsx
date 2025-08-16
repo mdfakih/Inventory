@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Spinner } from '@/components/ui/spinner';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import { useAuth } from '@/lib/auth-context';
 import {
   Card,
   CardContent,
@@ -22,6 +23,7 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { showSuccess, showError } = useSnackbarHelpers();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,13 +41,20 @@ export default function LoginForm() {
       const data = await response.json();
 
       if (data.success) {
-        showSuccess('Login Successful', 'Welcome back! Redirecting to dashboard...');
+        login(data.user);
+        showSuccess(
+          'Login Successful',
+          'Welcome back! Redirecting to dashboard...',
+        );
         router.push('/dashboard');
       } else {
         showError('Login Failed', data.message || 'Invalid credentials');
       }
-    } catch (error) {
-      showError('Connection Error', 'Unable to connect to the server. Please try again.');
+    } catch {
+      showError(
+        'Connection Error',
+        'Unable to connect to the server. Please try again.',
+      );
     } finally {
       setLoading(false);
     }

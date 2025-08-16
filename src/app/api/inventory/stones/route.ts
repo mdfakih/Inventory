@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Stone from '@/models/Stone';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
-    const stones = await Stone.find().sort({ createdAt: -1 });
-    
+    const stones = await Stone.find().sort({ name: 1 });
+
     return NextResponse.json({
       success: true,
       data: stones,
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     console.error('Get stones error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -23,14 +23,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
-    
+
     const body = await request.json();
     const { name, number, color, size, quantity, unit } = body;
 
-    if (!name || !number || !color || !size || quantity === undefined || !unit) {
+    if (
+      !name ||
+      !number ||
+      !color ||
+      !size ||
+      quantity === undefined ||
+      !unit
+    ) {
       return NextResponse.json(
         { success: false, message: 'All fields are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -39,7 +46,7 @@ export async function POST(request: NextRequest) {
     if (existingStone) {
       return NextResponse.json(
         { success: false, message: 'Stone number already exists' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -63,7 +70,7 @@ export async function POST(request: NextRequest) {
     console.error('Create stone error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

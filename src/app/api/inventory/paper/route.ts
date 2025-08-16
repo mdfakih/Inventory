@@ -3,7 +3,7 @@ import dbConnect from '@/lib/db';
 import Paper from '@/models/Paper';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
     const papers = await Paper.find().sort({ width: 1 });

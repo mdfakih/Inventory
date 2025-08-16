@@ -7,7 +7,7 @@ import { hashPassword } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   try {
     // Check authentication and authorization
-    const user = requireRole(request, ['admin']);
+    requireRole(request, ['admin']);
 
     await dbConnect();
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Check authentication and authorization
-    const user = requireRole(request, ['admin']);
+    requireRole(request, ['admin']);
 
     const body = await request.json();
     const { name, email, password, role } = body;

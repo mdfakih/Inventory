@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
   DropdownMenu,
@@ -17,53 +17,20 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Spinner } from '@/components/ui/spinner';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import { useAuth } from '@/lib/auth-context';
 import { Menu, X } from 'lucide-react';
 
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'admin' | 'manager' | 'employee';
-}
-
 export default function Navigation() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
+  const { user, loading, logout } = useAuth();
   const { showSuccess, showError } = useSnackbarHelpers();
-
-  useEffect(() => {
-    // Check if user is authenticated
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' });
-      if (response.ok) {
-        showSuccess('Logged Out', 'You have been successfully logged out.');
-        router.push('/login');
-      } else {
-        showError('Logout Failed', 'Failed to logout. Please try again.');
-      }
-    } catch (error) {
-      console.error('Logout failed:', error);
+      await logout();
+      showSuccess('Logged Out', 'You have been successfully logged out.');
+    } catch {
       showError('Network Error', 'Failed to logout. Please try again.');
     }
   };
@@ -125,7 +92,10 @@ export default function Navigation() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/dashboard" className="text-xl font-bold">
+            <Link
+              href="/dashboard"
+              className="text-xl font-bold"
+            >
               Inventory System
             </Link>
           </div>
@@ -150,19 +120,28 @@ export default function Navigation() {
           {/* User Menu */}
           <div className="flex items-center space-x-4">
             <ThemeToggle />
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Button
+                  variant="ghost"
+                  className="relative h-8 w-8 rounded-full"
+                >
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuContent
+                className="w-56"
+                align="end"
+                forceMount
+              >
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.name}</p>
+                    <p className="text-sm font-medium leading-none">
+                      {user.name}
+                    </p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>
@@ -182,7 +161,11 @@ export default function Navigation() {
               className="md:hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
             </Button>
           </div>
         </div>
