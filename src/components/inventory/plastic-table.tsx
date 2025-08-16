@@ -35,17 +35,25 @@ import { Package, Plus } from 'lucide-react';
 
 interface Plastic {
   _id: string;
+  name: string;
   width: number;
   quantity: number;
 }
 
+interface PlasticType {
+  _id: string;
+  name: string;
+  width: number;
+}
+
 export default function PlasticTable() {
   const [plastics, setPlastics] = useState<Plastic[]>([]);
+  const [plasticTypes, setPlasticTypes] = useState<PlasticType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
-    width: '',
+    plasticTypeId: '',
     quantity: '',
   });
   const { showSuccess, showError } = useSnackbarHelpers();
@@ -71,8 +79,23 @@ export default function PlasticTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const fetchPlasticTypes = useCallback(async () => {
+    try {
+      const response = await fetch('/api/inventory/plastic');
+      const data = await response.json();
+      if (data.success) {
+        setPlasticTypes(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching plastic types:', error);
+      showError('Data Loading Error', 'Failed to load plastic types.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     fetchPlastics();
+    fetchPlasticTypes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -80,14 +103,22 @@ export default function PlasticTable() {
     e.preventDefault();
     setIsCreating(true);
     try {
+      const selectedPlasticType = plasticTypes.find(
+        (pt) => pt._id === formData.plasticTypeId,
+      );
+      if (!selectedPlasticType) {
+        showError('Validation Error', 'Please select a valid plastic type.');
+        return;
+      }
+
       const response = await fetch('/api/inventory/plastic', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
-          width: parseInt(formData.width),
+          name: selectedPlasticType.name,
+          width: selectedPlasticType.width,
           quantity: parseInt(formData.quantity),
         }),
       });
@@ -100,7 +131,7 @@ export default function PlasticTable() {
         );
         setIsDialogOpen(false);
         setFormData({
-          width: '',
+          plasticTypeId: '',
           quantity: '',
         });
         fetchPlastics();
@@ -126,7 +157,12 @@ export default function PlasticTable() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Plastic ({plastics.length})</h3>
+        <div>
+          <h1 className="text-3xl font-bold">Plastic Inventory</h1>
+          <p className="text-gray-600">
+            Manage packaging plastic with different widths
+          </p>
+        </div>
         <Dialog
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
@@ -145,39 +181,41 @@ export default function PlasticTable() {
               onSubmit={handleSubmit}
               className="space-y-4"
             >
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="width">Width (inches)</Label>
-                  <Select
-                    value={formData.width}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, width: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select width" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="12">12 inches</SelectItem>
-                      <SelectItem value="14">14 inches</SelectItem>
-                      <SelectItem value="16">16 inches</SelectItem>
-                      <SelectItem value="18">18 inches</SelectItem>
-                      <SelectItem value="20">20 inches</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="quantity">Quantity (pcs)</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) =>
-                      setFormData({ ...formData, quantity: e.target.value })
-                    }
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="plasticType">Plastic Type</Label>
+                <Select
+                  value={formData.plasticTypeId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, plasticTypeId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select plastic type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {plasticTypes.map((plasticType) => (
+                      <SelectItem
+                        key={plasticType._id}
+                        value={plasticType._id}
+                      >
+                        {plasticType.name} ({plasticType.width}&quot;)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity (pcs)</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) =>
+                    setFormData({ ...formData, quantity: e.target.value })
+                  }
+                  placeholder="Enter number of pieces"
+                  required
+                />
               </div>
               <div className="flex justify-end space-x-2">
                 <Button
@@ -218,6 +256,7 @@ export default function PlasticTable() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Name</TableHead>
                 <TableHead>Width</TableHead>
                 <TableHead>Quantity (pcs)</TableHead>
                 <TableHead>Status</TableHead>
@@ -226,9 +265,8 @@ export default function PlasticTable() {
             <TableBody>
               {plastics.map((plastic) => (
                 <TableRow key={plastic._id}>
-                  <TableCell className="font-medium">
-                    {plastic.width}&quot;
-                  </TableCell>
+                  <TableCell className="font-medium">{plastic.name}</TableCell>
+                  <TableCell>{plastic.width}&quot;</TableCell>
                   <TableCell>{plastic.quantity}</TableCell>
                   <TableCell>
                     <Badge

@@ -1,10 +1,15 @@
 import mongoose from 'mongoose';
 
 const plasticSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+  },
   width: {
     type: Number,
-    enum: [12, 14, 16, 18, 20],
     required: true,
+    min: 1,
   },
   quantity: {
     type: Number,
@@ -20,7 +25,7 @@ const plasticSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Ensure unique width
-plasticSchema.index({ width: 1 }, { unique: true });
+// Ensure unique name
+plasticSchema.index({ name: 1 }, { unique: true });
 
 export default mongoose.models.Plastic || mongoose.model('Plastic', plasticSchema);

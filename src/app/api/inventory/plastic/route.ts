@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Plastic from '@/models/Plastic';
+import { getCurrentUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Check if MongoDB URI is configured
-    if (!process.env.MONGODB_URI) {
-      console.error('MONGODB_URI environment variable is not set');
-      return NextResponse.json(
-        { success: false, message: 'Database configuration error' },
-        { status: 500 },
-      );
-    }
-
     await dbConnect();
+
     const plastics = await Plastic.find().sort({ width: 1 });
 
     return NextResponse.json({
@@ -22,40 +15,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Get plastics error:', error);
-
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('ECONNREFUSED')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database connection failed. Please check if MongoDB is running.',
-          },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MONGODB_URI')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database configuration error. Please check environment variables.',
-          },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MongoNetworkError')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'Database network error. Please check your connection.',
-          },
-          { status: 500 },
-        );
-      }
-    }
-
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },
@@ -65,23 +24,22 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if MongoDB URI is configured
-    if (!process.env.MONGODB_URI) {
-      console.error('MONGODB_URI environment variable is not set');
+    await dbConnect();
+
+    const user = await getCurrentUser(request);
+    if (!user) {
       return NextResponse.json(
-        { success: false, message: 'Database configuration error' },
-        { status: 500 },
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
       );
     }
 
-    await dbConnect();
-
     const body = await request.json();
-    const { width, quantity } = body;
+    const { name, width, quantity = 0 } = body;
 
-    if (!width || quantity === undefined) {
+    if (!name || !width) {
       return NextResponse.json(
-        { success: false, message: 'All fields are required' },
+        { success: false, message: 'Name and width are required' },
         { status: 400 },
       );
     }
@@ -101,16 +59,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if plastic width already exists
-    const existingPlastic = await Plastic.findOne({ width });
+    // Check if plastic name already exists
+    const existingPlastic = await Plastic.findOne({ name });
     if (existingPlastic) {
       return NextResponse.json(
-        { success: false, message: 'Plastic width already exists' },
+        {
+          success: false,
+          message: 'Plastic with this name already exists',
+        },
         { status: 400 },
       );
     }
 
     const plastic = new Plastic({
+      name,
       width,
       quantity,
     });
@@ -124,31 +86,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Create plastic error:', error);
-
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('ECONNREFUSED')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database connection failed. Please check if MongoDB is running.',
-          },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MONGODB_URI')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database configuration error. Please check environment variables.',
-          },
-          { status: 500 },
-        );
-      }
-    }
-
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },

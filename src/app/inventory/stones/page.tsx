@@ -28,16 +28,7 @@ function StonesPageContent() {
 
   return (
     <div className="container mx-auto space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-3xl font-bold">{title}</h1>
-        <p className="text-gray-600">{description}</p>
-      </div>
-
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardHeader>
         <CardContent>
           <StonesTable inventoryType={inventoryType} />
         </CardContent>

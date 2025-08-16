@@ -40,6 +40,13 @@ import { SpinnerPage } from '@/components/ui/spinner';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import EditUserForm from '@/components/masters/edit-user-form';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -51,6 +58,8 @@ import {
   Lock,
   Unlock,
   Key,
+  Info,
+  Edit,
 } from 'lucide-react';
 
 interface User {
@@ -95,19 +104,24 @@ interface Stone {
 
 interface Paper {
   _id: string;
+  name: string;
   width: number;
   quantity: number;
   piecesPerRoll: number;
+  weightPerPiece: number;
+  inventoryType: 'internal' | 'out';
 }
 
 interface Plastic {
   _id: string;
+  name: string;
   width: number;
   quantity: number;
 }
 
 interface Tape {
   _id: string;
+  name: string;
   quantity: number;
 }
 
@@ -241,6 +255,113 @@ export default function MastersPage() {
   const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(
     null,
   );
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<User | null>(
+    null,
+  );
+  
+  // Edit and delete states for master data
+  const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
+  const [editingPlastic, setEditingPlastic] = useState<Plastic | null>(null);
+  const [editingTape, setEditingTape] = useState<Tape | null>(null);
+  const [isEditPaperDialogOpen, setIsEditPaperDialogOpen] = useState(false);
+  const [isEditPlasticDialogOpen, setIsEditPlasticDialogOpen] = useState(false);
+  const [isEditTapeDialogOpen, setIsEditTapeDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const handleEditUser = (user: User) => {
+    setSelectedUserForEdit(user);
+    setIsEditDialogOpen(true);
+  };
+
+  // Edit handlers for master data
+  const handleEditPaper = (paper: Paper) => {
+    setEditingPaper(paper);
+    setIsEditPaperDialogOpen(true);
+  };
+
+  const handleEditPlastic = (plastic: Plastic) => {
+    setEditingPlastic(plastic);
+    setIsEditPlasticDialogOpen(true);
+  };
+
+  const handleEditTape = (tape: Tape) => {
+    setEditingTape(tape);
+    setIsEditTapeDialogOpen(true);
+  };
+
+  // Delete handlers for master data
+  const handleDeletePaper = async (paperId: string) => {
+    if (!confirm('Are you sure you want to delete this paper type?')) return;
+    
+    setIsDeleting(paperId);
+    try {
+      const response = await fetch(`/api/inventory/paper/${paperId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        showSuccess('Paper Deleted', 'Paper type has been deleted successfully.');
+        await loadAllData();
+      } else {
+        const data = await response.json();
+        showError('Delete Failed', data.message || 'Failed to delete paper type.');
+      }
+    } catch (error) {
+      console.error('Error deleting paper:', error);
+      showError('Network Error', 'Failed to delete paper type. Please try again.');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const handleDeletePlastic = async (plasticId: string) => {
+    if (!confirm('Are you sure you want to delete this plastic type?')) return;
+    
+    setIsDeleting(plasticId);
+    try {
+      const response = await fetch(`/api/inventory/plastic/${plasticId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        showSuccess('Plastic Deleted', 'Plastic type has been deleted successfully.');
+        await loadAllData();
+      } else {
+        const data = await response.json();
+        showError('Delete Failed', data.message || 'Failed to delete plastic type.');
+      }
+    } catch (error) {
+      console.error('Error deleting plastic:', error);
+      showError('Network Error', 'Failed to delete plastic type. Please try again.');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const handleDeleteTape = async (tapeId: string) => {
+    if (!confirm('Are you sure you want to delete this tape type?')) return;
+    
+    setIsDeleting(tapeId);
+    try {
+      const response = await fetch(`/api/inventory/tape/${tapeId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        showSuccess('Tape Deleted', 'Tape type has been deleted successfully.');
+        await loadAllData();
+      } else {
+        const data = await response.json();
+        showError('Delete Failed', data.message || 'Failed to delete tape type.');
+      }
+    } catch (error) {
+      console.error('Error deleting tape:', error);
+      showError('Network Error', 'Failed to delete tape type. Please try again.');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   const handlePasswordResetRequest = async (
     userId: string,
@@ -452,6 +573,14 @@ export default function MastersPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditUser(user)}
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit
+                                </Button>
                                 <LoadingButton
                                   variant="outline"
                                   size="sm"
@@ -681,7 +810,7 @@ export default function MastersPage() {
                 <div>
                   <CardTitle>Paper Master Data</CardTitle>
                   <CardDescription>
-                    Manage paper types and specifications
+                    Manage paper types and specifications with custom width and pieces per roll
                   </CardDescription>
                 </div>
                 <Dialog>
@@ -691,7 +820,7 @@ export default function MastersPage() {
                       Add Paper Type
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle>Add New Paper Type</DialogTitle>
                     </DialogHeader>
@@ -701,37 +830,76 @@ export default function MastersPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Width (inches)</TableHead>
-                        <TableHead>Pieces per Roll</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {papers.map((paper) => (
-                        <TableRow key={paper._id}>
-                          <TableCell className="font-medium">
-                            {paper.width}&quot;
-                          </TableCell>
-                          <TableCell>{paper.piecesPerRoll}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                            >
-                              Edit
-                            </Button>
-                          </TableCell>
+              {papers.length === 0 ? (
+                <EmptyState
+                  icon={Palette}
+                  title="No Paper Types Found"
+                  description="Get started by adding your first paper type. Paper types will appear here once they are created."
+                  action={
+                    <Button onClick={() => setActiveTab('paper')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Paper Type
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Width (inches)</TableHead>
+                          <TableHead>Pieces per Roll</TableHead>
+                          <TableHead>Weight per Piece (g)</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {papers.map((paper) => (
+                          <TableRow key={paper._id}>
+                            <TableCell className="font-medium">
+                              {paper.name}
+                            </TableCell>
+                            <TableCell>{paper.width}&quot;</TableCell>
+                            <TableCell>{paper.piecesPerRoll}</TableCell>
+                            <TableCell>{paper.weightPerPiece}g</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {paper.inventoryType}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditPaper(paper)}
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit
+                                </Button>
+                                {user?.role === 'admin' && (
+                                  <LoadingButton
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleDeletePaper(paper._id)}
+                                    loading={isDeleting === paper._id}
+                                    loadingText=""
+                                  >
+                                    Delete
+                                  </LoadingButton>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -746,7 +914,7 @@ export default function MastersPage() {
                 <div>
                   <CardTitle>Plastic Master Data</CardTitle>
                   <CardDescription>
-                    Manage plastic types and specifications
+                    Manage plastic types and specifications with custom width values
                   </CardDescription>
                 </div>
                 <Dialog>
@@ -756,7 +924,7 @@ export default function MastersPage() {
                       Add Plastic Type
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle>Add New Plastic Type</DialogTitle>
                     </DialogHeader>
@@ -766,35 +934,66 @@ export default function MastersPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Width (inches)</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {plastics.map((plastic) => (
-                        <TableRow key={plastic._id}>
-                          <TableCell className="font-medium">
-                            {plastic.width}&quot;
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                            >
-                              Edit
-                            </Button>
-                          </TableCell>
+              {plastics.length === 0 ? (
+                <EmptyState
+                  icon={Package}
+                  title="No Plastic Types Found"
+                  description="Get started by adding your first plastic type. Plastic types will appear here once they are created."
+                  action={
+                    <Button onClick={() => setActiveTab('plastic')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Plastic Type
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Width (inches)</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {plastics.map((plastic) => (
+                          <TableRow key={plastic._id}>
+                            <TableCell className="font-medium">
+                              {plastic.name}
+                            </TableCell>
+                            <TableCell>{plastic.width}&quot;</TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditPlastic(plastic)}
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit
+                                </Button>
+                                {user?.role === 'admin' && (
+                                  <LoadingButton
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleDeletePlastic(plastic._id)}
+                                    loading={isDeleting === plastic._id}
+                                    loadingText=""
+                                  >
+                                    Delete
+                                  </LoadingButton>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -817,7 +1016,7 @@ export default function MastersPage() {
                       Add Tape Type
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle>Add New Tape Type</DialogTitle>
                     </DialogHeader>
@@ -827,39 +1026,172 @@ export default function MastersPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {tapes.map((tape) => (
-                        <TableRow key={tape._id}>
-                          <TableCell className="font-medium">
-                            Cello Tape
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                            >
-                              Edit
-                            </Button>
-                          </TableCell>
+              {tapes.length === 0 ? (
+                <EmptyState
+                  icon={Settings}
+                  title="No Tape Types Found"
+                  description="Get started by adding your first tape type. Tape types will appear here once they are created."
+                  action={
+                    <Button onClick={() => setActiveTab('tape')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Tape Type
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {tapes.map((tape) => (
+                          <TableRow key={tape._id}>
+                            <TableCell className="font-medium">
+                              {tape.name}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditTape(tape)}
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit
+                                </Button>
+                                {user?.role === 'admin' && (
+                                  <LoadingButton
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleDeleteTape(tape._id)}
+                                    loading={isDeleting === tape._id}
+                                    loadingText=""
+                                  >
+                                    Delete
+                                  </LoadingButton>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit User Dialog */}
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+          </DialogHeader>
+          {selectedUserForEdit && (
+            <EditUserForm
+              user={selectedUserForEdit}
+              onSuccess={() => {
+                setIsEditDialogOpen(false);
+                setSelectedUserForEdit(null);
+                loadAllData();
+              }}
+              onCancel={() => {
+                setIsEditDialogOpen(false);
+                setSelectedUserForEdit(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Paper Dialog */}
+      <Dialog
+        open={isEditPaperDialogOpen}
+        onOpenChange={setIsEditPaperDialogOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Paper Type</DialogTitle>
+          </DialogHeader>
+          {editingPaper && (
+            <EditPaperForm
+              paper={editingPaper}
+              onSuccess={() => {
+                setIsEditPaperDialogOpen(false);
+                setEditingPaper(null);
+                loadAllData();
+              }}
+              onCancel={() => {
+                setIsEditPaperDialogOpen(false);
+                setEditingPaper(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Plastic Dialog */}
+      <Dialog
+        open={isEditPlasticDialogOpen}
+        onOpenChange={setIsEditPlasticDialogOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Plastic Type</DialogTitle>
+          </DialogHeader>
+          {editingPlastic && (
+            <EditPlasticForm
+              plastic={editingPlastic}
+              onSuccess={() => {
+                setIsEditPlasticDialogOpen(false);
+                setEditingPlastic(null);
+                loadAllData();
+              }}
+              onCancel={() => {
+                setIsEditPlasticDialogOpen(false);
+                setEditingPlastic(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Tape Dialog */}
+      <Dialog
+        open={isEditTapeDialogOpen}
+        onOpenChange={setIsEditTapeDialogOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Tape Type</DialogTitle>
+          </DialogHeader>
+          {editingTape && (
+            <EditTapeForm
+              tape={editingTape}
+              onSuccess={() => {
+                setIsEditTapeDialogOpen(false);
+                setEditingTape(null);
+                loadAllData();
+              }}
+              onCancel={() => {
+                setIsEditTapeDialogOpen(false);
+                setEditingTape(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -946,9 +1278,37 @@ function UserForm({ onSuccess }: { onSuccess: () => void }) {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="role">
-          Role <span className="text-red-500">*</span>
-        </Label>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="role">
+            Role <span className="text-red-500">*</span>
+          </Label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <div className="space-y-2">
+                  <p className="font-semibold">Role Permissions:</p>
+                  <div className="space-y-1 text-xs">
+                    <p>
+                      <strong>Admin:</strong> Full access - can delete anything
+                      and everything
+                    </p>
+                    <p>
+                      <strong>Manager:</strong> Limited access - cannot delete
+                      records
+                    </p>
+                    <p>
+                      <strong>Employee:</strong> Basic access - view and update
+                      only
+                    </p>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <Select
           value={formData.role}
           onValueChange={(value: 'admin' | 'manager' | 'employee') =>
@@ -1192,8 +1552,11 @@ function StoneForm({ onSuccess }: { onSuccess: () => void }) {
 
 function PaperForm({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
+    name: '',
     width: '',
     piecesPerRoll: '',
+    weightPerPiece: '',
+    inventoryType: 'internal' as 'internal' | 'out',
   });
   const [loading, setLoading] = useState(false);
   const { showSuccess, showError } = useSnackbarHelpers();
@@ -1206,9 +1569,12 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          width: parseInt(formData.width),
+          name: formData.name,
+          width: parseFloat(formData.width),
           quantity: 0,
           piecesPerRoll: parseInt(formData.piecesPerRoll),
+          weightPerPiece: parseFloat(formData.weightPerPiece),
+          inventoryType: formData.inventoryType,
         }),
       });
 
@@ -1218,7 +1584,13 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
           'New paper type has been added successfully.',
         );
         onSuccess();
-        setFormData({ width: '', piecesPerRoll: '' });
+        setFormData({ 
+          name: '', 
+          width: '', 
+          piecesPerRoll: '', 
+          weightPerPiece: '',
+          inventoryType: 'internal'
+        });
       } else {
         const data = await response.json();
         showError(
@@ -1239,29 +1611,37 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
       onSubmit={handleSubmit}
       className="space-y-4"
     >
+      <div className="space-y-2">
+        <Label htmlFor="name">
+          Name <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., A4 Paper, Letter Paper"
+          required
+          className="mt-1"
+        />
+      </div>
+      
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="width">
             Width (inches) <span className="text-red-500">*</span>
           </Label>
-          <Select
+          <Input
+            id="width"
+            type="number"
+            step="0.1"
             value={formData.width}
-            onValueChange={(value) =>
-              setFormData({ ...formData, width: value })
+            onChange={(e) =>
+              setFormData({ ...formData, width: e.target.value })
             }
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="Select width" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="9">9 inches</SelectItem>
-              <SelectItem value="13">13 inches</SelectItem>
-              <SelectItem value="16">16 inches</SelectItem>
-              <SelectItem value="19">19 inches</SelectItem>
-              <SelectItem value="20">20 inches</SelectItem>
-              <SelectItem value="24">24 inches</SelectItem>
-            </SelectContent>
-          </Select>
+            placeholder="e.g., 8.5"
+            required
+            className="mt-1"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="piecesPerRoll">
@@ -1274,11 +1654,52 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
             onChange={(e) =>
               setFormData({ ...formData, piecesPerRoll: e.target.value })
             }
+            placeholder="e.g., 500"
             required
             className="mt-1"
           />
         </div>
       </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="weightPerPiece">
+            Weight per Piece (g) <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="weightPerPiece"
+            type="number"
+            step="0.1"
+            value={formData.weightPerPiece}
+            onChange={(e) =>
+              setFormData({ ...formData, weightPerPiece: e.target.value })
+            }
+            placeholder="e.g., 4.5"
+            required
+            className="mt-1"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="inventoryType">
+            Inventory Type <span className="text-red-500">*</span>
+          </Label>
+          <Select
+            value={formData.inventoryType}
+            onValueChange={(value: 'internal' | 'out') =>
+              setFormData({ ...formData, inventoryType: value })
+            }
+          >
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="internal">Internal</SelectItem>
+              <SelectItem value="out">Out</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      
       <div className="flex justify-end space-x-2">
         <LoadingButton
           type="submit"
@@ -1294,6 +1715,7 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
 
 function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
+    name: '',
     width: '',
   });
   const [loading, setLoading] = useState(false);
@@ -1307,7 +1729,8 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          width: parseInt(formData.width),
+          name: formData.name,
+          width: parseFloat(formData.width),
           quantity: 0,
         }),
       });
@@ -1318,7 +1741,7 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
           'New plastic type has been added successfully.',
         );
         onSuccess();
-        setFormData({ width: '' });
+        setFormData({ name: '', width: '' });
       } else {
         const data = await response.json();
         showError(
@@ -1343,25 +1766,35 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
       className="space-y-4"
     >
       <div className="space-y-2">
+        <Label htmlFor="name">
+          Name <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., Clear Plastic, Colored Plastic"
+          required
+          className="mt-1"
+        />
+      </div>
+      
+      <div className="space-y-2">
         <Label htmlFor="width">
           Width (inches) <span className="text-red-500">*</span>
         </Label>
-        <Select
+        <Input
+          id="width"
+          type="number"
+          step="0.1"
           value={formData.width}
-          onValueChange={(value) => setFormData({ ...formData, width: value })}
-        >
-          <SelectTrigger className="mt-1">
-            <SelectValue placeholder="Select width" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="12">12 inches</SelectItem>
-            <SelectItem value="14">14 inches</SelectItem>
-            <SelectItem value="16">16 inches</SelectItem>
-            <SelectItem value="18">18 inches</SelectItem>
-            <SelectItem value="20">20 inches</SelectItem>
-          </SelectContent>
-        </Select>
+          onChange={(e) => setFormData({ ...formData, width: e.target.value })}
+          placeholder="e.g., 12.5"
+          required
+          className="mt-1"
+        />
       </div>
+      
       <div className="flex justify-end space-x-2">
         <LoadingButton
           type="submit"
@@ -1376,6 +1809,9 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 function TapeForm({ onSuccess }: { onSuccess: () => void }) {
+  const [formData, setFormData] = useState({
+    name: 'Cello Tape',
+  });
   const [loading, setLoading] = useState(false);
   const { showSuccess, showError } = useSnackbarHelpers();
 
@@ -1386,15 +1822,19 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
       const response = await fetch('/api/inventory/tape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity: 0 }),
+        body: JSON.stringify({ 
+          name: formData.name,
+          quantity: 0 
+        }),
       });
 
       if (response.ok) {
         showSuccess(
           'Tape Type Added',
-          'Cello tape type has been added successfully.',
+          'Tape type has been added successfully.',
         );
         onSuccess();
+        setFormData({ name: 'Cello Tape' });
       } else {
         const data = await response.json();
         showError(
@@ -1415,11 +1855,20 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
       onSubmit={handleSubmit}
       className="space-y-4"
     >
-      <div className="text-center py-4">
-        <p className="text-muted-foreground">
-          Cello Tape type will be added to the system.
-        </p>
+      <div className="space-y-2">
+        <Label htmlFor="name">
+          Name <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., Cello Tape, Scotch Tape"
+          required
+          className="mt-1"
+        />
       </div>
+      
       <div className="flex justify-end space-x-2">
         <LoadingButton
           type="submit"
@@ -1427,6 +1876,347 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
           loadingText="Adding Tape Type..."
         >
           Add Tape Type
+        </LoadingButton>
+      </div>
+    </form>
+  );
+}
+
+// Edit form components
+function EditPaperForm({ 
+  paper, 
+  onSuccess, 
+  onCancel 
+}: { 
+  paper: Paper; 
+  onSuccess: () => void; 
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: paper.name,
+    width: paper.width.toString(),
+    piecesPerRoll: paper.piecesPerRoll.toString(),
+    weightPerPiece: paper.weightPerPiece.toString(),
+    inventoryType: paper.inventoryType,
+  });
+  const [loading, setLoading] = useState(false);
+  const { showSuccess, showError } = useSnackbarHelpers();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/inventory/paper/${paper._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          width: parseFloat(formData.width),
+          piecesPerRoll: parseInt(formData.piecesPerRoll),
+          weightPerPiece: parseFloat(formData.weightPerPiece),
+        }),
+      });
+
+      if (response.ok) {
+        showSuccess(
+          'Paper Type Updated',
+          'Paper type has been updated successfully.',
+        );
+        onSuccess();
+      } else {
+        const data = await response.json();
+        showError(
+          'Update Failed',
+          data.message || 'Failed to update paper type.',
+        );
+      }
+    } catch (error) {
+      console.error('Error updating paper:', error);
+      showError('Network Error', 'Failed to update paper type. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4"
+    >
+      <div className="space-y-2">
+        <Label htmlFor="edit-name">
+          Name <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="edit-name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., A4 Paper, Letter Paper"
+          required
+          className="mt-1"
+        />
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-width">
+            Width (inches) <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="edit-width"
+            type="number"
+            step="0.1"
+            value={formData.width}
+            onChange={(e) =>
+              setFormData({ ...formData, width: e.target.value })
+            }
+            placeholder="e.g., 8.5"
+            required
+            className="mt-1"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-piecesPerRoll">
+            Pieces per Roll <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="edit-piecesPerRoll"
+            type="number"
+            value={formData.piecesPerRoll}
+            onChange={(e) =>
+              setFormData({ ...formData, piecesPerRoll: e.target.value })
+            }
+            placeholder="e.g., 500"
+            required
+            className="mt-1"
+          />
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="edit-weightPerPiece">
+          Weight per Piece (g) <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="edit-weightPerPiece"
+          type="number"
+          step="0.1"
+          value={formData.weightPerPiece}
+          onChange={(e) =>
+            setFormData({ ...formData, weightPerPiece: e.target.value })
+          }
+          placeholder="e.g., 4.5"
+          required
+          className="mt-1"
+        />
+      </div>
+      
+      <div className="flex justify-end space-x-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+        <LoadingButton
+          type="submit"
+          loading={loading}
+          loadingText="Updating..."
+        >
+          Update Paper Type
+        </LoadingButton>
+      </div>
+    </form>
+  );
+}
+
+function EditPlasticForm({ 
+  plastic, 
+  onSuccess, 
+  onCancel 
+}: { 
+  plastic: Plastic; 
+  onSuccess: () => void; 
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: plastic.name,
+    width: plastic.width.toString(),
+  });
+  const [loading, setLoading] = useState(false);
+  const { showSuccess, showError } = useSnackbarHelpers();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/inventory/plastic/${plastic._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          width: parseFloat(formData.width),
+        }),
+      });
+
+      if (response.ok) {
+        showSuccess(
+          'Plastic Type Updated',
+          'Plastic type has been updated successfully.',
+        );
+        onSuccess();
+      } else {
+        const data = await response.json();
+        showError(
+          'Update Failed',
+          data.message || 'Failed to update plastic type.',
+        );
+      }
+    } catch (error) {
+      console.error('Error updating plastic:', error);
+      showError('Network Error', 'Failed to update plastic type. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4"
+    >
+      <div className="space-y-2">
+        <Label htmlFor="edit-plastic-name">
+          Name <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="edit-plastic-name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., Clear Plastic, Colored Plastic"
+          required
+          className="mt-1"
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="edit-plastic-width">
+          Width (inches) <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="edit-plastic-width"
+          type="number"
+          step="0.1"
+          value={formData.width}
+          onChange={(e) => setFormData({ ...formData, width: e.target.value })}
+          placeholder="e.g., 12.5"
+          required
+          className="mt-1"
+        />
+      </div>
+      
+      <div className="flex justify-end space-x-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+        <LoadingButton
+          type="submit"
+          loading={loading}
+          loadingText="Updating..."
+        >
+          Update Plastic Type
+        </LoadingButton>
+      </div>
+    </form>
+  );
+}
+
+function EditTapeForm({ 
+  tape, 
+  onSuccess, 
+  onCancel 
+}: { 
+  tape: Tape; 
+  onSuccess: () => void; 
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: tape.name,
+  });
+  const [loading, setLoading] = useState(false);
+  const { showSuccess, showError } = useSnackbarHelpers();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/inventory/tape/${tape._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+        }),
+      });
+
+      if (response.ok) {
+        showSuccess(
+          'Tape Type Updated',
+          'Tape type has been updated successfully.',
+        );
+        onSuccess();
+      } else {
+        const data = await response.json();
+        showError(
+          'Update Failed',
+          data.message || 'Failed to update tape type.',
+        );
+      }
+    } catch (error) {
+      console.error('Error updating tape:', error);
+      showError('Network Error', 'Failed to update tape type. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4"
+    >
+      <div className="space-y-2">
+        <Label htmlFor="edit-tape-name">
+          Name <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="edit-tape-name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., Cello Tape, Scotch Tape"
+          required
+          className="mt-1"
+        />
+      </div>
+      
+      <div className="flex justify-end space-x-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+        <LoadingButton
+          type="submit"
+          loading={loading}
+          loadingText="Updating..."
+        >
+          Update Tape Type
         </LoadingButton>
       </div>
     </form>

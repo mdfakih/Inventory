@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Tape from '@/models/Tape';
+import { getCurrentUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Check if MongoDB URI is configured
-    if (!process.env.MONGODB_URI) {
-      console.error('MONGODB_URI environment variable is not set');
-      return NextResponse.json(
-        { success: false, message: 'Database configuration error' },
-        { status: 500 },
-      );
-    }
-
     await dbConnect();
+
     const tapes = await Tape.find().sort({ createdAt: -1 });
 
     return NextResponse.json({
@@ -22,40 +15,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Get tapes error:', error);
-
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('ECONNREFUSED')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database connection failed. Please check if MongoDB is running.',
-          },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MONGODB_URI')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database configuration error. Please check environment variables.',
-          },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MongoNetworkError')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'Database network error. Please check your connection.',
-          },
-          { status: 500 },
-        );
-      }
-    }
-
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },
@@ -65,28 +24,19 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if MongoDB URI is configured
-    if (!process.env.MONGODB_URI) {
-      console.error('MONGODB_URI environment variable is not set');
-      return NextResponse.json(
-        { success: false, message: 'Database configuration error' },
-        { status: 500 },
-      );
-    }
-
     await dbConnect();
 
-    const body = await request.json();
-    const { quantity } = body;
-
-    if (quantity === undefined) {
+    const user = await getCurrentUser(request);
+    if (!user) {
       return NextResponse.json(
-        { success: false, message: 'Quantity is required' },
-        { status: 400 },
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
       );
     }
 
-    // Validate quantity
+    const body = await request.json();
+    const { name = 'Cello Tape', quantity = 0 } = body;
+
     if (typeof quantity !== 'number' || quantity < 0) {
       return NextResponse.json(
         { success: false, message: 'Quantity must be a non-negative number' },
@@ -94,7 +44,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if tape name already exists
+    const existingTape = await Tape.findOne({ name });
+    if (existingTape) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Tape with this name already exists',
+        },
+        { status: 400 },
+      );
+    }
+
     const tape = new Tape({
+      name,
       quantity,
     });
 
@@ -107,31 +70,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Create tape error:', error);
-
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('ECONNREFUSED')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database connection failed. Please check if MongoDB is running.',
-          },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MONGODB_URI')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database configuration error. Please check environment variables.',
-          },
-          { status: 500 },
-        );
-      }
-    }
-
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },

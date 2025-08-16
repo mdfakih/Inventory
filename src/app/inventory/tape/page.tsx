@@ -12,16 +12,7 @@ import TapeTable from '@/components/inventory/tape-table';
 export default function TapePage() {
   return (
     <div className="container mx-auto space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-3xl font-bold">Tape Inventory</h1>
-        <p className="text-gray-600">Manage cello tape inventory</p>
-      </div>
-
       <Card>
-        <CardHeader>
-          <CardTitle>Cello Tape Inventory</CardTitle>
-          <CardDescription>Manage cello tape inventory</CardDescription>
-        </CardHeader>
         <CardContent>
           <TapeTable />
         </CardContent>

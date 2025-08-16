@@ -118,7 +118,7 @@ export default function AdminDashboard() {
 
   const getPaperStockData = () => {
     return data.papers.map((paper: Paper) => ({
-      name: `${paper.width}&quot;`,
+      name: `${paper.width}"`,
       pcs: paper.quantity,
     }));
   };

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
-import Paper from '@/models/Paper';
+import Tape from '@/models/Tape';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function PUT(
@@ -27,92 +27,54 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const {
-      name,
-      width,
-      piecesPerRoll,
-      weightPerPiece,
-    } = body;
+    const { name } = body;
 
-    if (!name || !width || !piecesPerRoll || weightPerPiece === undefined) {
+    if (!name) {
       return NextResponse.json(
-        { success: false, message: 'All fields are required' },
+        { success: false, message: 'Name is required' },
         { status: 400 },
       );
     }
 
-    // Validate numeric fields
-    if (typeof width !== 'number' || width <= 0) {
+    const tape = await Tape.findById(params.id);
+    if (!tape) {
       return NextResponse.json(
-        { success: false, message: 'Width must be a positive number' },
-        { status: 400 },
-      );
-    }
-
-    if (typeof piecesPerRoll !== 'number' || piecesPerRoll <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Pieces per roll must be a positive number',
-        },
-        { status: 400 },
-      );
-    }
-
-    if (typeof weightPerPiece !== 'number' || weightPerPiece <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Weight per piece must be a positive number',
-        },
-        { status: 400 },
-      );
-    }
-
-    const paper = await Paper.findById(params.id);
-    if (!paper) {
-      return NextResponse.json(
-        { success: false, message: 'Paper not found' },
+        { success: false, message: 'Tape not found' },
         { status: 404 },
       );
     }
 
-    // Check if name already exists for the same inventory type (excluding current paper)
-    const existingPaper = await Paper.findOne({
+    // Check if name already exists (excluding current tape)
+    const existingTape = await Tape.findOne({
       name,
-      inventoryType: paper.inventoryType,
       _id: { $ne: params.id },
     });
-    if (existingPaper) {
+    if (existingTape) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Paper with this name already exists for this inventory type',
+          message: 'Tape with this name already exists',
         },
         { status: 400 },
       );
     }
 
-    // Update the paper
-    const updatedPaper = await Paper.findByIdAndUpdate(
+    // Update the tape
+    const updatedTape = await Tape.findByIdAndUpdate(
       params.id,
       {
         name,
-        width,
-        piecesPerRoll,
-        weightPerPiece,
-        updatedBy: user.id,
       },
       { new: true }
     );
 
     return NextResponse.json({
       success: true,
-      message: 'Paper updated successfully',
-      data: updatedPaper,
+      message: 'Tape updated successfully',
+      data: updatedTape,
     });
   } catch (error) {
-    console.error('Update paper error:', error);
+    console.error('Update tape error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },
@@ -143,30 +105,30 @@ export async function DELETE(
       );
     }
 
-    const paper = await Paper.findById(params.id);
-    if (!paper) {
+    const tape = await Tape.findById(params.id);
+    if (!tape) {
       return NextResponse.json(
-        { success: false, message: 'Paper not found' },
+        { success: false, message: 'Tape not found' },
         { status: 404 },
       );
     }
 
-    // Check if paper has quantity > 0
-    if (paper.quantity > 0) {
+    // Check if tape has quantity > 0
+    if (tape.quantity > 0) {
       return NextResponse.json(
-        { success: false, message: 'Cannot delete paper with existing stock' },
+        { success: false, message: 'Cannot delete tape with existing stock' },
         { status: 400 },
       );
     }
 
-    await Paper.findByIdAndDelete(params.id);
+    await Tape.findByIdAndDelete(params.id);
 
     return NextResponse.json({
       success: true,
-      message: 'Paper deleted successfully',
+      message: 'Tape deleted successfully',
     });
   } catch (error) {
-    console.error('Delete paper error:', error);
+    console.error('Delete tape error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },

@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -26,20 +33,28 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { Package, Plus } from 'lucide-react';
 
+interface Tape {
+  _id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TapeType {
+  _id: string;
+  name: string;
+}
+
 export default function TapeTable() {
-  const [tapes, setTapes] = useState<
-    {
-      _id: string;
-      quantity: number;
-      unit: string;
-      createdAt: string;
-      updatedAt: string;
-    }[]
-  >([]);
+  const [tapes, setTapes] = useState<Tape[]>([]);
+  const [tapeTypes, setTapeTypes] = useState<TapeType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
+    tapeTypeId: '',
     quantity: '',
   });
   const { showSuccess, showError } = useSnackbarHelpers();
@@ -62,8 +77,23 @@ export default function TapeTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const fetchTapeTypes = useCallback(async () => {
+    try {
+      const response = await fetch('/api/inventory/tape');
+      const data = await response.json();
+      if (data.success) {
+        setTapeTypes(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching tape types:', error);
+      showError('Data Loading Error', 'Failed to load tape types.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     fetchTapes();
+    fetchTapeTypes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -71,12 +101,21 @@ export default function TapeTable() {
     e.preventDefault();
     setIsCreating(true);
     try {
+      const selectedTapeType = tapeTypes.find(
+        (tt) => tt._id === formData.tapeTypeId,
+      );
+      if (!selectedTapeType) {
+        showError('Validation Error', 'Please select a valid tape type.');
+        return;
+      }
+
       const response = await fetch('/api/inventory/tape', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          name: selectedTapeType.name,
           quantity: parseInt(formData.quantity),
         }),
       });
@@ -86,6 +125,7 @@ export default function TapeTable() {
         showSuccess('Tape Added', 'New tape has been added successfully.');
         setIsDialogOpen(false);
         setFormData({
+          tapeTypeId: '',
           quantity: '',
         });
         fetchTapes();
@@ -111,7 +151,10 @@ export default function TapeTable() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Cello Tape ({tapes.length})</h3>
+        <div>
+          <h1 className="text-3xl font-bold">Tape Inventory</h1>
+          <p className="text-gray-600">Manage cello tape inventory</p>
+        </div>
         <Dialog
           open={isDialogOpen}
           onOpenChange={setIsDialogOpen}
@@ -130,7 +173,30 @@ export default function TapeTable() {
               onSubmit={handleSubmit}
               className="space-y-4"
             >
-              <div>
+              <div className="space-y-2">
+                <Label htmlFor="tapeType">Tape Type</Label>
+                <Select
+                  value={formData.tapeTypeId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, tapeTypeId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select tape type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tapeTypes.map((tapeType) => (
+                      <SelectItem
+                        key={tapeType._id}
+                        value={tapeType._id}
+                      >
+                        {tapeType.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="quantity">Quantity (pcs)</Label>
                 <Input
                   id="quantity"
@@ -139,6 +205,7 @@ export default function TapeTable() {
                   onChange={(e) =>
                     setFormData({ ...formData, quantity: e.target.value })
                   }
+                  placeholder="Enter number of pieces"
                   required
                 />
               </div>
@@ -181,6 +248,7 @@ export default function TapeTable() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Name</TableHead>
                 <TableHead>Quantity (pcs)</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -188,7 +256,8 @@ export default function TapeTable() {
             <TableBody>
               {tapes.map((tape) => (
                 <TableRow key={tape._id}>
-                  <TableCell className="font-medium">{tape.quantity}</TableCell>
+                  <TableCell className="font-medium">{tape.name}</TableCell>
+                  <TableCell>{tape.quantity}</TableCell>
                   <TableCell>
                     <Badge
                       variant={tape.quantity < 20 ? 'destructive' : 'default'}

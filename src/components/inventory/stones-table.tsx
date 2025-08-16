@@ -31,6 +31,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import { useAuth } from '@/lib/auth-context';
 import { Gem, Plus } from 'lucide-react';
 
 interface Stone {
@@ -53,11 +54,17 @@ interface StonesTableProps {
 export default function StonesTable({
   inventoryType = 'internal',
 }: StonesTableProps) {
+  const { user } = useAuth();
   const [stones, setStones] = useState<Stone[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [selectedStone, setSelectedStone] = useState<Stone | null>(null);
+  const [updateQuantity, setUpdateQuantity] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     number: '',
@@ -173,6 +180,9 @@ export default function StonesTable({
           'Stone quantity has been updated successfully.',
         );
         fetchStones();
+        setIsUpdateDialogOpen(false);
+        setSelectedStone(null);
+        setUpdateQuantity('');
       } else {
         showError(
           'Update Failed',
@@ -187,6 +197,45 @@ export default function StonesTable({
       );
     } finally {
       setIsUpdating(null);
+    }
+  };
+
+  const openUpdateDialog = (stone: Stone) => {
+    setSelectedStone(stone);
+    setUpdateQuantity(stone.quantity.toString());
+    setIsUpdateDialogOpen(true);
+  };
+
+  const openDeleteDialog = (stone: Stone) => {
+    setSelectedStone(stone);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteStone = async (stoneId: string) => {
+    setIsDeleting(stoneId);
+    try {
+      const response = await fetch(`/api/inventory/stones/${stoneId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess('Stone Deleted', 'Stone has been deleted successfully.');
+        fetchStones();
+        setIsDeleteDialogOpen(false);
+        setSelectedStone(null);
+      } else {
+        showError('Delete Failed', data.message || 'Failed to delete stone.');
+      }
+    } catch (error) {
+      console.error('Error deleting stone:', error);
+      showError('Network Error', 'Failed to delete stone. Please try again.');
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -205,11 +254,11 @@ export default function StonesTable({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-semibold">{title} Inventory</h3>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-3xl font-bold">{title} Inventory</h1>
+          <p className="text-gray-600">
             {isOutJob
               ? 'Manage stones received from customers for out jobs'
-              : 'Manage internal stone inventory with quantity tracking'}
+              : 'Manage internal stone inventory with name, number, color, size, and quantity'}
           </p>
         </div>
         <Dialog
@@ -332,6 +381,111 @@ export default function StonesTable({
         </Dialog>
       </div>
 
+      {/* Update Quantity Modal */}
+      <Dialog
+        open={isUpdateDialogOpen}
+        onOpenChange={setIsUpdateDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Quantity</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (selectedStone) {
+                const quantity = parseFloat(updateQuantity);
+                if (!isNaN(quantity) && quantity >= 0) {
+                  handleUpdateQuantity(selectedStone._id, quantity);
+                } else {
+                  showError(
+                    'Invalid Input',
+                    'Please enter a valid positive number.',
+                  );
+                }
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="updateQuantity">New Quantity</Label>
+              <Input
+                id="updateQuantity"
+                type="number"
+                step="0.01"
+                value={updateQuantity}
+                onChange={(e) => setUpdateQuantity(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsUpdateDialogOpen(false);
+                  setSelectedStone(null);
+                  setUpdateQuantity('');
+                }}
+                disabled={isUpdating === selectedStone?._id}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                type="submit"
+                loading={isUpdating === selectedStone?._id}
+                loadingText="Updating..."
+              >
+                Update Quantity
+              </LoadingButton>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Stone</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to delete{' '}
+              <strong>{selectedStone?.name}</strong>? This action cannot be
+              undone.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setSelectedStone(null);
+                }}
+                disabled={isDeleting === selectedStone?._id}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                type="button"
+                variant="destructive"
+                onClick={() =>
+                  selectedStone && handleDeleteStone(selectedStone._id)
+                }
+                loading={isDeleting === selectedStone?._id}
+                loadingText="Deleting..."
+              >
+                Delete
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {stones.length === 0 ? (
         <EmptyState
           icon={Gem}
@@ -370,31 +524,28 @@ export default function StonesTable({
                   <TableCell>{stone.quantity}</TableCell>
                   <TableCell>{stone.unit}</TableCell>
                   <TableCell>
-                    <LoadingButton
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newQuantity = prompt(
-                          'Enter new quantity:',
-                          stone.quantity.toString(),
-                        );
-                        if (newQuantity !== null) {
-                          const quantity = parseFloat(newQuantity);
-                          if (!isNaN(quantity) && quantity >= 0) {
-                            handleUpdateQuantity(stone._id, quantity);
-                          } else {
-                            showError(
-                              'Invalid Input',
-                              'Please enter a valid positive number.',
-                            );
-                          }
-                        }
-                      }}
-                      loading={isUpdating === stone._id}
-                      loadingText="Updating..."
-                    >
-                      Update Quantity
-                    </LoadingButton>
+                    <div className="flex gap-2">
+                      <LoadingButton
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openUpdateDialog(stone)}
+                        loading={isUpdating === stone._id}
+                        loadingText="Updating..."
+                      >
+                        Update Quantity
+                      </LoadingButton>
+                      {user?.role === 'admin' && (
+                        <LoadingButton
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => openDeleteDialog(stone)}
+                          loading={isDeleting === stone._id}
+                          loadingText="Deleting..."
+                        >
+                          Delete
+                        </LoadingButton>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -2,10 +2,15 @@ import mongoose from 'mongoose';
 
 const paperSchema = new mongoose.Schema(
   {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     width: {
       type: Number,
-      enum: [9, 13, 16, 19, 20, 24],
       required: true,
+      min: 1,
     },
     quantity: {
       type: Number,
@@ -59,7 +64,7 @@ const paperSchema = new mongoose.Schema(
   },
 );
 
-// Ensure unique width per inventory type
-paperSchema.index({ width: 1, inventoryType: 1 }, { unique: true });
+// Ensure unique name per inventory type
+paperSchema.index({ name: 1, inventoryType: 1 }, { unique: true });
 
 export default mongoose.models.Paper || mongoose.model('Paper', paperSchema);

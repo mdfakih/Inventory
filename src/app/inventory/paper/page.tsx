@@ -28,20 +28,7 @@ function PaperPageContent() {
 
   return (
     <div className="container mx-auto space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-3xl font-bold">{title}</h1>
-        <p className="text-gray-600">{description}</p>
-      </div>
-
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>
-            {isOutJob
-              ? 'Manage paper received from customers for out jobs'
-              : 'Manage paper rolls with different widths (9, 13, 16, 19, 20, 24 inches) and weights per piece'}
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           <PaperTable inventoryType={inventoryType} />
         </CardContent>

@@ -56,72 +56,81 @@ export default function FormsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Printable Forms</h1>
-        <p className="text-gray-600">
+    <div className="container mx-auto space-y-8 p-6 md:p-8">
+      <div className="space-y-4">
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+          Printable Forms
+        </h1>
+        <p className="text-lg text-gray-600 max-w-3xl">
           Download and print forms for maintaining paper trails and easy data
           entry
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-2">
         {forms.map((form) => (
           <Card
             key={form.id}
-            className="hover:shadow-lg transition-shadow"
+            className="hover:shadow-xl transition-all duration-300 border-2 hover:border-gray-300"
           >
-            <CardHeader>
+            <CardHeader className="space-y-4 pb-6">
               <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${form.color} text-white`}>
-                    <form.icon className="h-6 w-6" />
+                <div className="flex items-center space-x-4">
+                  <div
+                    className={`p-3 rounded-xl ${form.color} text-white shadow-lg`}
+                  >
+                    <form.icon className="h-7 w-7" />
                   </div>
-                  <div>
-                    <CardTitle className="text-xl">{form.title}</CardTitle>
+                  <div className="space-y-2">
+                    <CardTitle className="text-2xl font-bold text-gray-900">
+                      {form.title}
+                    </CardTitle>
                     <Badge
                       variant="outline"
-                      className="mt-1"
+                      className="text-sm font-medium px-3 py-1"
                     >
                       {form.type}
                     </Badge>
                   </div>
                 </div>
               </div>
-              <CardDescription className="text-base">
+              <CardDescription className="text-base leading-relaxed text-gray-600">
                 {form.description}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6 pt-0">
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium mb-2">Features:</h4>
-                  <ul className="space-y-1 text-sm text-gray-600">
+                  <h4 className="font-semibold text-lg mb-3 text-gray-900">
+                    Features:
+                  </h4>
+                  <ul className="space-y-2 text-sm text-gray-600">
                     {form.features.map((feature, index) => (
                       <li
                         key={index}
-                        className="flex items-center"
+                        className="flex items-start space-x-3"
                       >
-                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-2"></span>
-                        {feature}
+                        <span className="w-2 h-2 bg-gray-400 rounded-full mt-2 flex-shrink-0"></span>
+                        <span className="leading-relaxed">{feature}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
 
-                <div className="flex space-x-2 pt-4">
+                <div className="flex space-x-3 pt-6">
                   <Button
                     onClick={() => router.push(form.href)}
-                    className="flex-1"
+                    className="flex-1 h-12 text-base font-medium"
                   >
-                    <Eye className="h-4 w-4 mr-2" />
+                    <Eye className="h-5 w-5 mr-2" />
                     View Form
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => window.open(form.href, '_blank')}
+                    className="h-12 w-12 p-0"
                   >
-                    <Printer className="h-4 w-4" />
+                    <Printer className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
@@ -130,58 +139,66 @@ export default function FormsPage() {
         ))}
       </div>
 
-      <Card className="bg-blue-50 border-blue-200">
-        <CardHeader>
-          <CardTitle className="text-blue-800">
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 shadow-lg">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-2xl font-bold text-blue-900">
             How to Use These Forms
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3 text-sm">
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
-                1
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-4">
+              <div className="flex items-start space-x-4">
+                <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                  1
+                </div>
+                <div className="space-y-2">
+                  <p className="font-semibold text-gray-900">
+                    Print the appropriate form
+                  </p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Choose the form based on your job type (Internal or Out)
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Print the appropriate form</p>
-                <p className="text-gray-600">
-                  Choose the form based on your job type (Internal or Out)
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
-                2
-              </div>
-              <div>
-                <p className="font-medium">Fill out the form completely</p>
-                <p className="text-gray-600">
-                  Record all required information including materials, weights,
-                  and signatures
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
-                3
-              </div>
-              <div>
-                <p className="font-medium">Enter data into the system</p>
-                <p className="text-gray-600">
-                  Use the completed form as reference to enter data into the
-                  inventory system
-                </p>
+              <div className="flex items-start space-x-4">
+                <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                  2
+                </div>
+                <div className="space-y-2">
+                  <p className="font-semibold text-gray-900">
+                    Fill out the form
+                  </p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Complete all required fields with accurate information
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
-                4
+            <div className="space-y-4">
+              <div className="flex items-start space-x-4">
+                <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                  3
+                </div>
+                <div className="space-y-2">
+                  <p className="font-semibold text-gray-900">Get signatures</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Have the appropriate personnel sign the form
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">File the form</p>
-                <p className="text-gray-600">
-                  Keep the completed form for audit trail and record keeping
-                </p>
+              <div className="flex items-start space-x-4">
+                <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                  4
+                </div>
+                <div className="space-y-2">
+                  <p className="font-semibold text-gray-900">
+                    File for records
+                  </p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Keep the completed form for future reference
+                  </p>
+                </div>
               </div>
             </div>
           </div>

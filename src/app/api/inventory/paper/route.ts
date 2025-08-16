@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
+      name,
       width,
       quantity,
       piecesPerRoll,
@@ -107,6 +108,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (
+      !name ||
       !width ||
       quantity === undefined ||
       !piecesPerRoll ||
@@ -161,19 +163,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if paper width already exists for the same inventory type
-    const existingPaper = await Paper.findOne({ width, inventoryType });
+    // Check if paper name already exists for the same inventory type
+    const existingPaper = await Paper.findOne({ name, inventoryType });
     if (existingPaper) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Paper width already exists for this inventory type',
+          message: 'Paper with this name already exists for this inventory type',
         },
         { status: 400 },
       );
     }
 
     const paper = new Paper({
+      name,
       width,
       quantity,
       piecesPerRoll,
