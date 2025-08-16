@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
@@ -44,7 +44,8 @@ export async function PUT(
       );
     }
 
-    const plastic = await Plastic.findById(params.id);
+    const { id } = await params;
+    const plastic = await Plastic.findById(id);
     if (!plastic) {
       return NextResponse.json(
         { success: false, message: 'Plastic not found' },
@@ -55,7 +56,7 @@ export async function PUT(
     // Check if name already exists (excluding current plastic)
     const existingPlastic = await Plastic.findOne({
       name,
-      _id: { $ne: params.id },
+      _id: { $ne: id },
     });
     if (existingPlastic) {
       return NextResponse.json(
@@ -69,7 +70,7 @@ export async function PUT(
 
     // Update the plastic
     const updatedPlastic = await Plastic.findByIdAndUpdate(
-      params.id,
+      id,
       {
         name,
         width,
@@ -93,7 +94,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
@@ -114,7 +115,8 @@ export async function DELETE(
       );
     }
 
-    const plastic = await Plastic.findById(params.id);
+    const { id } = await params;
+    const plastic = await Plastic.findById(id);
     if (!plastic) {
       return NextResponse.json(
         { success: false, message: 'Plastic not found' },
@@ -130,7 +132,7 @@ export async function DELETE(
       );
     }
 
-    await Plastic.findByIdAndDelete(params.id);
+    await Plastic.findByIdAndDelete(id);
 
     return NextResponse.json({
       success: true,

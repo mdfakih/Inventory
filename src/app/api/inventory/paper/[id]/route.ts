@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
@@ -27,12 +27,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const {
-      name,
-      width,
-      piecesPerRoll,
-      weightPerPiece,
-    } = body;
+    const { name, width, piecesPerRoll, weightPerPiece } = body;
 
     if (!name || !width || !piecesPerRoll || weightPerPiece === undefined) {
       return NextResponse.json(
@@ -69,7 +64,8 @@ export async function PUT(
       );
     }
 
-    const paper = await Paper.findById(params.id);
+    const { id } = await params;
+    const paper = await Paper.findById(id);
     if (!paper) {
       return NextResponse.json(
         { success: false, message: 'Paper not found' },
@@ -81,13 +77,14 @@ export async function PUT(
     const existingPaper = await Paper.findOne({
       name,
       inventoryType: paper.inventoryType,
-      _id: { $ne: params.id },
+      _id: { $ne: id },
     });
     if (existingPaper) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Paper with this name already exists for this inventory type',
+          message:
+            'Paper with this name already exists for this inventory type',
         },
         { status: 400 },
       );
@@ -95,7 +92,7 @@ export async function PUT(
 
     // Update the paper
     const updatedPaper = await Paper.findByIdAndUpdate(
-      params.id,
+      id,
       {
         name,
         width,
@@ -103,7 +100,7 @@ export async function PUT(
         weightPerPiece,
         updatedBy: user.id,
       },
-      { new: true }
+      { new: true },
     );
 
     return NextResponse.json({
@@ -122,7 +119,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
@@ -138,12 +135,16 @@ export async function DELETE(
     // Only admin can delete master data
     if (user.role !== 'admin') {
       return NextResponse.json(
-        { success: false, message: 'Only administrators can delete master data' },
+        {
+          success: false,
+          message: 'Only administrators can delete master data',
+        },
         { status: 403 },
       );
     }
 
-    const paper = await Paper.findById(params.id);
+    const { id } = await params;
+    const paper = await Paper.findById(id);
     if (!paper) {
       return NextResponse.json(
         { success: false, message: 'Paper not found' },
@@ -159,7 +160,7 @@ export async function DELETE(
       );
     }
 
-    await Paper.findByIdAndDelete(params.id);
+    await Paper.findByIdAndDelete(id);
 
     return NextResponse.json({
       success: true,

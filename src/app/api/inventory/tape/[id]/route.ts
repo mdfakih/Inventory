@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
@@ -36,7 +36,8 @@ export async function PUT(
       );
     }
 
-    const tape = await Tape.findById(params.id);
+    const { id } = await params;
+    const tape = await Tape.findById(id);
     if (!tape) {
       return NextResponse.json(
         { success: false, message: 'Tape not found' },
@@ -47,7 +48,7 @@ export async function PUT(
     // Check if name already exists (excluding current tape)
     const existingTape = await Tape.findOne({
       name,
-      _id: { $ne: params.id },
+      _id: { $ne: id },
     });
     if (existingTape) {
       return NextResponse.json(
@@ -61,7 +62,7 @@ export async function PUT(
 
     // Update the tape
     const updatedTape = await Tape.findByIdAndUpdate(
-      params.id,
+      id,
       {
         name,
       },
@@ -84,7 +85,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
@@ -105,7 +106,8 @@ export async function DELETE(
       );
     }
 
-    const tape = await Tape.findById(params.id);
+    const { id } = await params;
+    const tape = await Tape.findById(id);
     if (!tape) {
       return NextResponse.json(
         { success: false, message: 'Tape not found' },
@@ -121,7 +123,7 @@ export async function DELETE(
       );
     }
 
-    await Tape.findByIdAndDelete(params.id);
+    await Tape.findByIdAndDelete(id);
 
     return NextResponse.json({
       success: true,
