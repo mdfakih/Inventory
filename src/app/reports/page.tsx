@@ -167,7 +167,8 @@ export default function ReportsPage() {
 
       loadReportData();
     }
-  }, [authLoading, isAuthenticated, user, loadReportData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, user?.role]);
 
   const handleGenerateReport = async () => {
     try {

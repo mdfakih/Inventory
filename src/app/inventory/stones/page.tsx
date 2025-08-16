@@ -27,7 +27,7 @@ function StonesPageContent() {
     : 'Manage internal stone inventory with name, number, color, size, and quantity';
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto space-y-6 p-4 md:p-6">
       <div>
         <h1 className="text-3xl font-bold">{title}</h1>
         <p className="text-gray-600">{description}</p>
@@ -48,7 +48,13 @@ function StonesPageContent() {
 
 export default function StonesPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center py-8"><Spinner size="lg" /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-8">
+          <Spinner size="lg" />
+        </div>
+      }
+    >
       <StonesPageContent />
     </Suspense>
   );

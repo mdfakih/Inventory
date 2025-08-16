@@ -104,7 +104,8 @@ export default function StonesTable({
   useEffect(() => {
     fetchStones();
     setFormData((prev) => ({ ...prev, inventoryType }));
-  }, [fetchStones, inventoryType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventoryType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

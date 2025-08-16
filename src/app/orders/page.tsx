@@ -226,7 +226,8 @@ export default function OrdersPage() {
   useEffect(() => {
     fetchData();
     fetchUser();
-  }, [fetchData, fetchUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -465,7 +466,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto space-y-6 p-4 md:p-6">
       <div>
         <h1 className="text-3xl font-bold">Orders Management</h1>
         <p className="text-gray-600">

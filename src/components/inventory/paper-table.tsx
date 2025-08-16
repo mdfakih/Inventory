@@ -83,7 +83,8 @@ export default function PaperTable({
   useEffect(() => {
     fetchPapers();
     setFormData((prev) => ({ ...prev, inventoryType }));
-  }, [fetchPapers, inventoryType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventoryType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

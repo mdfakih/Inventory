@@ -180,7 +180,8 @@ export default function MastersPage() {
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!authLoading) {
@@ -197,7 +198,8 @@ export default function MastersPage() {
 
       loadAllData();
     }
-  }, [authLoading, isAuthenticated, user, router, showError, loadAllData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, user?.role]);
 
   const [isTogglingStatus, setIsTogglingStatus] = useState<string | null>(null);
 
@@ -300,7 +302,7 @@ export default function MastersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto space-y-6 p-4 md:p-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold">Master Management</h1>
         <p className="text-muted-foreground">

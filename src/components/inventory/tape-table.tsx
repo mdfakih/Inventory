@@ -64,7 +64,8 @@ export default function TapeTable() {
 
   useEffect(() => {
     fetchTapes();
-  }, [fetchTapes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
