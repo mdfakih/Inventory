@@ -37,6 +37,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Spinner, SpinnerPage } from '@/components/ui/spinner';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -197,10 +199,13 @@ export default function MastersPage() {
     }
   }, [authLoading, isAuthenticated, user, router, showError, loadAllData]);
 
+  const [isTogglingStatus, setIsTogglingStatus] = useState<string | null>(null);
+
   const handleToggleUserStatus = async (
     userId: string,
     currentStatus: string,
   ) => {
+    setIsTogglingStatus(userId);
     try {
       const response = await fetch(`/api/masters/users/${userId}`, {
         method: 'PATCH',
@@ -226,13 +231,20 @@ export default function MastersPage() {
         'Network Error',
         'Failed to update user status. Please try again.',
       );
+    } finally {
+      setIsTogglingStatus(null);
     }
   };
+
+  const [isProcessingRequest, setIsProcessingRequest] = useState<string | null>(
+    null,
+  );
 
   const handlePasswordResetRequest = async (
     userId: string,
     action: 'approve' | 'reject',
   ) => {
+    setIsProcessingRequest(userId);
     try {
       const response = await fetch('/api/auth/password-reset-requests', {
         method: 'POST',
@@ -263,6 +275,8 @@ export default function MastersPage() {
         'Network Error',
         'Failed to process request. Please try again.',
       );
+    } finally {
+      setIsProcessingRequest(null);
     }
   };
 
@@ -374,104 +388,123 @@ export default function MastersPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user._id}>
-                          <TableCell className="font-medium">
-                            {user.name}
-                          </TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                user.role === 'admin'
-                                  ? 'default'
-                                  : user.role === 'manager'
-                                  ? 'secondary'
-                                  : 'outline'
-                              }
-                            >
-                              {user.role}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                user.status === 'active'
-                                  ? 'default'
-                                  : 'destructive'
-                              }
-                            >
-                              {user.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {new Date(user.createdAt).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleToggleUserStatus(user._id, user.status)
+              {users.length === 0 ? (
+                <EmptyState
+                  icon={Users}
+                  title="No Users Found"
+                  description="Get started by adding your first user. Users will appear here once they are created."
+                  action={
+                    <Button onClick={() => setActiveTab('users')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First User
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user._id}>
+                            <TableCell className="font-medium">
+                              {user.name}
+                            </TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  user.role === 'admin'
+                                    ? 'default'
+                                    : user.role === 'manager'
+                                    ? 'secondary'
+                                    : 'outline'
                                 }
                               >
-                                {user.status === 'active' ? (
-                                  <>
-                                    <Lock className="h-4 w-4 mr-1" />
-                                    Block
-                                  </>
-                                ) : (
-                                  <>
-                                    <Unlock className="h-4 w-4 mr-1" />
-                                    Unblock
-                                  </>
-                                )}
-                              </Button>
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                  >
-                                    <Key className="h-4 w-4 mr-1" />
-                                    Change Password
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>
-                                      Change Password for {user.name}
-                                    </DialogTitle>
-                                  </DialogHeader>
-                                  <ChangePasswordForm
-                                    userId={user._id}
-                                    onSuccess={loadAllData}
-                                  />
-                                </DialogContent>
-                              </Dialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                                {user.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  user.status === 'active'
+                                    ? 'default'
+                                    : 'destructive'
+                                }
+                              >
+                                {user.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(user.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <LoadingButton
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleToggleUserStatus(
+                                      user._id,
+                                      user.status,
+                                    )
+                                  }
+                                  loading={isTogglingStatus === user._id}
+                                  loadingText=""
+                                >
+                                  {user.status === 'active' ? (
+                                    <>
+                                      <Lock className="h-4 w-4 mr-1" />
+                                      Block
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Unlock className="h-4 w-4 mr-1" />
+                                      Unblock
+                                    </>
+                                  )}
+                                </LoadingButton>
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                    >
+                                      <Key className="h-4 w-4 mr-1" />
+                                      Change Password
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>
+                                        Change Password for {user.name}
+                                      </DialogTitle>
+                                    </DialogHeader>
+                                    <ChangePasswordForm
+                                      userId={user._id}
+                                      onSuccess={loadAllData}
+                                    />
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -491,11 +524,11 @@ export default function MastersPage() {
             </CardHeader>
             <CardContent>
               {passwordResetRequests.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    No pending password reset requests
-                  </p>
-                </div>
+                <EmptyState
+                  icon={Key}
+                  title="No Password Reset Requests"
+                  description="There are no pending password reset requests at the moment."
+                />
               ) : (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="overflow-x-auto">
@@ -522,7 +555,7 @@ export default function MastersPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
-                                <Button
+                                <LoadingButton
                                   variant="default"
                                   size="sm"
                                   onClick={() =>
@@ -531,10 +564,12 @@ export default function MastersPage() {
                                       'approve',
                                     )
                                   }
+                                  loading={isProcessingRequest === request._id}
+                                  loadingText="Approving..."
                                 >
                                   Approve
-                                </Button>
-                                <Button
+                                </LoadingButton>
+                                <LoadingButton
                                   variant="outline"
                                   size="sm"
                                   onClick={() =>
@@ -543,9 +578,11 @@ export default function MastersPage() {
                                       'reject',
                                     )
                                   }
+                                  loading={isProcessingRequest === request._id}
+                                  loadingText="Rejecting..."
                                 >
                                   Reject
-                                </Button>
+                                </LoadingButton>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -927,22 +964,13 @@ function UserForm({ onSuccess }: { onSuccess: () => void }) {
         </Select>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button
+        <LoadingButton
           type="submit"
-          disabled={loading}
+          loading={loading}
+          loadingText="Adding User..."
         >
-          {loading ? (
-            <>
-              <Spinner
-                size="sm"
-                className="mr-2"
-              />
-              Adding User...
-            </>
-          ) : (
-            'Add User'
-          )}
-        </Button>
+          Add User
+        </LoadingButton>
       </div>
     </form>
   );
@@ -1012,22 +1040,13 @@ function ChangePasswordForm({
         />
       </div>
       <div className="flex justify-end space-x-2">
-        <Button
+        <LoadingButton
           type="submit"
-          disabled={loading}
+          loading={loading}
+          loadingText="Changing Password..."
         >
-          {loading ? (
-            <>
-              <Spinner
-                size="sm"
-                className="mr-2"
-              />
-              Changing Password...
-            </>
-          ) : (
-            'Change Password'
-          )}
-        </Button>
+          Change Password
+        </LoadingButton>
       </div>
     </form>
   );
@@ -1157,22 +1176,13 @@ function StoneForm({ onSuccess }: { onSuccess: () => void }) {
         </Select>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button
+        <LoadingButton
           type="submit"
-          disabled={loading}
+          loading={loading}
+          loadingText="Adding Stone Type..."
         >
-          {loading ? (
-            <>
-              <Spinner
-                size="sm"
-                className="mr-2"
-              />
-              Adding Stone Type...
-            </>
-          ) : (
-            'Add Stone Type'
-          )}
-        </Button>
+          Add Stone Type
+        </LoadingButton>
       </div>
     </form>
   );
@@ -1268,22 +1278,13 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button
+        <LoadingButton
           type="submit"
-          disabled={loading}
+          loading={loading}
+          loadingText="Adding Paper Type..."
         >
-          {loading ? (
-            <>
-              <Spinner
-                size="sm"
-                className="mr-2"
-              />
-              Adding Paper Type...
-            </>
-          ) : (
-            'Add Paper Type'
-          )}
-        </Button>
+          Add Paper Type
+        </LoadingButton>
       </div>
     </form>
   );
@@ -1360,22 +1361,13 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
         </Select>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button
+        <LoadingButton
           type="submit"
-          disabled={loading}
+          loading={loading}
+          loadingText="Adding Plastic Type..."
         >
-          {loading ? (
-            <>
-              <Spinner
-                size="sm"
-                className="mr-2"
-              />
-              Adding Plastic Type...
-            </>
-          ) : (
-            'Add Plastic Type'
-          )}
-        </Button>
+          Add Plastic Type
+        </LoadingButton>
       </div>
     </form>
   );
@@ -1427,22 +1419,13 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
         </p>
       </div>
       <div className="flex justify-end space-x-2">
-        <Button
+        <LoadingButton
           type="submit"
-          disabled={loading}
+          loading={loading}
+          loadingText="Adding Tape Type..."
         >
-          {loading ? (
-            <>
-              <Spinner
-                size="sm"
-                className="mr-2"
-              />
-              Adding Tape Type...
-            </>
-          ) : (
-            'Add Tape Type'
-          )}
-        </Button>
+          Add Tape Type
+        </LoadingButton>
       </div>
     </form>
   );

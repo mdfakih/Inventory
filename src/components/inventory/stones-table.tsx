@@ -28,7 +28,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import { Gem, Plus } from 'lucide-react';
 
 interface Stone {
   _id: string;
@@ -46,6 +49,8 @@ export default function StonesTable() {
   const [stones, setStones] = useState<Stone[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     number: '',
@@ -67,7 +72,10 @@ export default function StonesTable() {
       }
     } catch (error) {
       console.error('Error fetching stones:', error);
-      showError('Network Error', 'Failed to load stones data. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to load stones data. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -79,6 +87,7 @@ export default function StonesTable() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
       const response = await fetch('/api/inventory/stones', {
         method: 'POST',
@@ -110,10 +119,13 @@ export default function StonesTable() {
     } catch (error) {
       console.error('Error adding stone:', error);
       showError('Network Error', 'Failed to add stone. Please try again.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleUpdateQuantity = async (stoneId: string, newQuantity: number) => {
+    setIsUpdating(stoneId);
     try {
       const response = await fetch(`/api/inventory/stones/${stoneId}`, {
         method: 'PATCH',
@@ -125,14 +137,25 @@ export default function StonesTable() {
 
       const data = await response.json();
       if (data.success) {
-        showSuccess('Quantity Updated', 'Stone quantity has been updated successfully.');
+        showSuccess(
+          'Quantity Updated',
+          'Stone quantity has been updated successfully.',
+        );
         fetchStones();
       } else {
-        showError('Update Failed', data.message || 'Failed to update quantity.');
+        showError(
+          'Update Failed',
+          data.message || 'Failed to update quantity.',
+        );
       }
     } catch (error) {
       console.error('Error updating quantity:', error);
-      showError('Network Error', 'Failed to update quantity. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to update quantity. Please try again.',
+      );
+    } finally {
+      setIsUpdating(null);
     }
   };
 
@@ -153,22 +176,33 @@ export default function StonesTable() {
             Manage stone inventory with quantity tracking
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+        >
           <DialogTrigger asChild>
-            <Button>Add Stone</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Stone
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Stone</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-4"
+            >
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
                   <Input
                     id="name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -177,7 +211,9 @@ export default function StonesTable() {
                   <Input
                     id="number"
                     value={formData.number}
-                    onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, number: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -188,7 +224,9 @@ export default function StonesTable() {
                   <Input
                     id="color"
                     value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, color: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -197,7 +235,9 @@ export default function StonesTable() {
                   <Input
                     id="size"
                     value={formData.size}
-                    onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, size: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -210,7 +250,9 @@ export default function StonesTable() {
                     type="number"
                     step="0.01"
                     value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, quantity: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -218,7 +260,9 @@ export default function StonesTable() {
                   <Label htmlFor="unit">Unit</Label>
                   <Select
                     value={formData.unit}
-                    onValueChange={(value: 'g' | 'kg') => setFormData({ ...formData, unit: value })}
+                    onValueChange={(value: 'g' | 'kg') =>
+                      setFormData({ ...formData, unit: value })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -231,64 +275,97 @@ export default function StonesTable() {
                 </div>
               </div>
               <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  disabled={isCreating}
+                >
                   Cancel
                 </Button>
-                <Button type="submit">Add Stone</Button>
+                <LoadingButton
+                  type="submit"
+                  loading={isCreating}
+                  loadingText="Adding..."
+                >
+                  Add Stone
+                </LoadingButton>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Number</TableHead>
-              <TableHead>Color</TableHead>
-              <TableHead>Size</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {stones.map((stone) => (
-              <TableRow key={stone._id}>
-                <TableCell className="font-medium">{stone.name}</TableCell>
-                <TableCell>{stone.number}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{stone.color}</Badge>
-                </TableCell>
-                <TableCell>{stone.size}</TableCell>
-                <TableCell>{stone.quantity}</TableCell>
-                <TableCell>{stone.unit}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const newQuantity = prompt('Enter new quantity:', stone.quantity.toString());
-                      if (newQuantity !== null) {
-                        const quantity = parseFloat(newQuantity);
-                        if (!isNaN(quantity) && quantity >= 0) {
-                          handleUpdateQuantity(stone._id, quantity);
-                        } else {
-                          showError('Invalid Input', 'Please enter a valid positive number.');
-                        }
-                      }
-                    }}
-                  >
-                    Update Quantity
-                  </Button>
-                </TableCell>
+      {stones.length === 0 ? (
+        <EmptyState
+          icon={Gem}
+          title="No Stones Found"
+          description="Get started by adding your first stone. Stone inventory will appear here once added."
+          action={
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Stone
+            </Button>
+          }
+        />
+      ) : (
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Number</TableHead>
+                <TableHead>Color</TableHead>
+                <TableHead>Size</TableHead>
+                <TableHead>Quantity</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {stones.map((stone) => (
+                <TableRow key={stone._id}>
+                  <TableCell className="font-medium">{stone.name}</TableCell>
+                  <TableCell>{stone.number}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{stone.color}</Badge>
+                  </TableCell>
+                  <TableCell>{stone.size}</TableCell>
+                  <TableCell>{stone.quantity}</TableCell>
+                  <TableCell>{stone.unit}</TableCell>
+                  <TableCell>
+                    <LoadingButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newQuantity = prompt(
+                          'Enter new quantity:',
+                          stone.quantity.toString(),
+                        );
+                        if (newQuantity !== null) {
+                          const quantity = parseFloat(newQuantity);
+                          if (!isNaN(quantity) && quantity >= 0) {
+                            handleUpdateQuantity(stone._id, quantity);
+                          } else {
+                            showError(
+                              'Invalid Input',
+                              'Please enter a valid positive number.',
+                            );
+                          }
+                        }
+                      }}
+                      loading={isUpdating === stone._id}
+                      loadingText="Updating..."
+                    >
+                      Update Quantity
+                    </LoadingButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }

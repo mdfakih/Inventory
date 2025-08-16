@@ -28,6 +28,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import { Package, Plus } from 'lucide-react';
 
 interface Plastic {
   _id: string;
@@ -39,10 +43,12 @@ export default function PlasticTable() {
   const [plastics, setPlastics] = useState<Plastic[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
     width: '',
     quantity: '',
   });
+  const { showSuccess, showError } = useSnackbarHelpers();
 
   const fetchPlastics = useCallback(async () => {
     try {
@@ -50,13 +56,19 @@ export default function PlasticTable() {
       const data = await response.json();
       if (data.success) {
         setPlastics(data.data);
+      } else {
+        showError('Data Loading Error', 'Failed to load plastic data.');
       }
     } catch (error) {
       console.error('Error fetching plastics:', error);
+      showError(
+        'Network Error',
+        'Failed to load plastic data. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showError]);
 
   useEffect(() => {
     fetchPlastics();
@@ -64,6 +76,7 @@ export default function PlasticTable() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
       const response = await fetch('/api/inventory/plastic', {
         method: 'POST',
@@ -79,6 +92,10 @@ export default function PlasticTable() {
 
       const data = await response.json();
       if (data.success) {
+        showSuccess(
+          'Plastic Added',
+          'New plastic has been added successfully.',
+        );
         setIsDialogOpen(false);
         setFormData({
           width: '',
@@ -86,11 +103,13 @@ export default function PlasticTable() {
         });
         fetchPlastics();
       } else {
-        alert(data.message);
+        showError('Creation Failed', data.message || 'Failed to add plastic.');
       }
     } catch (error) {
       console.error('Error creating plastic:', error);
-      alert('Error creating plastic');
+      showError('Network Error', 'Failed to add plastic. Please try again.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -111,7 +130,10 @@ export default function PlasticTable() {
           onOpenChange={setIsDialogOpen}
         >
           <DialogTrigger asChild>
-            <Button>Add Plastic</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Plastic
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -160,44 +182,67 @@ export default function PlasticTable() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsDialogOpen(false)}
+                  disabled={isCreating}
                 >
                   Cancel
                 </Button>
-                <Button type="submit">Add Plastic</Button>
+                <LoadingButton
+                  type="submit"
+                  loading={isCreating}
+                  loadingText="Adding..."
+                >
+                  Add Plastic
+                </LoadingButton>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Width</TableHead>
-              <TableHead>Quantity (pcs)</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {plastics.map((plastic) => (
-              <TableRow key={plastic._id}>
-                <TableCell className="font-medium">
-                  {plastic.width}&quot;
-                </TableCell>
-                <TableCell>{plastic.quantity}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={plastic.quantity < 10 ? 'destructive' : 'default'}
-                  >
-                    {plastic.quantity < 10 ? 'Low Stock' : 'In Stock'}
-                  </Badge>
-                </TableCell>
+      {plastics.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="No Plastic Found"
+          description="Get started by adding your first plastic. Plastic inventory will appear here once added."
+          action={
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Plastic
+            </Button>
+          }
+        />
+      ) : (
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Width</TableHead>
+                <TableHead>Quantity (pcs)</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {plastics.map((plastic) => (
+                <TableRow key={plastic._id}>
+                  <TableCell className="font-medium">
+                    {plastic.width}&quot;
+                  </TableCell>
+                  <TableCell>{plastic.quantity}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        plastic.quantity < 10 ? 'destructive' : 'default'
+                      }
+                    >
+                      {plastic.quantity < 10 ? 'Low Stock' : 'In Stock'}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }

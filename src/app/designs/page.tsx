@@ -30,8 +30,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
-import { Upload, X, Edit, Trash2, Eye, Plus } from 'lucide-react';
+import { Upload, X, Edit, Trash2, Eye, Plus, Palette } from 'lucide-react';
 
 interface Stone {
   _id: string;
@@ -99,6 +101,9 @@ export default function DesignsPage() {
   const [selectedDesign, setSelectedDesign] = useState<Design | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -184,6 +189,7 @@ export default function DesignsPage() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
       const response = await fetch('/api/designs', {
         method: 'POST',
@@ -217,6 +223,8 @@ export default function DesignsPage() {
     } catch (error) {
       console.error('Error creating design:', error);
       showError('Network Error', 'Failed to create design. Please try again.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -224,6 +232,7 @@ export default function DesignsPage() {
     e.preventDefault();
     if (!selectedDesign) return;
 
+    setIsUpdating(true);
     try {
       const response = await fetch(`/api/designs/${selectedDesign._id}`, {
         method: 'PUT',
@@ -245,12 +254,15 @@ export default function DesignsPage() {
     } catch (error) {
       console.error('Error updating design:', error);
       showError('Network Error', 'Failed to update design. Please try again.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   const handleDelete = async (designId: string) => {
     if (!confirm('Are you sure you want to delete this design?')) return;
 
+    setIsDeleting(designId);
     try {
       const response = await fetch(`/api/designs/${designId}`, {
         method: 'DELETE',
@@ -269,6 +281,8 @@ export default function DesignsPage() {
     } catch (error) {
       console.error('Error deleting design:', error);
       showError('Network Error', 'Failed to delete design. Please try again.');
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -354,7 +368,10 @@ export default function DesignsPage() {
           onOpenChange={setIsCreateDialogOpen}
         >
           <DialogTrigger asChild>
-            <Button>Add Design</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Design
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -532,10 +549,17 @@ export default function DesignsPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsCreateDialogOpen(false)}
+                  disabled={isCreating}
                 >
                   Cancel
                 </Button>
-                <Button type="submit">Create Design</Button>
+                <LoadingButton
+                  type="submit"
+                  loading={isCreating}
+                  loadingText="Creating..."
+                >
+                  Create Design
+                </LoadingButton>
               </div>
             </form>
           </DialogContent>
@@ -544,107 +568,125 @@ export default function DesignsPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Image</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Number</TableHead>
-                <TableHead>Default Stones</TableHead>
-                <TableHead>Paper Configurations</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {designs.map((design) => (
-                <TableRow key={design._id}>
-                  <TableCell>
-                    {design.imageUrl ? (
-                      <Image
-                        src={design.imageUrl}
-                        alt={design.name}
-                        width={48}
-                        height={48}
-                        className="h-12 w-12 object-cover rounded"
-                      />
-                    ) : (
-                      <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center">
-                        <span className="text-gray-500 text-xs">No Image</span>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">{design.name}</TableCell>
-                  <TableCell>{design.number}</TableCell>
-                  <TableCell>
-                    {design.defaultStones.length > 0 ? (
-                      <div className="space-y-1">
-                        {design.defaultStones.map((stone, index) => (
-                          <Badge
-                            key={index}
-                            variant="outline"
-                            className="mr-1"
-                          >
-                            {stone.stoneId.name}: {stone.quantity}g
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-500">No default stones</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {design.paperConfigurations.length > 0 ? (
-                      <div className="space-y-1">
-                        {design.paperConfigurations.map((config, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="mr-1"
-                          >
-                            {config.paperSize}&quot;:{' '}
-                            {config.defaultStones.length} stones
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-500">No paper configs</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(design.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openViewDialog(design)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDialog(design)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {user?.role === 'admin' && (
+          {designs.length === 0 ? (
+            <EmptyState
+              icon={Palette}
+              title="No Designs Found"
+              description="Get started by creating your first design. Designs will appear here once they are created."
+              action={
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Design
+                </Button>
+              }
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Image</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Number</TableHead>
+                  <TableHead>Default Stones</TableHead>
+                  <TableHead>Paper Configurations</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {designs.map((design) => (
+                  <TableRow key={design._id}>
+                    <TableCell>
+                      {design.imageUrl ? (
+                        <Image
+                          src={design.imageUrl}
+                          alt={design.name}
+                          width={48}
+                          height={48}
+                          className="h-12 w-12 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center">
+                          <span className="text-gray-500 text-xs">
+                            No Image
+                          </span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{design.name}</TableCell>
+                    <TableCell>{design.number}</TableCell>
+                    <TableCell>
+                      {design.defaultStones.length > 0 ? (
+                        <div className="space-y-1">
+                          {design.defaultStones.map((stone, index) => (
+                            <Badge
+                              key={index}
+                              variant="outline"
+                              className="mr-1"
+                            >
+                              {stone.stoneId.name}: {stone.quantity}g
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">No default stones</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {design.paperConfigurations.length > 0 ? (
+                        <div className="space-y-1">
+                          {design.paperConfigurations.map((config, index) => (
+                            <Badge
+                              key={index}
+                              variant="secondary"
+                              className="mr-1"
+                            >
+                              {config.paperSize}&quot;:{' '}
+                              {config.defaultStones.length} stones
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">No paper configs</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(design.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(design._id)}
+                          onClick={() => openViewDialog(design)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditDialog(design)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {user?.role === 'admin' && (
+                          <LoadingButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(design._id)}
+                            loading={isDeleting === design._id}
+                            loadingText=""
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </LoadingButton>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -840,10 +882,17 @@ export default function DesignsPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsEditDialogOpen(false)}
+                disabled={isUpdating}
               >
                 Cancel
               </Button>
-              <Button type="submit">Update Design</Button>
+              <LoadingButton
+                type="submit"
+                loading={isUpdating}
+                loadingText="Updating..."
+              >
+                Update Design
+              </LoadingButton>
             </div>
           </form>
         </DialogContent>

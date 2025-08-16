@@ -29,8 +29,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
-import { Edit, Trash2, Eye } from 'lucide-react';
+import { Edit, Trash2, Eye, Package, Plus } from 'lucide-react';
 
 interface User {
   id: string;
@@ -92,7 +94,6 @@ interface Order {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [designs, setDesigns] = useState<Design[]>([]);
-
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -100,6 +101,11 @@ export default function OrdersPage() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [user, setUser] = useState<User | null>(null);
+
+  // Loading states for individual operations
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     type: 'internal' as 'internal' | 'out',
     customerName: '',
@@ -168,6 +174,7 @@ export default function OrdersPage() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
       const response = await fetch('/api/orders', {
         method: 'POST',
@@ -209,11 +216,14 @@ export default function OrdersPage() {
     } catch (error) {
       console.error('Error creating order:', error);
       showError('Network Error', 'Failed to create order. Please try again.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsUpdating(true);
     try {
       const response = await fetch(`/api/orders/${selectedOrder?._id}`, {
         method: 'PUT',
@@ -245,12 +255,15 @@ export default function OrdersPage() {
     } catch (error) {
       console.error('Error updating order:', error);
       showError('Network Error', 'Failed to update order. Please try again.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   const handleDelete = async (orderId: string) => {
     if (!confirm('Are you sure you want to delete this order?')) return;
 
+    setIsDeleting(orderId);
     try {
       const response = await fetch(`/api/orders/${orderId}`, {
         method: 'DELETE',
@@ -266,6 +279,8 @@ export default function OrdersPage() {
     } catch (error) {
       console.error('Error deleting order:', error);
       showError('Network Error', 'Failed to delete order. Please try again.');
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -336,7 +351,10 @@ export default function OrdersPage() {
           onOpenChange={setIsCreateDialogOpen}
         >
           <DialogTrigger asChild>
-            <Button>Create Order</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Order
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -467,10 +485,17 @@ export default function OrdersPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsCreateDialogOpen(false)}
+                  disabled={isCreating}
                 >
                   Cancel
                 </Button>
-                <Button type="submit">Create Order</Button>
+                <LoadingButton
+                  type="submit"
+                  loading={isCreating}
+                  loadingText="Creating..."
+                >
+                  Create Order
+                </LoadingButton>
               </div>
             </form>
           </DialogContent>
@@ -479,85 +504,101 @@ export default function OrdersPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableHead>Customer</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Design</TableHead>
-              <TableHead>Paper Used</TableHead>
-              <TableHead>Calculated Weight</TableHead>
-              <TableHead>Final Weight</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order._id}>
-                  <TableCell className="font-medium">
-                    {order.customerName}
-                  </TableCell>
-                  <TableCell>{order.phone}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        order.type === 'internal' ? 'default' : 'secondary'
-                      }
-                    >
-                      {order.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{order.designId?.name || 'N/A'}</TableCell>
-                  <TableCell>
-                    {order.paperUsed.sizeInInch}&quot; ×{' '}
-                    {order.paperUsed.quantityInPcs} pcs
-                  </TableCell>
-                  <TableCell>{order.calculatedWeight?.toFixed(2)}g</TableCell>
-                  <TableCell>
-                    {order.finalTotalWeight
-                      ? `${order.finalTotalWeight.toFixed(2)}g`
-                      : 'Not set'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(order.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openViewDialog(order)}
+          {orders.length === 0 ? (
+            <EmptyState
+              icon={Package}
+              title="No Orders Found"
+              description="Get started by creating your first order. Orders will appear here once they are created."
+              action={
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Order
+                </Button>
+              }
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableHead>Customer</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Design</TableHead>
+                <TableHead>Paper Used</TableHead>
+                <TableHead>Calculated Weight</TableHead>
+                <TableHead>Final Weight</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order._id}>
+                    <TableCell className="font-medium">
+                      {order.customerName}
+                    </TableCell>
+                    <TableCell>{order.phone}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          order.type === 'internal' ? 'default' : 'secondary'
+                        }
                       >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDialog(order)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {user?.role === 'admin' && (
+                        {order.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{order.designId?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      {order.paperUsed.sizeInInch}&quot; ×{' '}
+                      {order.paperUsed.quantityInPcs} pcs
+                    </TableCell>
+                    <TableCell>{order.calculatedWeight?.toFixed(2)}g</TableCell>
+                    <TableCell>
+                      {order.finalTotalWeight
+                        ? `${order.finalTotalWeight.toFixed(2)}g`
+                        : 'Not set'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(order._id)}
+                          onClick={() => openViewDialog(order)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditDialog(order)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {user?.role === 'admin' && (
+                          <LoadingButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(order._id)}
+                            loading={isDeleting === order._id}
+                            loadingText=""
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </LoadingButton>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -741,10 +782,17 @@ export default function OrdersPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsEditDialogOpen(false)}
+                disabled={isUpdating}
               >
                 Cancel
               </Button>
-              <Button type="submit">Update Order</Button>
+              <LoadingButton
+                type="submit"
+                loading={isUpdating}
+                loadingText="Updating..."
+              >
+                Update Order
+              </LoadingButton>
             </div>
           </form>
         </DialogContent>

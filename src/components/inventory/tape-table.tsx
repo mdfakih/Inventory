@@ -21,6 +21,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import { Package, Plus } from 'lucide-react';
 
 export default function TapeTable() {
   const [tapes, setTapes] = useState<
@@ -34,9 +38,11 @@ export default function TapeTable() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
     quantity: '',
   });
+  const { showSuccess, showError } = useSnackbarHelpers();
 
   useEffect(() => {
     fetchTapes();
@@ -48,9 +54,12 @@ export default function TapeTable() {
       const data = await response.json();
       if (data.success) {
         setTapes(data.data);
+      } else {
+        showError('Data Loading Error', 'Failed to load tape data.');
       }
     } catch (error) {
       console.error('Error fetching tapes:', error);
+      showError('Network Error', 'Failed to load tape data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -58,6 +67,7 @@ export default function TapeTable() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
       const response = await fetch('/api/inventory/tape', {
         method: 'POST',
@@ -71,17 +81,20 @@ export default function TapeTable() {
 
       const data = await response.json();
       if (data.success) {
+        showSuccess('Tape Added', 'New tape has been added successfully.');
         setIsDialogOpen(false);
         setFormData({
           quantity: '',
         });
         fetchTapes();
       } else {
-        alert(data.message);
+        showError('Creation Failed', data.message || 'Failed to add tape.');
       }
     } catch (error) {
       console.error('Error creating tape:', error);
-      alert('Error creating tape');
+      showError('Network Error', 'Failed to add tape. Please try again.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -102,7 +115,10 @@ export default function TapeTable() {
           onOpenChange={setIsDialogOpen}
         >
           <DialogTrigger asChild>
-            <Button>Add Tape</Button>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Tape
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -129,40 +145,61 @@ export default function TapeTable() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsDialogOpen(false)}
+                  disabled={isCreating}
                 >
                   Cancel
                 </Button>
-                <Button type="submit">Add Tape</Button>
+                <LoadingButton
+                  type="submit"
+                  loading={isCreating}
+                  loadingText="Adding..."
+                >
+                  Add Tape
+                </LoadingButton>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Quantity (pcs)</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tapes.map((tape) => (
-              <TableRow key={tape._id}>
-                <TableCell className="font-medium">{tape.quantity}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={tape.quantity < 20 ? 'destructive' : 'default'}
-                  >
-                    {tape.quantity < 20 ? 'Low Stock' : 'In Stock'}
-                  </Badge>
-                </TableCell>
+      {tapes.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="No Tape Found"
+          description="Get started by adding your first tape. Tape inventory will appear here once added."
+          action={
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Tape
+            </Button>
+          }
+        />
+      ) : (
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Quantity (pcs)</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {tapes.map((tape) => (
+                <TableRow key={tape._id}>
+                  <TableCell className="font-medium">{tape.quantity}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={tape.quantity < 20 ? 'destructive' : 'default'}
+                    >
+                      {tape.quantity < 20 ? 'Low Stock' : 'In Stock'}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }
