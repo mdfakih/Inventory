@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -63,18 +63,15 @@ const outJobInventoryItems = [
   },
 ];
 
-export default function InventoryLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function InventoryLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
+
   // Determine current tab based on URL or default to internal
   const currentTab = searchParams.get('type') === 'out' ? 'out' : 'internal';
-  const currentItems = currentTab === 'out' ? outJobInventoryItems : internalInventoryItems;
+  const currentItems =
+    currentTab === 'out' ? outJobInventoryItems : internalInventoryItems;
 
   const handleTabChange = (value: string) => {
     // Update the URL to reflect the selected tab
@@ -120,13 +117,23 @@ export default function InventoryLayout({
         {/* Tabs */}
         {isSidebarOpen && (
           <div className="p-4 border-b">
-            <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
+            <Tabs
+              value={currentTab}
+              onValueChange={handleTabChange}
+              className="w-full"
+            >
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="internal" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="internal"
+                  className="flex items-center gap-2"
+                >
                   <Building2 className="h-4 w-4" />
                   Internal
                 </TabsTrigger>
-                <TabsTrigger value="out" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="out"
+                  className="flex items-center gap-2"
+                >
                   <ExternalLink className="h-4 w-4" />
                   Out Jobs
                 </TabsTrigger>
@@ -139,8 +146,9 @@ export default function InventoryLayout({
           <div className="space-y-1">
             {currentItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname.includes(item.href.split('?')[0]) &&
-                (item.href.includes('type=') 
+              const isActive =
+                pathname.includes(item.href.split('?')[0]) &&
+                (item.href.includes('type=')
                   ? searchParams.get('type') === item.href.split('type=')[1]
                   : !searchParams.get('type'));
 
@@ -182,5 +190,23 @@ export default function InventoryLayout({
         <div className="p-6">{children}</div>
       </div>
     </div>
+  );
+}
+
+export default function InventoryLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
+      <InventoryLayoutContent>{children}</InventoryLayoutContent>
+    </Suspense>
   );
 }
