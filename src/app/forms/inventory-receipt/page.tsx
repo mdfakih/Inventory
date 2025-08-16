@@ -1,13 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { generateReceiptNumber } from '@/lib/utils';
 
 export default function InventoryReceiptFormPage() {
   const router = useRouter();
-  const [currentDate] = useState(new Date().toLocaleDateString());
+  const [receiptNumber, setReceiptNumber] = useState('');
+
+  useEffect(() => {
+    setReceiptNumber(generateReceiptNumber());
+  }, []);
 
   const handlePrint = () => {
     window.print();
@@ -15,12 +20,6 @@ export default function InventoryReceiptFormPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Print Header - Only visible when printing */}
-      <div className="hidden print:block text-center py-4 border-b-2 border-gray-300">
-        <h1 className="text-2xl font-bold text-gray-800">INVENTORY RECEIPT FORM</h1>
-        <p className="text-sm text-gray-600">Inventory Management System</p>
-      </div>
-
       {/* Screen Header - Hidden when printing */}
       <div className="print:hidden bg-white border-b p-4">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
@@ -32,7 +31,10 @@ export default function InventoryReceiptFormPage() {
             <ArrowLeft className="h-4 w-4" />
             <span>Back to Forms</span>
           </Button>
-          <Button onClick={handlePrint} className="flex items-center space-x-2">
+          <Button
+            onClick={handlePrint}
+            className="flex items-center space-x-2"
+          >
             <Printer className="h-4 w-4" />
             <span>Print Form</span>
           </Button>
@@ -46,13 +48,19 @@ export default function InventoryReceiptFormPage() {
           <div className="border-b-2 border-gray-300 p-6 print:p-4">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-3xl font-bold text-gray-800 print:text-2xl">INVENTORY RECEIPT FORM</h1>
-                <p className="text-gray-600 mt-1">Record received materials and inventory updates</p>
+                <h1 className="text-3xl font-bold text-gray-800 print:text-2xl">
+                  INVENTORY RECEIPT FORM
+                </h1>
+                <p className="text-gray-600 mt-1">
+                  Record received materials and inventory updates
+                </p>
               </div>
               <div className="text-right">
                 <div className="border-2 border-gray-300 p-3 print:p-2">
                   <p className="text-sm font-medium text-gray-700">RECEIPT #</p>
-                  <div className="h-8 border-b border-gray-400 mt-1 print:h-6"></div>
+                  <div className="h-8 border-b border-gray-400 mt-1 print:h-6 text-sm font-mono">
+                    {receiptNumber}
+                  </div>
                 </div>
               </div>
             </div>
@@ -60,31 +68,51 @@ export default function InventoryReceiptFormPage() {
 
           {/* Receipt Information Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">RECEIPT INFORMATION</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              RECEIPT INFORMATION
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date Received:</label>
-                <div className="border-2 border-gray-300 p-2 h-10 print:h-8">{currentDate}</div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time Received:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date Received:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Inventory Type:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time Received:
+                </label>
+                <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Inventory Type:
+                </label>
                 <div className="flex space-x-4">
                   <label className="flex items-center">
-                    <input type="radio" name="inventoryType" value="internal" className="mr-2" />
+                    <input
+                      type="radio"
+                      name="inventoryType"
+                      value="internal"
+                      className="mr-2"
+                    />
                     <span className="text-sm">Internal</span>
                   </label>
                   <label className="flex items-center">
-                    <input type="radio" name="inventoryType" value="out" className="mr-2" />
+                    <input
+                      type="radio"
+                      name="inventoryType"
+                      value="out"
+                      className="mr-2"
+                    />
                     <span className="text-sm">Out Job</span>
                   </label>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Batch Number:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Batch Number:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
             </div>
@@ -92,26 +120,38 @@ export default function InventoryReceiptFormPage() {
 
           {/* Supplier Information Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">SUPPLIER INFORMATION</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              SUPPLIER INFORMATION
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Supplier Name:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supplier Name:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Contact Person:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Contact Person:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Supplier Address:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supplier Address:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
             </div>
@@ -119,20 +159,36 @@ export default function InventoryReceiptFormPage() {
 
           {/* Materials Received Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">MATERIALS RECEIVED</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              MATERIALS RECEIVED
+            </h2>
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">Stones Received:</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">
+                  Stones Received:
+                </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full border border-gray-300">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Stone Name/Number</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Color</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Size</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Quantity Received</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Unit</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Quality Check</th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Stone Name/Number
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Color
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Size
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Quantity Received
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Unit
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Quality Check
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -146,11 +202,21 @@ export default function InventoryReceiptFormPage() {
                           <td className="border border-gray-300 p-2 h-8 print:h-6">
                             <div className="flex space-x-2">
                               <label className="flex items-center">
-                                <input type="radio" name={`quality-${row}`} value="pass" className="mr-1" />
+                                <input
+                                  type="radio"
+                                  name={`quality-${row}`}
+                                  value="pass"
+                                  className="mr-1"
+                                />
                                 <span className="text-xs">Pass</span>
                               </label>
                               <label className="flex items-center">
-                                <input type="radio" name={`quality-${row}`} value="fail" className="mr-1" />
+                                <input
+                                  type="radio"
+                                  name={`quality-${row}`}
+                                  value="fail"
+                                  className="mr-1"
+                                />
                                 <span className="text-xs">Fail</span>
                               </label>
                             </div>
@@ -163,16 +229,28 @@ export default function InventoryReceiptFormPage() {
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">Paper Received:</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">
+                  Paper Received:
+                </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full border border-gray-300">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Width (inches)</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Quantity (pcs)</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Pieces per Roll</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Weight per Piece (g)</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Quality Check</th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Width (inches)
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Quantity (pcs)
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Pieces per Roll
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Weight per Piece (g)
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Quality Check
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -185,11 +263,21 @@ export default function InventoryReceiptFormPage() {
                           <td className="border border-gray-300 p-2 h-8 print:h-6">
                             <div className="flex space-x-2">
                               <label className="flex items-center">
-                                <input type="radio" name={`paper-quality-${row}`} value="pass" className="mr-1" />
+                                <input
+                                  type="radio"
+                                  name={`paper-quality-${row}`}
+                                  value="pass"
+                                  className="mr-1"
+                                />
                                 <span className="text-xs">Pass</span>
                               </label>
                               <label className="flex items-center">
-                                <input type="radio" name={`paper-quality-${row}`} value="fail" className="mr-1" />
+                                <input
+                                  type="radio"
+                                  name={`paper-quality-${row}`}
+                                  value="fail"
+                                  className="mr-1"
+                                />
                                 <span className="text-xs">Fail</span>
                               </label>
                             </div>
@@ -202,16 +290,28 @@ export default function InventoryReceiptFormPage() {
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">Other Materials:</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">
+                  Other Materials:
+                </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full border border-gray-300">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Material Type</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Description</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Quantity</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Unit</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Quality Check</th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Material Type
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Description
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Quantity
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Unit
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Quality Check
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -224,11 +324,21 @@ export default function InventoryReceiptFormPage() {
                           <td className="border border-gray-300 p-2 h-8 print:h-6">
                             <div className="flex space-x-2">
                               <label className="flex items-center">
-                                <input type="radio" name={`other-quality-${row}`} value="pass" className="mr-1" />
+                                <input
+                                  type="radio"
+                                  name={`other-quality-${row}`}
+                                  value="pass"
+                                  className="mr-1"
+                                />
                                 <span className="text-xs">Pass</span>
                               </label>
                               <label className="flex items-center">
-                                <input type="radio" name={`other-quality-${row}`} value="fail" className="mr-1" />
+                                <input
+                                  type="radio"
+                                  name={`other-quality-${row}`}
+                                  value="fail"
+                                  className="mr-1"
+                                />
                                 <span className="text-xs">Fail</span>
                               </label>
                             </div>
@@ -243,55 +353,100 @@ export default function InventoryReceiptFormPage() {
           </div>
 
           {/* Quality Check Section */}
-          <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">QUALITY CHECK</h2>
+          <div className="p-6 print:p-4 border-b border-gray-200 print:page-break-before">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              QUALITY CHECK
+            </h2>
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Overall Quality Rating:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Overall Quality Rating:
+                  </label>
                   <div className="flex space-x-4">
                     <label className="flex items-center">
-                      <input type="radio" name="overallQuality" value="excellent" className="mr-2" />
+                      <input
+                        type="radio"
+                        name="overallQuality"
+                        value="excellent"
+                        className="mr-2"
+                      />
                       <span className="text-sm">Excellent</span>
                     </label>
                     <label className="flex items-center">
-                      <input type="radio" name="overallQuality" value="good" className="mr-2" />
+                      <input
+                        type="radio"
+                        name="overallQuality"
+                        value="good"
+                        className="mr-2"
+                      />
                       <span className="text-sm">Good</span>
                     </label>
                     <label className="flex items-center">
-                      <input type="radio" name="overallQuality" value="fair" className="mr-2" />
+                      <input
+                        type="radio"
+                        name="overallQuality"
+                        value="fair"
+                        className="mr-2"
+                      />
                       <span className="text-sm">Fair</span>
                     </label>
                     <label className="flex items-center">
-                      <input type="radio" name="overallQuality" value="poor" className="mr-2" />
+                      <input
+                        type="radio"
+                        name="overallQuality"
+                        value="poor"
+                        className="mr-2"
+                      />
                       <span className="text-sm">Poor</span>
                     </label>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Packaging Condition:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Packaging Condition:
+                  </label>
                   <div className="flex space-x-4">
                     <label className="flex items-center">
-                      <input type="radio" name="packaging" value="excellent" className="mr-2" />
+                      <input
+                        type="radio"
+                        name="packaging"
+                        value="excellent"
+                        className="mr-2"
+                      />
                       <span className="text-sm">Excellent</span>
                     </label>
                     <label className="flex items-center">
-                      <input type="radio" name="packaging" value="good" className="mr-2" />
+                      <input
+                        type="radio"
+                        name="packaging"
+                        value="good"
+                        className="mr-2"
+                      />
                       <span className="text-sm">Good</span>
                     </label>
                     <label className="flex items-center">
-                      <input type="radio" name="packaging" value="damaged" className="mr-2" />
+                      <input
+                        type="radio"
+                        name="packaging"
+                        value="damaged"
+                        className="mr-2"
+                      />
                       <span className="text-sm">Damaged</span>
                     </label>
                   </div>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Quality Issues Found:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quality Issues Found:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Action Taken:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Action Taken:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
             </div>
@@ -299,40 +454,70 @@ export default function InventoryReceiptFormPage() {
 
           {/* Verification Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">VERIFICATION</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              VERIFICATION
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Quantity Verified:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quantity Verified:
+                </label>
                 <div className="flex space-x-4">
                   <label className="flex items-center">
-                    <input type="radio" name="quantityVerified" value="yes" className="mr-2" />
+                    <input
+                      type="radio"
+                      name="quantityVerified"
+                      value="yes"
+                      className="mr-2"
+                    />
                     <span className="text-sm">Yes</span>
                   </label>
                   <label className="flex items-center">
-                    <input type="radio" name="quantityVerified" value="no" className="mr-2" />
+                    <input
+                      type="radio"
+                      name="quantityVerified"
+                      value="no"
+                      className="mr-2"
+                    />
                     <span className="text-sm">No</span>
                   </label>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Specifications Match:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Specifications Match:
+                </label>
                 <div className="flex space-x-4">
                   <label className="flex items-center">
-                    <input type="radio" name="specificationsMatch" value="yes" className="mr-2" />
+                    <input
+                      type="radio"
+                      name="specificationsMatch"
+                      value="yes"
+                      className="mr-2"
+                    />
                     <span className="text-sm">Yes</span>
                   </label>
                   <label className="flex items-center">
-                    <input type="radio" name="specificationsMatch" value="no" className="mr-2" />
+                    <input
+                      type="radio"
+                      name="specificationsMatch"
+                      value="no"
+                      className="mr-2"
+                    />
                     <span className="text-sm">No</span>
                   </label>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Discrepancies Found:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Discrepancies Found:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Corrective Actions:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Corrective Actions:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
             </div>
@@ -340,18 +525,26 @@ export default function InventoryReceiptFormPage() {
 
           {/* Notes Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">NOTES & COMMENTS</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              NOTES & COMMENTS
+            </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Special Instructions:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Special Instructions:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Supplier Notes:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supplier Notes:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Additional Comments:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Additional Comments:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
             </div>
@@ -359,31 +552,49 @@ export default function InventoryReceiptFormPage() {
 
           {/* Signatures Section */}
           <div className="p-6 print:p-4">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">SIGNATURES & APPROVALS</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              SIGNATURES & APPROVALS
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 print:grid-cols-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Received By:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Received By:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
-                <p className="text-xs text-gray-500 mt-1">Employee Name & Signature</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Employee Name & Signature
+                </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Quality Checked By:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quality Checked By:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
-                <p className="text-xs text-gray-500 mt-1">Quality Inspector Name & Signature</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Quality Inspector Name & Signature
+                </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Approved By:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Approved By:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
-                <p className="text-xs text-gray-500 mt-1">Manager Name & Signature</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Manager Name & Signature
+                </p>
               </div>
             </div>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
             </div>
@@ -392,13 +603,19 @@ export default function InventoryReceiptFormPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500 print:mt-4">
-          <p>This form must be completed for all received materials and filed for audit purposes.</p>
-          <p className="mt-1">Form Version: 1.0 | Last Updated: {currentDate}</p>
+          <p>
+            This form must be completed for all received materials and filed for
+            audit purposes.
+          </p>
+          <p className="mt-1">Form Version: 1.0 | Receipt: {receiptNumber}</p>
         </div>
       </div>
 
       {/* Print Styles */}
-      <style jsx global>{`
+      <style
+        jsx
+        global
+      >{`
         @media print {
           @page {
             margin: 0.5in;
@@ -458,6 +675,16 @@ export default function InventoryReceiptFormPage() {
           }
           .print\\:mt-4 {
             margin-top: 1rem !important;
+          }
+          /* Optimize for 2-page printing */
+          .print\\:page-break-before {
+            page-break-before: always !important;
+          }
+          .print\\:page-break-after {
+            page-break-after: always !important;
+          }
+          .print\\:page-break-inside-avoid {
+            page-break-inside: avoid !important;
           }
         }
       `}</style>

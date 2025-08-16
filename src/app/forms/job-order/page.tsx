@@ -1,13 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { generateJobOrderNumber } from '@/lib/utils';
 
 export default function JobOrderFormPage() {
   const router = useRouter();
-  const [currentDate] = useState(new Date().toLocaleDateString());
+  const [jobOrderNumber, setJobOrderNumber] = useState('');
+
+  useEffect(() => {
+    setJobOrderNumber(generateJobOrderNumber());
+  }, []);
 
   const handlePrint = () => {
     window.print();
@@ -15,12 +20,6 @@ export default function JobOrderFormPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Print Header - Only visible when printing */}
-      <div className="hidden print:block text-center py-4 border-b-2 border-gray-300">
-        <h1 className="text-2xl font-bold text-gray-800">JOB ORDER FORM</h1>
-        <p className="text-sm text-gray-600">Inventory Management System</p>
-      </div>
-
       {/* Screen Header - Hidden when printing */}
       <div className="print:hidden bg-white border-b p-4">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
@@ -32,7 +31,10 @@ export default function JobOrderFormPage() {
             <ArrowLeft className="h-4 w-4" />
             <span>Back to Forms</span>
           </Button>
-          <Button onClick={handlePrint} className="flex items-center space-x-2">
+          <Button
+            onClick={handlePrint}
+            className="flex items-center space-x-2"
+          >
             <Printer className="h-4 w-4" />
             <span>Print Form</span>
           </Button>
@@ -46,13 +48,21 @@ export default function JobOrderFormPage() {
           <div className="border-b-2 border-gray-300 p-6 print:p-4">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-3xl font-bold text-gray-800 print:text-2xl">JOB ORDER FORM</h1>
-                <p className="text-gray-600 mt-1">Complete this form for all job orders</p>
+                <h1 className="text-3xl font-bold text-gray-800 print:text-2xl">
+                  JOB ORDER FORM
+                </h1>
+                <p className="text-gray-600 mt-1">
+                  Complete this form for all job orders
+                </p>
               </div>
               <div className="text-right">
                 <div className="border-2 border-gray-300 p-3 print:p-2">
-                  <p className="text-sm font-medium text-gray-700">JOB ORDER #</p>
-                  <div className="h-8 border-b border-gray-400 mt-1 print:h-6"></div>
+                  <p className="text-sm font-medium text-gray-700">
+                    JOB ORDER #
+                  </p>
+                  <div className="h-8 border-b border-gray-400 mt-1 print:h-6 text-sm font-mono">
+                    {jobOrderNumber}
+                  </div>
                 </div>
               </div>
             </div>
@@ -60,31 +70,51 @@ export default function JobOrderFormPage() {
 
           {/* Job Information Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">JOB INFORMATION</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              JOB INFORMATION
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date:</label>
-                <div className="border-2 border-gray-300 p-2 h-10 print:h-8">{currentDate}</div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Job Type:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time:
+                </label>
+                <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Job Type:
+                </label>
                 <div className="flex space-x-4">
                   <label className="flex items-center">
-                    <input type="radio" name="jobType" value="internal" className="mr-2" />
+                    <input
+                      type="radio"
+                      name="jobType"
+                      value="internal"
+                      className="mr-2"
+                    />
                     <span className="text-sm">Internal Job</span>
                   </label>
                   <label className="flex items-center">
-                    <input type="radio" name="jobType" value="out" className="mr-2" />
+                    <input
+                      type="radio"
+                      name="jobType"
+                      value="out"
+                      className="mr-2"
+                    />
                     <span className="text-sm">Out Job</span>
                   </label>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
             </div>
@@ -92,18 +122,26 @@ export default function JobOrderFormPage() {
 
           {/* Customer Information Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">CUSTOMER INFORMATION</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              CUSTOMER INFORMATION
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Customer Name:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Customer Name:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Design/Product Description:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Design/Product Description:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
             </div>
@@ -111,19 +149,33 @@ export default function JobOrderFormPage() {
 
           {/* Materials Received Section (For Out Jobs) */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">MATERIALS RECEIVED (For Out Jobs Only)</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              MATERIALS RECEIVED (For Out Jobs Only)
+            </h2>
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">Stones Received:</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">
+                  Stones Received:
+                </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full border border-gray-300">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Stone Name/Number</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Color</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Size</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Quantity (g/kg)</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Unit</th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Stone Name/Number
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Color
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Size
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Quantity (g/kg)
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Unit
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -142,18 +194,26 @@ export default function JobOrderFormPage() {
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">Paper Received:</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">
+                  Paper Received:
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Width (inches):</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Width (inches):
+                    </label>
                     <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Quantity (pcs):</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Quantity (pcs):
+                    </label>
                     <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Weight per Piece (g):</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Weight per Piece (g):
+                    </label>
                     <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
                   </div>
                 </div>
@@ -162,20 +222,34 @@ export default function JobOrderFormPage() {
           </div>
 
           {/* Materials Used Section */}
-          <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">MATERIALS USED</h2>
+          <div className="p-6 print:p-4 border-b border-gray-200 print:page-break-before">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              MATERIALS USED
+            </h2>
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">Stones Used:</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">
+                  Stones Used:
+                </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full border border-gray-300">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Stone Name/Number</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Color</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Size</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Quantity Used (g/kg)</th>
-                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">Unit</th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Stone Name/Number
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Color
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Size
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Quantity Used (g/kg)
+                        </th>
+                        <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                          Unit
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -194,18 +268,26 @@ export default function JobOrderFormPage() {
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">Paper Used:</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3 print:text-base">
+                  Paper Used:
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Width (inches):</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Width (inches):
+                    </label>
                     <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Quantity (pcs):</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Quantity (pcs):
+                    </label>
                     <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Weight per Piece (g):</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Weight per Piece (g):
+                    </label>
                     <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
                   </div>
                 </div>
@@ -215,22 +297,32 @@ export default function JobOrderFormPage() {
 
           {/* Weight Calculations Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">WEIGHT CALCULATIONS</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              WEIGHT CALCULATIONS
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Calculated Weight (g):</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Calculated Weight (g):
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Final Total Weight (g):</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Final Total Weight (g):
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Weight Discrepancy (g):</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Weight Discrepancy (g):
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Discrepancy %:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Discrepancy %:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
             </div>
@@ -238,22 +330,32 @@ export default function JobOrderFormPage() {
 
           {/* For Out Jobs - Stone Usage Analysis */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">STONE USAGE ANALYSIS (For Out Jobs)</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              STONE USAGE ANALYSIS (For Out Jobs)
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Stone Used (g):</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Stone Used (g):
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Stone Balance (g):</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Stone Balance (g):
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Stone Loss (g):</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Stone Loss (g):
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Paper Balance (pcs):</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Paper Balance (pcs):
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
             </div>
@@ -261,18 +363,26 @@ export default function JobOrderFormPage() {
 
           {/* Notes Section */}
           <div className="p-6 print:p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">NOTES & COMMENTS</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              NOTES & COMMENTS
+            </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Special Instructions:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Special Instructions:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Quality Issues:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quality Issues:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Additional Comments:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Additional Comments:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
               </div>
             </div>
@@ -280,31 +390,49 @@ export default function JobOrderFormPage() {
 
           {/* Signatures Section */}
           <div className="p-6 print:p-4">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">SIGNATURES & APPROVALS</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 print:text-lg">
+              SIGNATURES & APPROVALS
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 print:grid-cols-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Prepared By:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Prepared By:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
-                <p className="text-xs text-gray-500 mt-1">Employee Name & Signature</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Employee Name & Signature
+                </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Checked By:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Checked By:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
-                <p className="text-xs text-gray-500 mt-1">Supervisor Name & Signature</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Supervisor Name & Signature
+                </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Approved By:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Approved By:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-16 print:h-12"></div>
-                <p className="text-xs text-gray-500 mt-1">Manager Name & Signature</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Manager Name & Signature
+                </p>
               </div>
             </div>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time:
+                </label>
                 <div className="border-2 border-gray-300 p-2 h-10 print:h-8"></div>
               </div>
             </div>
@@ -313,13 +441,21 @@ export default function JobOrderFormPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500 print:mt-4">
-          <p>This form must be completed for all job orders and filed for audit purposes.</p>
-          <p className="mt-1">Form Version: 1.0 | Last Updated: {currentDate}</p>
+          <p>
+            This form must be completed for all job orders and filed for audit
+            purposes.
+          </p>
+          <p className="mt-1">
+            Form Version: 1.0 | Job Order: {jobOrderNumber}
+          </p>
         </div>
       </div>
 
       {/* Print Styles */}
-      <style jsx global>{`
+      <style
+        jsx
+        global
+      >{`
         @media print {
           @page {
             margin: 0.5in;
@@ -379,6 +515,16 @@ export default function JobOrderFormPage() {
           }
           .print\\:mt-4 {
             margin-top: 1rem !important;
+          }
+          /* Optimize for 2-page printing */
+          .print\\:page-break-before {
+            page-break-before: always !important;
+          }
+          .print\\:page-break-after {
+            page-break-after: always !important;
+          }
+          .print\\:page-break-inside-avoid {
+            page-break-inside: avoid !important;
           }
         }
       `}</style>
