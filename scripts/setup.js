@@ -28,15 +28,23 @@ const User = mongoose.model('User', userSchema);
 const stoneSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    number: { type: String, required: true, unique: true },
+    number: { type: String, required: true },
     color: { type: String, required: true },
     size: { type: String, required: true },
     quantity: { type: Number, required: true, min: 0, default: 0 },
     unit: { type: String, enum: ['g', 'kg'], required: true },
+    inventoryType: {
+      type: String,
+      enum: ['internal', 'out'],
+      default: 'internal',
+      required: true,
+    },
   },
   { timestamps: true },
 );
 
+// Ensure unique number per inventory type
+stoneSchema.index({ number: 1, inventoryType: 1 }, { unique: true });
 const Stone = mongoose.model('Stone', stoneSchema);
 
 // Paper Schema
@@ -47,6 +55,12 @@ const paperSchema = new mongoose.Schema(
     unit: { type: String, default: 'pcs' },
     piecesPerRoll: { type: Number, required: true, min: 1 },
     weightPerPiece: { type: Number, required: true, min: 0, default: 0 },
+    inventoryType: {
+      type: String,
+      enum: ['internal', 'out'],
+      default: 'internal',
+      required: true,
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -70,7 +84,7 @@ const paperSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-paperSchema.index({ width: 1 }, { unique: true });
+paperSchema.index({ width: 1, inventoryType: 1 }, { unique: true });
 const Paper = mongoose.model('Paper', paperSchema);
 
 // Plastic Schema
@@ -223,7 +237,39 @@ const orderSchema = new mongoose.Schema(
         min: 0,
       },
     },
+    // For out orders: track received materials
+    receivedMaterials: {
+      stones: [
+        {
+          stoneId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Stone',
+          },
+          quantity: {
+            type: Number,
+            min: 0,
+          },
+        },
+      ],
+      paper: {
+        sizeInInch: {
+          type: Number,
+        },
+        quantityInPcs: {
+          type: Number,
+          min: 0,
+        },
+        paperWeightPerPc: {
+          type: Number,
+          min: 0,
+        },
+      },
+    },
     finalTotalWeight: {
+      type: Number,
+      min: 0,
+    },
+    stoneUsed: {
       type: Number,
       min: 0,
     },
@@ -239,14 +285,35 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    stoneUsed: {
+    // For out orders: track stone balance and loss
+    stoneBalance: {
       type: Number,
-      min: 0,
+      default: 0,
+    },
+    stoneLoss: {
+      type: Number,
+      default: 0,
+    },
+    paperBalance: {
+      type: Number,
+      default: 0,
+    },
+    paperLoss: {
+      type: Number,
+      default: 0,
     },
     status: {
       type: String,
       enum: ['pending', 'completed', 'cancelled'],
       default: 'pending',
+    },
+    // Track if out order has been finalized (materials consumed)
+    isFinalized: {
+      type: Boolean,
+      default: false,
+    },
+    finalizedAt: {
+      type: Date,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -327,9 +394,9 @@ async function setupDatabase() {
     });
     await employeeUser.save();
 
-    // Create sample stones
-    console.log('Creating sample stones...');
-    const stones = [
+    // Create sample internal stones
+    console.log('Creating sample internal stones...');
+    const internalStones = [
       {
         name: 'Red Stone',
         number: 'RS001',
@@ -337,6 +404,7 @@ async function setupDatabase() {
         size: 'Small',
         quantity: 500,
         unit: 'g',
+        inventoryType: 'internal',
       },
       {
         name: 'Blue Stone',
@@ -345,6 +413,7 @@ async function setupDatabase() {
         size: 'Medium',
         quantity: 300,
         unit: 'g',
+        inventoryType: 'internal',
       },
       {
         name: 'Green Stone',
@@ -353,6 +422,7 @@ async function setupDatabase() {
         size: 'Large',
         quantity: 200,
         unit: 'kg',
+        inventoryType: 'internal',
       },
       {
         name: 'Yellow Stone',
@@ -361,6 +431,7 @@ async function setupDatabase() {
         size: 'Small',
         quantity: 400,
         unit: 'g',
+        inventoryType: 'internal',
       },
       {
         name: 'Purple Stone',
@@ -369,28 +440,71 @@ async function setupDatabase() {
         size: 'Medium',
         quantity: 250,
         unit: 'g',
+        inventoryType: 'internal',
       },
     ];
 
-    const createdStones = [];
-    for (const stoneData of stones) {
+    const createdInternalStones = [];
+    for (const stoneData of internalStones) {
       const stone = new Stone(stoneData);
       await stone.save();
-      createdStones.push(stone);
+      createdInternalStones.push(stone);
     }
 
-    // Create sample paper
-    console.log('Creating sample paper...');
-    const papers = [
-      { width: 9, quantity: 10, piecesPerRoll: 1000, weightPerPiece: 20 },
-      { width: 13, quantity: 8, piecesPerRoll: 750, weightPerPiece: 28 },
-      { width: 16, quantity: 6, piecesPerRoll: 600, weightPerPiece: 35 },
-      { width: 19, quantity: 5, piecesPerRoll: 500, weightPerPiece: 42 },
-      { width: 20, quantity: 4, piecesPerRoll: 487, weightPerPiece: 45 },
-      { width: 24, quantity: 3, piecesPerRoll: 400, weightPerPiece: 55 },
+    // Create sample out job stones
+    console.log('Creating sample out job stones...');
+    const outStones = [
+      {
+        name: 'Customer Red Stone',
+        number: 'CRS001',
+        color: 'Red',
+        size: 'Small',
+        quantity: 100,
+        unit: 'g',
+        inventoryType: 'out',
+      },
+      {
+        name: 'Customer Blue Stone',
+        number: 'CBS001',
+        color: 'Blue',
+        size: 'Medium',
+        quantity: 150,
+        unit: 'g',
+        inventoryType: 'out',
+      },
     ];
 
-    for (const paperData of papers) {
+    const createdOutStones = [];
+    for (const stoneData of outStones) {
+      const stone = new Stone(stoneData);
+      await stone.save();
+      createdOutStones.push(stone);
+    }
+
+    // Create sample internal paper
+    console.log('Creating sample internal paper...');
+    const internalPapers = [
+      { width: 9, quantity: 10, piecesPerRoll: 1000, weightPerPiece: 20, inventoryType: 'internal' },
+      { width: 13, quantity: 8, piecesPerRoll: 750, weightPerPiece: 28, inventoryType: 'internal' },
+      { width: 16, quantity: 6, piecesPerRoll: 600, weightPerPiece: 35, inventoryType: 'internal' },
+      { width: 19, quantity: 5, piecesPerRoll: 500, weightPerPiece: 42, inventoryType: 'internal' },
+      { width: 20, quantity: 4, piecesPerRoll: 487, weightPerPiece: 45, inventoryType: 'internal' },
+      { width: 24, quantity: 3, piecesPerRoll: 400, weightPerPiece: 55, inventoryType: 'internal' },
+    ];
+
+    for (const paperData of internalPapers) {
+      const paper = new Paper(paperData);
+      await paper.save();
+    }
+
+    // Create sample out job paper
+    console.log('Creating sample out job paper...');
+    const outPapers = [
+      { width: 9, quantity: 5, piecesPerRoll: 1000, weightPerPiece: 20, inventoryType: 'out' },
+      { width: 13, quantity: 3, piecesPerRoll: 750, weightPerPiece: 28, inventoryType: 'out' },
+    ];
+
+    for (const paperData of outPapers) {
       const paper = new Paper(paperData);
       await paper.save();
     }
@@ -426,21 +540,21 @@ async function setupDatabase() {
           {
             paperSize: 9,
             defaultStones: [
-              { stoneId: createdStones[0]._id, quantity: 50 },
-              { stoneId: createdStones[1]._id, quantity: 30 },
+              { stoneId: createdInternalStones[0]._id, quantity: 50 },
+              { stoneId: createdInternalStones[1]._id, quantity: 30 },
             ],
           },
           {
             paperSize: 13,
             defaultStones: [
-              { stoneId: createdStones[0]._id, quantity: 70 },
-              { stoneId: createdStones[1]._id, quantity: 45 },
+              { stoneId: createdInternalStones[0]._id, quantity: 70 },
+              { stoneId: createdInternalStones[1]._id, quantity: 45 },
             ],
           },
         ],
         defaultStones: [
-          { stoneId: createdStones[0]._id, quantity: 50 },
-          { stoneId: createdStones[1]._id, quantity: 30 },
+          { stoneId: createdInternalStones[0]._id, quantity: 50 },
+          { stoneId: createdInternalStones[1]._id, quantity: 30 },
         ],
         createdBy: adminUser._id,
       },
@@ -452,21 +566,21 @@ async function setupDatabase() {
           {
             paperSize: 16,
             defaultStones: [
-              { stoneId: createdStones[2]._id, quantity: 100 },
-              { stoneId: createdStones[3]._id, quantity: 40 },
+              { stoneId: createdInternalStones[2]._id, quantity: 100 },
+              { stoneId: createdInternalStones[3]._id, quantity: 40 },
             ],
           },
           {
             paperSize: 20,
             defaultStones: [
-              { stoneId: createdStones[2]._id, quantity: 120 },
-              { stoneId: createdStones[3]._id, quantity: 50 },
+              { stoneId: createdInternalStones[2]._id, quantity: 120 },
+              { stoneId: createdInternalStones[3]._id, quantity: 50 },
             ],
           },
         ],
         defaultStones: [
-          { stoneId: createdStones[2]._id, quantity: 100 },
-          { stoneId: createdStones[3]._id, quantity: 40 },
+          { stoneId: createdInternalStones[2]._id, quantity: 100 },
+          { stoneId: createdInternalStones[3]._id, quantity: 40 },
         ],
         createdBy: adminUser._id,
       },
@@ -478,21 +592,21 @@ async function setupDatabase() {
           {
             paperSize: 19,
             defaultStones: [
-              { stoneId: createdStones[4]._id, quantity: 35 },
-              { stoneId: createdStones[0]._id, quantity: 25 },
+              { stoneId: createdInternalStones[4]._id, quantity: 35 },
+              { stoneId: createdInternalStones[0]._id, quantity: 25 },
             ],
           },
           {
             paperSize: 24,
             defaultStones: [
-              { stoneId: createdStones[4]._id, quantity: 45 },
-              { stoneId: createdStones[0]._id, quantity: 35 },
+              { stoneId: createdInternalStones[4]._id, quantity: 45 },
+              { stoneId: createdInternalStones[0]._id, quantity: 35 },
             ],
           },
         ],
         defaultStones: [
-          { stoneId: createdStones[4]._id, quantity: 35 },
-          { stoneId: createdStones[0]._id, quantity: 25 },
+          { stoneId: createdInternalStones[4]._id, quantity: 35 },
+          { stoneId: createdInternalStones[0]._id, quantity: 25 },
         ],
         createdBy: adminUser._id,
       },
@@ -509,8 +623,10 @@ async function setupDatabase() {
     console.log('- Manager: manager@example.com / admin123');
     console.log('- Employee: employee@example.com / admin123');
     console.log('\nSample data created:');
-    console.log('- 5 stones');
-    console.log('- 6 paper types (with weights)');
+    console.log('- 5 internal stones');
+    console.log('- 2 out job stones');
+    console.log('- 6 internal paper types (with weights)');
+    console.log('- 2 out job paper types');
     console.log('- 5 plastic types');
     console.log('- 1 tape entry');
     console.log('- 3 designs (with paper configurations)');

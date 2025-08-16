@@ -31,7 +31,17 @@ interface CreateOrderData {
 
 export async function GET() {
   try {
+    // Check if MongoDB URI is configured
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI environment variable is not set');
+      return NextResponse.json(
+        { success: false, message: 'Database configuration error' },
+        { status: 500 },
+      );
+    }
+
     await dbConnect();
+    
     const orders = await Order.find()
       .populate('designId')
       .populate('stonesUsed.stoneId')
@@ -46,6 +56,23 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Get orders error:', error);
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          { success: false, message: 'Database connection failed. Please check if MongoDB is running.' },
+          { status: 500 },
+        );
+      }
+      if (error.message.includes('MONGODB_URI')) {
+        return NextResponse.json(
+          { success: false, message: 'Database configuration error. Please check environment variables.' },
+          { status: 500 },
+        );
+      }
+    }
+    
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },
@@ -55,6 +82,15 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if MongoDB URI is configured
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI environment variable is not set');
+      return NextResponse.json(
+        { success: false, message: 'Database configuration error' },
+        { status: 500 },
+      );
+    }
+
     await dbConnect();
 
     const user = await getCurrentUser(request);
@@ -193,6 +229,23 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Create order error:', error);
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          { success: false, message: 'Database connection failed. Please check if MongoDB is running.' },
+          { status: 500 },
+        );
+      }
+      if (error.message.includes('MONGODB_URI')) {
+        return NextResponse.json(
+          { success: false, message: 'Database configuration error. Please check environment variables.' },
+          { status: 500 },
+        );
+      }
+    }
+    
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },
