@@ -4,10 +4,30 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 
 interface Plastic {
   _id: string;
@@ -75,14 +95,21 @@ export default function PlasticTable() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Spinner size="lg" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Plastic ({plastics.length})</h3>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+        >
           <DialogTrigger asChild>
             <Button>Add Plastic</Button>
           </DialogTrigger>
@@ -90,11 +117,19 @@ export default function PlasticTable() {
             <DialogHeader>
               <DialogTitle>Add New Plastic</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-4"
+            >
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="width">Width (inches)</Label>
-                  <Select value={formData.width} onValueChange={(value) => setFormData({ ...formData, width: value })}>
+                  <Select
+                    value={formData.width}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, width: value })
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select width" />
                     </SelectTrigger>
@@ -113,13 +148,19 @@ export default function PlasticTable() {
                     id="quantity"
                     type="number"
                     value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, quantity: e.target.value })
+                    }
                     required
                   />
                 </div>
               </div>
               <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="submit">Add Plastic</Button>
@@ -141,10 +182,14 @@ export default function PlasticTable() {
           <TableBody>
             {plastics.map((plastic) => (
               <TableRow key={plastic._id}>
-                <TableCell className="font-medium">{plastic.width}&quot;</TableCell>
+                <TableCell className="font-medium">
+                  {plastic.width}&quot;
+                </TableCell>
                 <TableCell>{plastic.quantity}</TableCell>
                 <TableCell>
-                  <Badge variant={plastic.quantity < 10 ? 'destructive' : 'default'}>
+                  <Badge
+                    variant={plastic.quantity < 10 ? 'destructive' : 'default'}
+                  >
                     {plastic.quantity < 10 ? 'Low Stock' : 'In Stock'}
                   </Badge>
                 </TableCell>

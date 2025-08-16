@@ -86,6 +86,13 @@ export default function Navigation() {
     { href: '/reports', label: 'Reports' },
   ];
 
+  const isActive = (href: string) => {
+    if (href === '/inventory') {
+      return pathname.startsWith('/inventory');
+    }
+    return pathname === href;
+  };
+
   return (
     <nav className="bg-background border-b">
       <div className="container mx-auto px-4">
@@ -107,7 +114,7 @@ export default function Navigation() {
                 key={item.href}
                 href={item.href}
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === item.href
+                  isActive(item.href)
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
@@ -179,7 +186,7 @@ export default function Navigation() {
                   key={item.href}
                   href={item.href}
                   className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                    pathname === item.href
+                    isActive(item.href)
                       ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}

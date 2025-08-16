@@ -4,10 +4,30 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 
 interface Paper {
@@ -68,7 +88,10 @@ export default function PaperTable() {
 
       const data = await response.json();
       if (data.success) {
-        showSuccess('Paper Added', 'New paper roll has been added successfully.');
+        showSuccess(
+          'Paper Added',
+          'New paper roll has been added successfully.',
+        );
         setIsDialogOpen(false);
         setFormData({
           width: '',
@@ -78,7 +101,10 @@ export default function PaperTable() {
         });
         fetchPapers();
       } else {
-        showError('Creation Failed', data.message || 'Failed to add paper roll.');
+        showError(
+          'Creation Failed',
+          data.message || 'Failed to add paper roll.',
+        );
       }
     } catch (error) {
       console.error('Error creating paper:', error);
@@ -87,14 +113,21 @@ export default function PaperTable() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Spinner size="lg" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Paper Rolls ({papers.length})</h3>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+        >
           <DialogTrigger asChild>
             <Button>Add Paper</Button>
           </DialogTrigger>
@@ -102,11 +135,19 @@ export default function PaperTable() {
             <DialogHeader>
               <DialogTitle>Add New Paper Roll</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-4"
+            >
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="width">Width (inches)</Label>
-                  <Select value={formData.width} onValueChange={(value) => setFormData({ ...formData, width: value })}>
+                  <Select
+                    value={formData.width}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, width: value })
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select width" />
                     </SelectTrigger>
@@ -126,7 +167,9 @@ export default function PaperTable() {
                     id="quantity"
                     type="number"
                     value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, quantity: e.target.value })
+                    }
                     required
                   />
                 </div>
@@ -138,7 +181,12 @@ export default function PaperTable() {
                     id="piecesPerRoll"
                     type="number"
                     value={formData.piecesPerRoll}
-                    onChange={(e) => setFormData({ ...formData, piecesPerRoll: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        piecesPerRoll: e.target.value,
+                      })
+                    }
                     required
                   />
                 </div>
@@ -149,13 +197,22 @@ export default function PaperTable() {
                     type="number"
                     step="0.01"
                     value={formData.weightPerPiece}
-                    onChange={(e) => setFormData({ ...formData, weightPerPiece: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        weightPerPiece: e.target.value,
+                      })
+                    }
                     required
                   />
                 </div>
               </div>
               <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="submit">Add Paper</Button>
@@ -180,13 +237,17 @@ export default function PaperTable() {
           <TableBody>
             {papers.map((paper) => (
               <TableRow key={paper._id}>
-                <TableCell className="font-medium">{paper.width}&quot;</TableCell>
+                <TableCell className="font-medium">
+                  {paper.width}&quot;
+                </TableCell>
                 <TableCell>{paper.quantity}</TableCell>
                 <TableCell>{paper.piecesPerRoll}</TableCell>
                 <TableCell>{paper.weightPerPiece}g</TableCell>
                 <TableCell>{paper.quantity * paper.piecesPerRoll}</TableCell>
                 <TableCell>
-                  <Badge variant={paper.quantity < 5 ? 'destructive' : 'default'}>
+                  <Badge
+                    variant={paper.quantity < 5 ? 'destructive' : 'default'}
+                  >
                     {paper.quantity < 5 ? 'Low Stock' : 'In Stock'}
                   </Badge>
                 </TableCell>
