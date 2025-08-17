@@ -3,7 +3,7 @@ import dbConnect from '@/lib/db';
 import Plastic from '@/models/Plastic';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await dbConnect();
 

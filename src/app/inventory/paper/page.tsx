@@ -5,9 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import PaperTable from '@/components/inventory/paper-table';
 import { Spinner } from '@/components/ui/spinner';
@@ -18,13 +15,7 @@ function PaperPageContent() {
     | 'internal'
     | 'out';
 
-  const isOutJob = inventoryType === 'out';
-  const title = isOutJob
-    ? 'Out Job Paper Inventory'
-    : 'Internal Paper Inventory';
-  const description = isOutJob
-    ? 'Manage paper received from customers for out jobs'
-    : 'Manage paper rolls with different widths and weights';
+
 
   return (
     <div className="container mx-auto space-y-6 p-4 md:p-6">

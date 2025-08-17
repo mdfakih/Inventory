@@ -5,9 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import StonesTable from '@/components/inventory/stones-table';
 import { Spinner } from '@/components/ui/spinner';
@@ -18,13 +15,7 @@ function StonesPageContent() {
     | 'internal'
     | 'out';
 
-  const isOutJob = inventoryType === 'out';
-  const title = isOutJob
-    ? 'Out Job Stones Inventory'
-    : 'Internal Stones Inventory';
-  const description = isOutJob
-    ? 'Manage stones received from customers for out jobs'
-    : 'Manage internal stone inventory with name, number, color, size, and quantity';
+
 
   return (
     <div className="container mx-auto space-y-6 p-4 md:p-6">

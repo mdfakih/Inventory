@@ -137,7 +137,7 @@ export async function PUT(
     let weightDiscrepancy = 0;
     let discrepancyPercentage = 0;
     let inventoryChanged = false;
-    let inventoryAdjustments = [];
+    const inventoryAdjustments = [];
 
     // Check if paper usage changed
     if (
@@ -206,7 +206,7 @@ export async function PUT(
 
         // Calculate stone inventory adjustments
         const oldStoneMap = new Map();
-        oldValues.stonesUsed.forEach((stone: any) => {
+        oldValues.stonesUsed.forEach((stone: { stoneId: string | { _id: string }; quantity: number }) => {
           const stoneId =
             typeof stone.stoneId === 'string'
               ? stone.stoneId
@@ -215,7 +215,7 @@ export async function PUT(
         });
 
         const newStoneMap = new Map();
-        stonesUsed.forEach((stone: any) => {
+        stonesUsed.forEach((stone: { stoneId: string | { _id: string }; quantity: number }) => {
           const stoneId =
             typeof stone.stoneId === 'string'
               ? stone.stoneId
@@ -264,12 +264,13 @@ export async function PUT(
     }
 
     // Calculate discrepancy if final weight is provided or if order is being completed
+    let effectiveFinalWeight: number | undefined;
     if (finalTotalWeight !== undefined || status === 'completed') {
       // If finalTotalWeight is not provided but order is being completed, use calculated weight as final weight
-      const effectiveFinalWeight =
+      effectiveFinalWeight =
         finalTotalWeight !== undefined ? finalTotalWeight : calculatedWeight;
 
-      weightDiscrepancy = effectiveFinalWeight - calculatedWeight;
+      weightDiscrepancy = effectiveFinalWeight! - calculatedWeight;
       discrepancyPercentage =
         calculatedWeight > 0 ? (weightDiscrepancy / calculatedWeight) * 100 : 0;
 
@@ -312,7 +313,7 @@ export async function PUT(
         const paperWeight =
           order.receivedMaterials.paper.paperWeightPerPc *
           order.receivedMaterials.paper.quantityInPcs;
-        const stoneUsed = effectiveFinalWeight - paperWeight;
+        const stoneUsed = effectiveFinalWeight! - paperWeight;
 
         // Calculate total received stones
         const totalReceivedStones = order.receivedMaterials.stones.reduce(
@@ -504,7 +505,7 @@ export async function PUT(
     });
 
     if (finalTotalWeight !== undefined || status === 'completed') {
-      updateData.finalTotalWeight = effectiveFinalWeight;
+      updateData.finalTotalWeight = effectiveFinalWeight!;
     }
 
     if (isFinalized && !order.isFinalized) {

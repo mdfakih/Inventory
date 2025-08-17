@@ -33,7 +33,7 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { authenticatedFetch } from '@/lib/utils';
-import { useAuth } from '@/lib/auth-context';
+
 import { Edit, Trash2, Eye, Package, Plus, CheckCircle } from 'lucide-react';
 
 interface User {
