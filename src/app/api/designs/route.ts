@@ -12,7 +12,7 @@ export async function GET() {
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email')
       .sort({ createdAt: -1 });
-    
+
     return NextResponse.json({
       success: true,
       data: designs,
@@ -21,7 +21,7 @@ export async function GET() {
     console.error('Get designs error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -29,22 +29,23 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
-    
+
     const user = await getCurrentUser(request);
+    console.log('user', user);
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { status: 401 },
       );
     }
-    
+
     const body = await request.json();
     const { name, number, imageUrl, defaultStones, paperConfigurations } = body;
 
     if (!name || !number || !imageUrl) {
       return NextResponse.json(
         { success: false, message: 'Name, number, and image URL are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     if (existingDesign) {
       return NextResponse.json(
         { success: false, message: 'Design number already exists' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     console.error('Create design error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

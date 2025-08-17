@@ -136,7 +136,10 @@ export async function PUT(
     let calculatedWeight = order.calculatedWeight;
     let weightDiscrepancy = 0;
     let discrepancyPercentage = 0;
+    let inventoryChanged = false;
+    let inventoryAdjustments = [];
 
+    // Check if paper usage changed
     if (
       paperUsed &&
       (paperUsed.sizeInInch !== oldValues.paperUsed.sizeInInch ||
@@ -156,6 +159,20 @@ export async function PUT(
         );
         calculatedWeight = paperWeight + stoneWeight;
 
+        // Calculate paper inventory adjustment
+        const paperDiff =
+          paperUsed.quantityInPcs - oldValues.paperUsed.quantityInPcs;
+        if (paperDiff !== 0) {
+          inventoryChanged = true;
+          inventoryAdjustments.push({
+            type: 'paper',
+            oldQuantity: oldValues.paperUsed.quantityInPcs,
+            newQuantity: paperUsed.quantityInPcs,
+            difference: paperDiff,
+            paperId: paper._id,
+          });
+        }
+
         updateHistory.push({
           field: 'paperUsed',
           oldValue: oldValues.paperUsed,
@@ -166,6 +183,7 @@ export async function PUT(
       }
     }
 
+    // Check if stone usage changed
     if (
       stonesUsed &&
       JSON.stringify(stonesUsed) !== JSON.stringify(oldValues.stonesUsed)
@@ -186,6 +204,55 @@ export async function PUT(
         );
         calculatedWeight = paperWeight + stoneWeight;
 
+        // Calculate stone inventory adjustments
+        const oldStoneMap = new Map();
+        oldValues.stonesUsed.forEach((stone: any) => {
+          const stoneId =
+            typeof stone.stoneId === 'string'
+              ? stone.stoneId
+              : stone.stoneId._id;
+          oldStoneMap.set(stoneId, stone.quantity);
+        });
+
+        const newStoneMap = new Map();
+        stonesUsed.forEach((stone: any) => {
+          const stoneId =
+            typeof stone.stoneId === 'string'
+              ? stone.stoneId
+              : stone.stoneId._id;
+          newStoneMap.set(stoneId, stone.quantity);
+        });
+
+        // Calculate differences
+        for (const [stoneId, newQuantity] of newStoneMap) {
+          const oldQuantity = oldStoneMap.get(stoneId) || 0;
+          const difference = newQuantity - oldQuantity;
+          if (difference !== 0) {
+            inventoryChanged = true;
+            inventoryAdjustments.push({
+              type: 'stone',
+              stoneId: stoneId,
+              oldQuantity: oldQuantity,
+              newQuantity: newQuantity,
+              difference: difference,
+            });
+          }
+        }
+
+        // Check for removed stones
+        for (const [stoneId, oldQuantity] of oldStoneMap) {
+          if (!newStoneMap.has(stoneId)) {
+            inventoryChanged = true;
+            inventoryAdjustments.push({
+              type: 'stone',
+              stoneId: stoneId,
+              oldQuantity: oldQuantity,
+              newQuantity: 0,
+              difference: -oldQuantity,
+            });
+          }
+        }
+
         updateHistory.push({
           field: 'stonesUsed',
           oldValue: oldValues.stonesUsed,
@@ -196,16 +263,46 @@ export async function PUT(
       }
     }
 
-    // Calculate discrepancy if final weight is provided
-    if (finalTotalWeight !== undefined) {
-      weightDiscrepancy = finalTotalWeight - calculatedWeight;
+    // Calculate discrepancy if final weight is provided or if order is being completed
+    if (finalTotalWeight !== undefined || status === 'completed') {
+      // If finalTotalWeight is not provided but order is being completed, use calculated weight as final weight
+      const effectiveFinalWeight =
+        finalTotalWeight !== undefined ? finalTotalWeight : calculatedWeight;
+
+      weightDiscrepancy = effectiveFinalWeight - calculatedWeight;
       discrepancyPercentage =
         calculatedWeight > 0 ? (weightDiscrepancy / calculatedWeight) * 100 : 0;
+
+      console.log('Discrepancy calculation:', {
+        effectiveFinalWeight,
+        calculatedWeight,
+        weightDiscrepancy,
+        discrepancyPercentage,
+        status,
+        finalTotalWeight,
+      });
+
+      // Add discrepancy calculation to history
+      updateHistory.push({
+        field: 'weightDiscrepancy',
+        oldValue: oldValues.weightDiscrepancy,
+        newValue: weightDiscrepancy,
+        updatedBy: user.id,
+        updatedAt: new Date(),
+      });
+
+      updateHistory.push({
+        field: 'discrepancyPercentage',
+        oldValue: oldValues.discrepancyPercentage,
+        newValue: discrepancyPercentage,
+        updatedBy: user.id,
+        updatedAt: new Date(),
+      });
 
       updateHistory.push({
         field: 'finalTotalWeight',
         oldValue: oldValues.finalTotalWeight,
-        newValue: finalTotalWeight,
+        newValue: effectiveFinalWeight,
         updatedBy: user.id,
         updatedAt: new Date(),
       });
@@ -215,11 +312,12 @@ export async function PUT(
         const paperWeight =
           order.receivedMaterials.paper.paperWeightPerPc *
           order.receivedMaterials.paper.quantityInPcs;
-        const stoneUsed = finalTotalWeight - paperWeight;
+        const stoneUsed = effectiveFinalWeight - paperWeight;
 
         // Calculate total received stones
         const totalReceivedStones = order.receivedMaterials.stones.reduce(
-          (total: number, stone: { quantity: number }) => total + stone.quantity,
+          (total: number, stone: { quantity: number }) =>
+            total + stone.quantity,
           0,
         );
 
@@ -251,6 +349,97 @@ export async function PUT(
           updatedBy: user.id,
           updatedAt: new Date(),
         });
+      }
+    }
+
+    // Validate and adjust inventory if changes were made
+    if (inventoryChanged) {
+      const inventoryType = type === 'out' ? 'out' : 'internal';
+      const inventoryErrors = [];
+
+      // Validate paper availability
+      for (const adjustment of inventoryAdjustments.filter(
+        (a) => a.type === 'paper',
+      )) {
+        if (adjustment.difference > 0) {
+          const paper = await Paper.findById(adjustment.paperId);
+          if (!paper || paper.quantity < adjustment.difference) {
+            inventoryErrors.push(
+              `Insufficient paper stock: ${
+                paper?.width || 'Unknown'
+              }" (available: ${paper?.quantity || 0}, required: ${
+                adjustment.difference
+              })`,
+            );
+          }
+        }
+      }
+
+      // Validate stone availability
+      for (const adjustment of inventoryAdjustments.filter(
+        (a) => a.type === 'stone',
+      )) {
+        if (adjustment.difference > 0) {
+          const stone = await Stone.findById(adjustment.stoneId);
+          if (!stone) {
+            inventoryErrors.push(`Stone not found: ${adjustment.stoneId}`);
+            continue;
+          }
+
+          const inventoryStone = await Stone.findOne({
+            number: stone.number,
+            inventoryType: inventoryType,
+          });
+
+          if (
+            !inventoryStone ||
+            inventoryStone.quantity < adjustment.difference
+          ) {
+            inventoryErrors.push(
+              `Insufficient stone stock: ${stone.name} (available: ${
+                inventoryStone?.quantity || 0
+              }, required: ${adjustment.difference})`,
+            );
+          }
+        }
+      }
+
+      if (inventoryErrors.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Insufficient inventory for changes',
+            errors: inventoryErrors,
+          },
+          { status: 400 },
+        );
+      }
+
+      // Apply inventory adjustments
+      try {
+        for (const adjustment of inventoryAdjustments) {
+          if (adjustment.type === 'paper') {
+            await Paper.findByIdAndUpdate(adjustment.paperId, {
+              $inc: { quantity: -adjustment.difference },
+            });
+          } else if (adjustment.type === 'stone') {
+            const stone = await Stone.findById(adjustment.stoneId);
+            const inventoryStone = await Stone.findOne({
+              number: stone.number,
+              inventoryType: inventoryType,
+            });
+
+            await Stone.findByIdAndUpdate(inventoryStone._id, {
+              $inc: { quantity: -adjustment.difference },
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to adjust inventory:', error);
+        return NextResponse.json(
+          { success: false, message: 'Failed to adjust inventory' },
+          { status: 500 },
+        );
       }
     }
 
@@ -314,8 +503,8 @@ export async function PUT(
       updatedBy: user.id,
     });
 
-    if (finalTotalWeight !== undefined) {
-      updateData.finalTotalWeight = finalTotalWeight;
+    if (finalTotalWeight !== undefined || status === 'completed') {
+      updateData.finalTotalWeight = effectiveFinalWeight;
     }
 
     if (isFinalized && !order.isFinalized) {

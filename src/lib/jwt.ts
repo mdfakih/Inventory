@@ -21,7 +21,10 @@ export function verifyToken(token: string): JWTPayload | null {
   }
 }
 
-export function setAuthCookie(response: NextResponse, token: string): NextResponse {
+export function setAuthCookie(
+  response: NextResponse,
+  token: string,
+): NextResponse {
   response.cookies.set('auth-token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

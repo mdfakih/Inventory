@@ -84,6 +84,11 @@ interface Order {
   phone: string;
   designId: { name: string; number: string };
   finalTotalWeight: number;
+  calculatedWeight: number;
+  weightDiscrepancy: number;
+  discrepancyPercentage: number;
+  status: string;
+  isFinalized: boolean;
   createdAt: string;
   stonesUsed: Array<{ stoneId: { name: string }; quantity: number }>;
   paperUsed: { sizeInInch: number; quantityInPcs: number };
@@ -97,6 +102,22 @@ interface ReportData {
   papers: Paper[];
   plastics: Plastic[];
   tapes: Tape[];
+  analytics?: {
+    inventory: {
+      totalStoneQuantity: number;
+      totalPaperQuantity: number;
+      lowStockStones: number;
+      lowStockPapers: number;
+    };
+    orders: {
+      total: number;
+      completed: number;
+      pending: number;
+      internal: number;
+      out: number;
+    };
+    lowStockItems: Array<Stone | Paper>;
+  };
 }
 
 export default function ReportsPage() {
@@ -136,6 +157,7 @@ export default function ReportsPage() {
             papers: data.data.papers || [],
             plastics: data.data.plastics || [],
             tapes: data.data.tapes || [],
+            analytics: data.data.analytics,
           });
         } else {
           showError('Data Loading Error', 'Failed to load report data.');
@@ -655,7 +677,8 @@ export default function ReportsPage() {
                         <TableHead>Customer</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Design</TableHead>
-                        <TableHead>Weight</TableHead>
+                        <TableHead>Weight Details</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -677,7 +700,163 @@ export default function ReportsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>{order.designId?.name || 'N/A'}</TableCell>
-                          <TableCell>{order.finalTotalWeight}g</TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div>
+                                Final:{' '}
+                                {order.finalTotalWeight?.toFixed(2) || 'N/A'}g
+                              </div>
+                              <div>
+                                Calculated:{' '}
+                                {order.calculatedWeight?.toFixed(2) || 'N/A'}g
+                              </div>
+                              {order.weightDiscrepancy !== undefined &&
+                                order.weightDiscrepancy !== null && (
+                                  <div
+                                    className={`text-sm ${
+                                      order.weightDiscrepancy !== 0
+                                        ? order.weightDiscrepancy > 0
+                                          ? 'text-red-600'
+                                          : 'text-green-600'
+                                        : 'text-gray-600'
+                                    }`}
+                                  >
+                                    Discrepancy:{' '}
+                                    {order.weightDiscrepancy.toFixed(2)}g (
+                                    {order.discrepancyPercentage?.toFixed(1)}%)
+                                  </div>
+                                )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <Badge
+                                className={
+                                  order.status === 'completed'
+                                    ? 'bg-green-100 text-green-800'
+                                    : order.status === 'cancelled'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }
+                              >
+                                {order.status}
+                              </Badge>
+                              {order.isFinalized && (
+                                <Badge className="bg-blue-100 text-blue-800 text-xs">
+                                  Finalized
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No orders found</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Comprehensive Orders Table */}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>All Orders with Discrepancy Analysis</CardTitle>
+              <CardDescription>
+                Complete order data including weight discrepancies
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {reportData.orders.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Design</TableHead>
+                        <TableHead>Calculated Weight</TableHead>
+                        <TableHead>Final Weight</TableHead>
+                        <TableHead>Discrepancy</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Finalized</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.orders.map((order) => (
+                        <TableRow key={order._id}>
+                          <TableCell className="font-medium">
+                            {order.customerName}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                order.type === 'internal'
+                                  ? 'default'
+                                  : 'secondary'
+                              }
+                            >
+                              {order.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{order.designId?.name || 'N/A'}</TableCell>
+                          <TableCell>
+                            {order.calculatedWeight?.toFixed(2) || 'N/A'}g
+                          </TableCell>
+                          <TableCell>
+                            {order.finalTotalWeight?.toFixed(2) || 'Not set'}g
+                          </TableCell>
+                          <TableCell>
+                            {order.weightDiscrepancy !== undefined &&
+                            order.weightDiscrepancy !== null ? (
+                              <div
+                                className={`${
+                                  order.weightDiscrepancy !== 0
+                                    ? order.weightDiscrepancy > 0
+                                      ? 'text-red-600'
+                                      : 'text-green-600'
+                                    : 'text-gray-600'
+                                }`}
+                              >
+                                {order.weightDiscrepancy.toFixed(2)}g (
+                                {order.discrepancyPercentage?.toFixed(1)}%)
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">
+                                Not calculated
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={
+                                order.status === 'completed'
+                                  ? 'bg-green-100 text-green-800'
+                                  : order.status === 'cancelled'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }
+                            >
+                              {order.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {order.isFinalized ? (
+                              <Badge className="bg-green-100 text-green-800">
+                                Yes
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">No</Badge>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {new Date(order.createdAt).toLocaleDateString()}
                           </TableCell>
@@ -700,6 +879,129 @@ export default function ReportsPage() {
           value="analytics"
           className="space-y-6"
         >
+          {/* Inventory Analytics */}
+          {reportData.analytics && (
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Inventory Analytics</CardTitle>
+                <CardDescription>
+                  Current inventory status and analytics
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {reportData.analytics.inventory.totalStoneQuantity.toLocaleString()}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Total Stone Quantity
+                    </p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">
+                      {reportData.analytics.inventory.totalPaperQuantity.toLocaleString()}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Total Paper Quantity
+                    </p>
+                  </div>
+                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {reportData.analytics.inventory.lowStockStones}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Low Stock Stones
+                    </p>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 rounded-lg">
+                    <div className="text-2xl font-bold text-red-600">
+                      {reportData.analytics.inventory.lowStockPapers}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Low Stock Papers
+                    </p>
+                  </div>
+                </div>
+
+                {/* Low Stock Alerts */}
+                {reportData.analytics.lowStockItems.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-3">
+                      Low Stock Alerts
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {reportData.analytics.lowStockItems
+                        .slice(0, 6)
+                        .map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-red-50 rounded-lg"
+                          >
+                            <div>
+                              <p className="font-medium">
+                                {'name' in item
+                                  ? item.name
+                                  : `${item.width}" Paper`}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {'number' in item
+                                  ? `#${item.number}`
+                                  : `Quantity: ${item.quantity}`}
+                              </p>
+                            </div>
+                            <Badge variant="destructive">{item.quantity}</Badge>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Order Analytics */}
+          {reportData.analytics && (
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Order Analytics</CardTitle>
+                <CardDescription>
+                  Order statistics and distribution
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {reportData.analytics.orders.total}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Total Orders
+                    </p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">
+                      {reportData.analytics.orders.completed}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Completed</p>
+                  </div>
+                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {reportData.analytics.orders.pending}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Pending</p>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {reportData.analytics.orders.internal}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Internal</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Order Trends</CardTitle>

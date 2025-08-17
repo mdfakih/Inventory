@@ -11,6 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { SpinnerPage } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
+import { authenticatedFetch } from '@/lib/utils';
 import {
   BarChart,
   Bar,
@@ -43,6 +44,13 @@ interface Order {
   type: 'internal' | 'out';
   customerName: string;
   phone: string;
+  designId: { name: string; number: string };
+  calculatedWeight?: number;
+  finalTotalWeight?: number;
+  weightDiscrepancy?: number;
+  discrepancyPercentage?: number;
+  status: string;
+  isFinalized: boolean;
   createdAt: string;
 }
 
@@ -72,20 +80,23 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       const [stonesRes, papersRes, ordersRes] = await Promise.all([
-        fetch('/api/inventory/stones'),
-        fetch('/api/inventory/paper'),
-        fetch('/api/orders'),
+        authenticatedFetch('/api/inventory/stones'),
+        authenticatedFetch('/api/inventory/paper'),
+        authenticatedFetch('/api/orders'),
       ]);
 
       const stones = await stonesRes.json();
       const papers = await papersRes.json();
       const orders = await ordersRes.json();
 
+      // Ensure orders have all required fields populated
+      const ordersWithDetails = orders.data || [];
+
       setData({
         stones: stones.data || [],
         papers: papers.data || [],
-        orders: orders.data || [],
-        recentOrders: (orders.data || []).slice(0, 5),
+        orders: ordersWithDetails,
+        recentOrders: ordersWithDetails.slice(0, 5),
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -359,30 +370,104 @@ export default function AdminDashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
-          <CardDescription>Latest 5 orders</CardDescription>
+          <CardDescription>Latest 5 orders with weight details</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {data.recentOrders.map((order: Order) => (
               <div
                 key={order._id}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="p-4 border rounded-lg space-y-3"
               >
-                <div>
-                  <p className="font-medium">{order.customerName}</p>
-                  <p className="text-sm text-muted-foreground">{order.phone}</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{order.customerName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {order.phone}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Design: {order.designId?.name || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <Badge
+                      variant={
+                        order.type === 'internal' ? 'default' : 'secondary'
+                      }
+                    >
+                      {order.type}
+                    </Badge>
+                    <Badge
+                      className={`ml-2 ${
+                        order.status === 'completed'
+                          ? 'bg-green-100 text-green-800'
+                          : order.status === 'cancelled'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}
+                    >
+                      {order.status}
+                    </Badge>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <Badge
-                    variant={
-                      order.type === 'internal' ? 'default' : 'secondary'
-                    }
-                  >
-                    {order.type}
-                  </Badge>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(order.createdAt).toLocaleDateString()}
-                  </p>
+
+                {/* Weight Information */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Calculated Weight
+                    </p>
+                    <p className="font-medium">
+                      {order.calculatedWeight?.toFixed(2) || 'N/A'}g
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Final Weight
+                    </p>
+                    <p className="font-medium">
+                      {order.finalTotalWeight?.toFixed(2) || 'Not set'}g
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Discrepancy</p>
+                    <p
+                      className={`font-medium ${
+                        order.weightDiscrepancy !== undefined &&
+                        order.weightDiscrepancy !== null
+                          ? order.weightDiscrepancy !== 0
+                            ? order.weightDiscrepancy > 0
+                              ? 'text-red-600'
+                              : 'text-green-600'
+                            : 'text-gray-600'
+                          : 'text-gray-500'
+                      }`}
+                    >
+                      {order.weightDiscrepancy !== undefined &&
+                      order.weightDiscrepancy !== null
+                        ? `${order.weightDiscrepancy.toFixed(
+                            2,
+                          )}g (${order.discrepancyPercentage?.toFixed(1)}%)`
+                        : 'Not calculated'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <div className="flex flex-col gap-1">
+                      <Badge
+                        className={`text-xs ${
+                          order.isFinalized
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {order.isFinalized ? 'Finalized' : 'Pending'}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

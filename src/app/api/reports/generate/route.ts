@@ -58,6 +58,7 @@ async function generateReport(request: NextRequest) {
         const orders = await Order.find(dateFilter)
           .populate('designId', 'name number')
           .populate('stonesUsed.stoneId', 'name')
+          .populate('receivedMaterials.stones.stoneId', 'name')
           .sort({ createdAt: -1 });
         reportData = { orders };
         break;
@@ -72,14 +73,64 @@ async function generateReport(request: NextRequest) {
       case 'analytics':
         const [analyticsOrders, analyticsStones, analyticsPapers] =
           await Promise.all([
-            Order.find(dateFilter).populate('designId', 'name'),
+            Order.find(dateFilter)
+              .populate('designId', 'name')
+              .populate('stonesUsed.stoneId', 'name')
+              .populate('receivedMaterials.stones.stoneId', 'name'),
             Stone.find({}),
             Paper.find({}),
           ]);
+
+        // Calculate inventory analytics
+        const totalStoneQuantity = analyticsStones.reduce(
+          (sum, stone) => sum + stone.quantity,
+          0,
+        );
+        const totalPaperQuantity = analyticsPapers.reduce(
+          (sum, paper) => sum + paper.quantity,
+          0,
+        );
+        const lowStockStones = analyticsStones.filter(
+          (stone) => stone.quantity < 100,
+        );
+        const lowStockPapers = analyticsPapers.filter(
+          (paper) => paper.quantity < 10,
+        );
+
+        // Calculate order analytics
+        const completedOrders = analyticsOrders.filter(
+          (order) => order.status === 'completed',
+        );
+        const pendingOrders = analyticsOrders.filter(
+          (order) => order.status === 'pending',
+        );
+        const internalOrders = analyticsOrders.filter(
+          (order) => order.type === 'internal',
+        );
+        const outOrders = analyticsOrders.filter(
+          (order) => order.type === 'out',
+        );
+
         reportData = {
           orders: analyticsOrders,
           stones: analyticsStones,
           papers: analyticsPapers,
+          analytics: {
+            inventory: {
+              totalStoneQuantity,
+              totalPaperQuantity,
+              lowStockStones: lowStockStones.length,
+              lowStockPapers: lowStockPapers.length,
+            },
+            orders: {
+              total: analyticsOrders.length,
+              completed: completedOrders.length,
+              pending: pendingOrders.length,
+              internal: internalOrders.length,
+              out: outOrders.length,
+            },
+            lowStockItems: [...lowStockStones, ...lowStockPapers],
+          },
         };
         break;
 
@@ -94,7 +145,8 @@ async function generateReport(request: NextRequest) {
         ] = await Promise.all([
           Order.find(dateFilter)
             .populate('designId', 'name number')
-            .populate('stonesUsed.stoneId', 'name'),
+            .populate('stonesUsed.stoneId', 'name')
+            .populate('receivedMaterials.stones.stoneId', 'name'),
           User.find({}).select('-password'),
           Stone.find({}),
           Paper.find({}),

@@ -5,6 +5,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export async function authenticatedFetch(
+  url: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const defaultOptions: RequestInit = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    credentials: 'include', // Include cookies for authentication
+    ...options,
+  };
+
+  return fetch(url, defaultOptions);
+}
+
 export function generateJobOrderNumber(): string {
   const now = new Date();
   const year = now.getFullYear();

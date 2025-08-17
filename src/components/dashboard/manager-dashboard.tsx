@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SpinnerPage } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
+import { authenticatedFetch } from '@/lib/utils';
 import Link from 'next/link';
 
 interface Stone {
@@ -31,6 +32,13 @@ interface Order {
   type: 'internal' | 'out';
   customerName: string;
   phone: string;
+  designId: { name: string; number: string };
+  calculatedWeight?: number;
+  finalTotalWeight?: number;
+  weightDiscrepancy?: number;
+  discrepancyPercentage?: number;
+  status: string;
+  isFinalized: boolean;
   createdAt: string;
 }
 
@@ -60,9 +68,9 @@ export default function ManagerDashboard() {
   const fetchDashboardData = async () => {
     try {
       const [stonesRes, papersRes, ordersRes] = await Promise.all([
-        fetch('/api/inventory/stones'),
-        fetch('/api/inventory/paper'),
-        fetch('/api/orders'),
+        authenticatedFetch('/api/inventory/stones'),
+        authenticatedFetch('/api/inventory/paper'),
+        authenticatedFetch('/api/orders'),
       ]);
 
       const stones = await stonesRes.json();
@@ -224,28 +232,103 @@ export default function ManagerDashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Recent Orders</CardTitle>
-            <CardDescription>Latest 5 orders</CardDescription>
+            <CardDescription>
+              Latest 5 orders with weight details
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {data.recentOrders.map((order: Order) => (
                 <div
                   key={order._id}
-                  className="flex items-center justify-between p-2 border rounded"
+                  className="p-3 border rounded space-y-2"
                 >
-                  <div>
-                    <p className="font-medium text-sm">{order.customerName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {order.phone}
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">
+                        {order.customerName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {order.phone}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Design: {order.designId?.name || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Badge
+                        variant={
+                          order.type === 'internal' ? 'default' : 'secondary'
+                        }
+                        className="text-xs"
+                      >
+                        {order.type}
+                      </Badge>
+                      <Badge
+                        className={`ml-1 text-xs ${
+                          order.status === 'completed'
+                            ? 'bg-green-100 text-green-800'
+                            : order.status === 'cancelled'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        {order.status}
+                      </Badge>
+                    </div>
                   </div>
-                  <Badge
-                    variant={
-                      order.type === 'internal' ? 'default' : 'secondary'
-                    }
-                  >
-                    {order.type}
-                  </Badge>
+
+                  {/* Weight Information */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Calculated
+                      </p>
+                      <p className="text-sm font-medium">
+                        {order.calculatedWeight?.toFixed(2) || 'N/A'}g
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Final</p>
+                      <p className="text-sm font-medium">
+                        {order.finalTotalWeight?.toFixed(2) || 'Not set'}g
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Discrepancy
+                      </p>
+                      <p
+                        className={`text-sm font-medium ${
+                          order.weightDiscrepancy !== undefined &&
+                          order.weightDiscrepancy !== null
+                            ? order.weightDiscrepancy !== 0
+                              ? order.weightDiscrepancy > 0
+                                ? 'text-red-600'
+                                : 'text-green-600'
+                              : 'text-gray-600'
+                            : 'text-gray-500'
+                        }`}
+                      >
+                        {order.weightDiscrepancy !== undefined &&
+                        order.weightDiscrepancy !== null
+                          ? `${order.weightDiscrepancy.toFixed(2)}g`
+                          : 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <Badge
+                        className={`text-xs ${
+                          order.isFinalized
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {order.isFinalized ? 'Finalized' : 'Pending'}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

@@ -32,6 +32,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import { authenticatedFetch } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 import { Edit, Trash2, Eye, Package, Plus, CheckCircle } from 'lucide-react';
 
 interface User {
@@ -149,6 +151,22 @@ export default function OrdersPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isFinalizing, setIsFinalizing] = useState<string | null>(null);
+  const [isCompleting, setIsCompleting] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText: string;
+    cancelText: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+  });
   const [formData, setFormData] = useState({
     type: 'internal' as 'internal' | 'out',
     customerName: '',
@@ -186,7 +204,7 @@ export default function OrdersPage() {
 
   const fetchUser = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me');
+      const response = await authenticatedFetch('/api/auth/me');
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
@@ -199,10 +217,10 @@ export default function OrdersPage() {
   const fetchData = useCallback(async () => {
     try {
       const [ordersRes, designsRes, papersRes, stonesRes] = await Promise.all([
-        fetch('/api/orders'),
-        fetch('/api/designs'),
-        fetch('/api/inventory/paper'),
-        fetch('/api/inventory/stones'),
+        authenticatedFetch('/api/orders'),
+        authenticatedFetch('/api/designs'),
+        authenticatedFetch('/api/inventory/paper'),
+        authenticatedFetch('/api/inventory/stones'),
       ]);
 
       const ordersData = await ordersRes.json();
@@ -264,11 +282,8 @@ export default function OrdersPage() {
         };
       }
 
-      const response = await fetch('/api/orders', {
+      const response = await authenticatedFetch('/api/orders', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(orderData),
       });
 
@@ -314,23 +329,23 @@ export default function OrdersPage() {
     e.preventDefault();
     setIsUpdating(true);
     try {
-      const response = await fetch(`/api/orders/${selectedOrder?._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await authenticatedFetch(
+        `/api/orders/${selectedOrder?._id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...editFormData,
+            paperUsed: {
+              ...editFormData.paperUsed,
+              sizeInInch: parseInt(editFormData.paperUsed.sizeInInch),
+              quantityInPcs: parseInt(editFormData.paperUsed.quantityInPcs),
+            },
+            finalTotalWeight: editFormData.finalTotalWeight
+              ? parseFloat(editFormData.finalTotalWeight)
+              : undefined,
+          }),
         },
-        body: JSON.stringify({
-          ...editFormData,
-          paperUsed: {
-            ...editFormData.paperUsed,
-            sizeInInch: parseInt(editFormData.paperUsed.sizeInInch),
-            quantityInPcs: parseInt(editFormData.paperUsed.quantityInPcs),
-          },
-          finalTotalWeight: editFormData.finalTotalWeight
-            ? parseFloat(editFormData.finalTotalWeight)
-            : undefined,
-        }),
-      });
+      );
 
       const data = await response.json();
       if (data.success) {
@@ -350,68 +365,164 @@ export default function OrdersPage() {
   };
 
   const handleFinalize = async (orderId: string) => {
-    if (
-      !confirm(
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Finalize Order',
+      message:
         'Are you sure you want to finalize this order? This will deduct consumed materials from inventory.',
-      )
-    )
-      return;
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        setIsFinalizing(orderId);
+        try {
+          const response = await authenticatedFetch(`/api/orders/${orderId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              isFinalized: true,
+            }),
+          });
 
-    setIsFinalizing(orderId);
-    try {
-      const response = await fetch(`/api/orders/${orderId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          isFinalized: true,
-        }),
-      });
+          const data = await response.json();
+          if (data.success) {
+            showSuccess(
+              'Order Finalized',
+              'Order has been finalized and materials deducted from inventory.',
+            );
+            fetchData();
+          } else {
+            showError(
+              'Finalization Failed',
+              data.message || 'Failed to finalize order.',
+            );
+          }
+        } catch (error) {
+          console.error('Error finalizing order:', error);
+          showError(
+            'Network Error',
+            'Failed to finalize order. Please try again.',
+          );
+        } finally {
+          setIsFinalizing(null);
+        }
+      },
+      confirmText: 'Finalize',
+      cancelText: 'Cancel',
+    });
+  };
 
-      const data = await response.json();
-      if (data.success) {
-        showSuccess(
-          'Order Finalized',
-          'Order has been finalized and materials deducted from inventory.',
-        );
-        fetchData();
-      } else {
-        showError(
-          'Finalization Failed',
-          data.message || 'Failed to finalize order.',
-        );
-      }
-    } catch (error) {
-      console.error('Error finalizing order:', error);
-      showError('Network Error', 'Failed to finalize order. Please try again.');
-    } finally {
-      setIsFinalizing(null);
-    }
+  const handleComplete = async (orderId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Complete Order',
+      message:
+        'Are you sure you want to mark this order as completed? This action cannot be undone.',
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        setIsCompleting(orderId);
+        try {
+          // Get the current order data to ensure we have all necessary fields
+          const orderResponse = await authenticatedFetch(
+            `/api/orders/${orderId}`,
+          );
+          const orderData = await orderResponse.json();
+
+          if (!orderData.success) {
+            throw new Error('Failed to fetch order data');
+          }
+
+          const order = orderData.data;
+
+          // Prepare update data with all necessary fields
+          const updateData = {
+            status: 'completed',
+            // Include existing data to ensure discrepancy calculation works
+            type: order.type,
+            customerName: order.customerName,
+            phone: order.phone,
+            designId: order.designId._id || order.designId,
+            stonesUsed: order.stonesUsed,
+            paperUsed: order.paperUsed,
+            calculatedWeight: order.calculatedWeight,
+            // Only include finalTotalWeight if it exists, otherwise use calculated weight
+            finalTotalWeight: order.finalTotalWeight || order.calculatedWeight,
+          };
+
+          const response = await authenticatedFetch(`/api/orders/${orderId}`, {
+            method: 'PUT',
+            body: JSON.stringify(updateData),
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            showSuccess(
+              'Order Completed',
+              'Order has been marked as completed successfully.',
+            );
+            // Close all modals and reset state
+            setIsViewDialogOpen(false);
+            setIsEditDialogOpen(false);
+            setSelectedOrder(null);
+            fetchData();
+          } else {
+            showError(
+              'Completion Failed',
+              data.message || 'Failed to complete order.',
+            );
+          }
+        } catch (error) {
+          console.error('Error completing order:', error);
+          showError(
+            'Network Error',
+            'Failed to complete order. Please try again.',
+          );
+        } finally {
+          setIsCompleting(null);
+        }
+      },
+      confirmText: 'Complete',
+      cancelText: 'Cancel',
+    });
   };
 
   const handleDelete = async (orderId: string) => {
-    if (!confirm('Are you sure you want to delete this order?')) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Order',
+      message:
+        'Are you sure you want to delete this order? This action cannot be undone.',
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        setIsDeleting(orderId);
+        try {
+          const response = await authenticatedFetch(`/api/orders/${orderId}`, {
+            method: 'DELETE',
+          });
 
-    setIsDeleting(orderId);
-    try {
-      const response = await fetch(`/api/orders/${orderId}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        showSuccess('Order Deleted', 'Order has been deleted successfully.');
-        fetchData();
-      } else {
-        showError('Deletion Failed', data.message || 'Failed to delete order.');
-      }
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      showError('Network Error', 'Failed to delete order. Please try again.');
-    } finally {
-      setIsDeleting(null);
-    }
+          const data = await response.json();
+          if (data.success) {
+            showSuccess(
+              'Order Deleted',
+              'Order has been deleted successfully.',
+            );
+            fetchData();
+          } else {
+            showError(
+              'Deletion Failed',
+              data.message || 'Failed to delete order.',
+            );
+          }
+        } catch (error) {
+          console.error('Error deleting order:', error);
+          showError(
+            'Network Error',
+            'Failed to delete order. Please try again.',
+          );
+        } finally {
+          setIsDeleting(null);
+        }
+      },
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+    });
   };
 
   const openEditDialog = (order: Order) => {
@@ -882,17 +993,19 @@ export default function OrdersPage() {
           ) : (
             <Table>
               <TableHeader>
-                <TableHead>Customer</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Design</TableHead>
-                <TableHead>Paper Used</TableHead>
-                <TableHead>Calculated Weight</TableHead>
-                <TableHead>Final Weight</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Finalized</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Design</TableHead>
+                  <TableHead>Paper Used</TableHead>
+                  <TableHead>Calculated Weight</TableHead>
+                  <TableHead>Final Weight</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Finalized</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {orders.map((order) => (
@@ -1269,13 +1382,21 @@ export default function OrdersPage() {
                   <Label className="font-semibold">Discrepancy</Label>
                   <p
                     className={
-                      selectedOrder.weightDiscrepancy > 0
-                        ? 'text-red-600'
-                        : 'text-green-600'
+                      selectedOrder.weightDiscrepancy !== 0
+                        ? selectedOrder.weightDiscrepancy > 0
+                          ? 'text-red-600'
+                          : 'text-green-600'
+                        : 'text-gray-600'
                     }
                   >
-                    {selectedOrder.weightDiscrepancy?.toFixed(2)}g (
-                    {selectedOrder.discrepancyPercentage?.toFixed(1)}%)
+                    {selectedOrder.weightDiscrepancy !== undefined &&
+                    selectedOrder.weightDiscrepancy !== null
+                      ? `${selectedOrder.weightDiscrepancy.toFixed(
+                          2,
+                        )}g (${selectedOrder.discrepancyPercentage?.toFixed(
+                          1,
+                        )}%)`
+                      : 'Not calculated'}
                   </p>
                 </div>
               </div>
@@ -1361,36 +1482,41 @@ export default function OrdersPage() {
                   ))}
                 </div>
               </div>
-              {selectedOrder.receivedMaterials && (
-                <div className="space-y-4 border p-4 rounded-lg">
-                  <Label className="font-semibold">Received Materials</Label>
-                  <div>
-                    <Label className="font-semibold">Received Paper</Label>
-                    <p>
-                      {selectedOrder.receivedMaterials.paper.sizeInInch}&quot; ×{' '}
-                      {selectedOrder.receivedMaterials.paper.quantityInPcs} pcs
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Received Stones</Label>
-                    <div className="space-y-2">
-                      {selectedOrder.receivedMaterials.stones.map(
-                        (stone, index) => (
-                          <div
-                            key={index}
-                            className="flex justify-between"
-                          >
-                            <span>
-                              {stone.stoneId?.name || 'Unknown Stone'}
-                            </span>
-                            <span>{stone.quantity}g</span>
-                          </div>
-                        ),
-                      )}
+              {selectedOrder.type === 'out' &&
+                selectedOrder.receivedMaterials && (
+                  <div className="space-y-4 border p-4 rounded-lg">
+                    <Label className="font-semibold">Received Materials</Label>
+                    <div>
+                      <Label className="font-semibold">Received Paper</Label>
+                      <p>
+                        {selectedOrder.receivedMaterials.paper?.sizeInInch}
+                        &quot; ×{' '}
+                        {
+                          selectedOrder.receivedMaterials.paper?.quantityInPcs
+                        }{' '}
+                        pcs
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="font-semibold">Received Stones</Label>
+                      <div className="space-y-2">
+                        {selectedOrder.receivedMaterials.stones.map(
+                          (stone, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between"
+                            >
+                              <span>
+                                {stone.stoneId?.name || 'Unknown Stone'}
+                              </span>
+                              <span>{stone.quantity}g</span>
+                            </div>
+                          ),
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="font-semibold">Created By</Label>
@@ -1401,8 +1527,58 @@ export default function OrdersPage() {
                   <p>{selectedOrder.updatedBy?.name || 'Not updated'}</p>
                 </div>
               </div>
+
+              {/* Mark as Completed Button */}
+              {selectedOrder.status !== 'completed' &&
+                selectedOrder.finalTotalWeight && (
+                  <div className="flex justify-center pt-4">
+                    <LoadingButton
+                      onClick={() => handleComplete(selectedOrder._id)}
+                      loading={isCompleting === selectedOrder._id}
+                      loadingText="Marking as Completed..."
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      Mark as Completed
+                    </LoadingButton>
+                  </div>
+                )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmDialog.isOpen}
+        onOpenChange={(open) =>
+          setConfirmDialog((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{confirmDialog.title}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              {confirmDialog.message}
+            </p>
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={() =>
+                setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
+              }
+            >
+              {confirmDialog.cancelText}
+            </Button>
+            <Button
+              onClick={confirmDialog.onConfirm}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {confirmDialog.confirmText}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
