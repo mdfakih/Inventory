@@ -18,7 +18,17 @@ export async function authenticatedFetch(
     ...options,
   };
 
-  return fetch(url, defaultOptions);
+  const response = await fetch(url, defaultOptions);
+
+  // Handle 401 responses globally
+  if (response.status === 401) {
+    // Only redirect if we're in a browser environment
+    if (typeof window !== 'undefined') {
+      window.location.href = '/unauthorized';
+    }
+  }
+
+  return response;
 }
 
 export function generateJobOrderNumber(): string {

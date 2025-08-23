@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
+import Stone from '@/models/Stone';
+import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 interface DesignUpdateData {
   name: string;
   number: string;
   imageUrl: string;
+  prices: Array<{ currency: string; price: number }>;
   defaultStones: Array<{ stoneId: string; quantity: number }>;
   paperConfigurations: Array<{
     paperSize: number;
@@ -70,9 +73,32 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
-    const { name, number, imageUrl, defaultStones, paperConfigurations } = body;
     const { id } = await params;
+    const body = await request.json();
+    const {
+      name,
+      number,
+      imageUrl,
+      prices,
+      defaultStones,
+      paperConfigurations,
+    } = body;
+
+    if (!name || !number || !imageUrl) {
+      return NextResponse.json(
+        { success: false, message: 'Name, number, and image URL are required' },
+        { status: 400 },
+      );
+    }
+
+    // Check if design number already exists for other designs
+    const existingDesign = await Design.findOne({ number, _id: { $ne: id } });
+    if (existingDesign) {
+      return NextResponse.json(
+        { success: false, message: 'Design number already exists' },
+        { status: 400 },
+      );
+    }
 
     const design = await Design.findById(id);
     if (!design) {
@@ -82,11 +108,17 @@ export async function PUT(
       );
     }
 
-    // Track changes for audit trail
+    // Track changes for update history
     const updateHistory = [];
-    const oldValues = design.toObject();
+    const oldValues = {
+      name: design.name,
+      number: design.number,
+      imageUrl: design.imageUrl,
+      prices: design.prices,
+      defaultStones: design.defaultStones,
+      paperConfigurations: design.paperConfigurations,
+    };
 
-    // Check for changes and add to history
     if (name !== oldValues.name) {
       updateHistory.push({
         field: 'name',
@@ -112,6 +144,16 @@ export async function PUT(
         field: 'imageUrl',
         oldValue: oldValues.imageUrl,
         newValue: imageUrl,
+        updatedBy: user.id,
+        updatedAt: new Date(),
+      });
+    }
+
+    if (JSON.stringify(prices) !== JSON.stringify(oldValues.prices)) {
+      updateHistory.push({
+        field: 'prices',
+        oldValue: oldValues.prices,
+        newValue: prices,
         updatedBy: user.id,
         updatedAt: new Date(),
       });
@@ -147,6 +189,7 @@ export async function PUT(
       name,
       number,
       imageUrl,
+      prices: prices || [],
       defaultStones: defaultStones || [],
       paperConfigurations: paperConfigurations || [],
       updatedBy: user.id,

@@ -69,3 +69,59 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await dbConnect();
+
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
+
+    const { id } = await params;
+    const stone = await Stone.findById(id);
+    if (!stone) {
+      return NextResponse.json(
+        { success: false, message: 'Stone not found' },
+        { status: 404 },
+      );
+    }
+
+    // Reset quantity to 0 instead of deleting
+    await Stone.findByIdAndUpdate(
+      id,
+      {
+        quantity: 0,
+        updatedBy: user.id,
+        $push: {
+          updateHistory: {
+            field: 'quantity',
+            oldValue: stone.quantity,
+            newValue: 0,
+            updatedBy: user.id,
+            updatedAt: new Date(),
+          },
+        },
+      },
+      { new: true },
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Stone quantity reset to 0 successfully',
+    });
+  } catch (error) {
+    console.error('Reset stone quantity error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}

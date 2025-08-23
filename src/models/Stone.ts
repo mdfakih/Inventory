@@ -34,6 +34,12 @@ const stoneSchema = new mongoose.Schema(
       enum: ['g', 'kg'],
       required: true,
     },
+    weightPerPiece: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0, // Weight in grams per piece
+    },
     inventoryType: {
       type: String,
       enum: ['internal', 'out'],

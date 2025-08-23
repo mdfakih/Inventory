@@ -4,13 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import {
   Table,
   TableBody,
@@ -25,13 +19,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
-import { Package, Plus } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
+import { Package, Edit, Trash2 } from 'lucide-react';
 
 interface Plastic {
   _id: string;
@@ -40,26 +34,24 @@ interface Plastic {
   quantity: number;
 }
 
-interface PlasticType {
-  _id: string;
-  name: string;
-  width: number;
-}
-
 export default function PlasticTable() {
   const [plastics, setPlastics] = useState<Plastic[]>([]);
-  const [plasticTypes, setPlasticTypes] = useState<PlasticType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [formData, setFormData] = useState({
-    plasticTypeId: '',
-    quantity: '',
-  });
+  const [refreshing, setRefreshing] = useState(false);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [selectedPlastic, setSelectedPlastic] = useState<Plastic | null>(null);
+  const [updateQuantity, setUpdateQuantity] = useState('');
   const { showSuccess, showError } = useSnackbarHelpers();
+  const { loading: authLoading, isAuthenticated } = useAuth();
 
-  const fetchPlastics = useCallback(async () => {
+  const fetchPlastics = useCallback(async (isRefresh = false) => {
     try {
+      if (isRefresh) {
+        setRefreshing(true);
+      }
       const response = await fetch('/api/inventory/plastic');
       const data = await response.json();
       if (data.success) {
@@ -75,75 +67,104 @@ export default function PlasticTable() {
       );
     } finally {
       setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const fetchPlasticTypes = useCallback(async () => {
-    try {
-      const response = await fetch('/api/inventory/plastic');
-      const data = await response.json();
-      if (data.success) {
-        setPlasticTypes(data.data);
+      if (isRefresh) {
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.error('Error fetching plastic types:', error);
-      showError('Data Loading Error', 'Failed to load plastic types.');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    fetchPlastics();
-    fetchPlasticTypes();
+    // Only fetch data when authentication is ready and user is authenticated
+    if (!authLoading && isAuthenticated) {
+      fetchPlastics();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
+  const handleUpdateQuantity = async (
+    plasticId: string,
+    newQuantity: number,
+  ) => {
+    setIsUpdating(plasticId);
     try {
-      const selectedPlasticType = plasticTypes.find(
-        (pt) => pt._id === formData.plasticTypeId,
-      );
-      if (!selectedPlasticType) {
-        showError('Validation Error', 'Please select a valid plastic type.');
-        return;
-      }
-
-      const response = await fetch('/api/inventory/plastic', {
-        method: 'POST',
+      const response = await fetch(`/api/inventory/plastic/${plasticId}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: selectedPlasticType.name,
-          width: selectedPlasticType.width,
-          quantity: parseInt(formData.quantity),
-        }),
+        body: JSON.stringify({ quantity: newQuantity }),
       });
 
       const data = await response.json();
       if (data.success) {
         showSuccess(
-          'Plastic Added',
-          'New plastic has been added successfully.',
+          'Quantity Updated',
+          'Plastic quantity has been updated successfully.',
         );
-        setIsDialogOpen(false);
-        setFormData({
-          plasticTypeId: '',
-          quantity: '',
-        });
-        fetchPlastics();
+        await fetchPlastics(true);
+        setIsUpdateDialogOpen(false);
+        setSelectedPlastic(null);
+        setUpdateQuantity('');
       } else {
-        showError('Creation Failed', data.message || 'Failed to add plastic.');
+        showError(
+          'Update Failed',
+          data.message || 'Failed to update quantity.',
+        );
       }
     } catch (error) {
-      console.error('Error creating plastic:', error);
-      showError('Network Error', 'Failed to add plastic. Please try again.');
+      console.error('Error updating quantity:', error);
+      showError(
+        'Network Error',
+        'Failed to update quantity. Please try again.',
+      );
     } finally {
-      setIsCreating(false);
+      setIsUpdating(null);
     }
+  };
+
+  const handleResetPlastic = async (plasticId: string) => {
+    setIsDeleting(plasticId);
+    try {
+      const response = await fetch(`/api/inventory/plastic/${plasticId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(
+          'Plastic Reset',
+          'Plastic quantity has been reset to 0 successfully.',
+        );
+        await fetchPlastics(true);
+        setIsDeleteDialogOpen(false);
+        setSelectedPlastic(null);
+      } else {
+        showError(
+          'Reset Failed',
+          data.message || 'Failed to reset plastic quantity.',
+        );
+      }
+    } catch (error) {
+      console.error('Error resetting plastic quantity:', error);
+      showError(
+        'Network Error',
+        'Failed to reset plastic quantity. Please try again.',
+      );
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const openUpdateDialog = (plastic: Plastic) => {
+    setSelectedPlastic(plastic);
+    setUpdateQuantity(plastic.quantity.toString());
+    setIsUpdateDialogOpen(true);
+  };
+
+  const openDeleteDialog = (plastic: Plastic) => {
+    setSelectedPlastic(plastic);
+    setIsDeleteDialogOpen(true);
   };
 
   if (loading) {
@@ -163,93 +184,123 @@ export default function PlasticTable() {
             Manage packaging plastic with different widths
           </p>
         </div>
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Plastic
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Plastic</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-4"
-            >
-              <div className="space-y-2">
-                <Label htmlFor="plasticType">Plastic Type</Label>
-                <Select
-                  value={formData.plasticTypeId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, plasticTypeId: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select plastic type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {plasticTypes.map((plasticType) => (
-                      <SelectItem
-                        key={plasticType._id}
-                        value={plasticType._id}
-                      >
-                        {plasticType.name} ({plasticType.width}&quot;)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity (pcs)</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={formData.quantity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, quantity: e.target.value })
-                  }
-                  placeholder="Enter number of pieces"
-                  required
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <LoadingButton
-                  type="submit"
-                  loading={isCreating}
-                  loadingText="Adding..."
-                >
-                  Add Plastic
-                </LoadingButton>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {refreshing && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner size="sm" />
+            <span>Refreshing...</span>
+          </div>
+        )}
       </div>
+
+      {/* Update Quantity Modal */}
+      <Dialog
+        open={isUpdateDialogOpen}
+        onOpenChange={setIsUpdateDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Quantity</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (selectedPlastic) {
+                const quantity = parseInt(updateQuantity);
+                if (!isNaN(quantity) && quantity >= 0) {
+                  handleUpdateQuantity(selectedPlastic._id, quantity);
+                } else {
+                  showError(
+                    'Invalid Input',
+                    'Please enter a valid positive number.',
+                  );
+                }
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="updateQuantity">New Quantity (pcs)</Label>
+              <Input
+                id="updateQuantity"
+                type="number"
+                value={updateQuantity}
+                onChange={(e) => setUpdateQuantity(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsUpdateDialogOpen(false);
+                  setSelectedPlastic(null);
+                  setUpdateQuantity('');
+                }}
+                disabled={isUpdating === selectedPlastic?._id}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                type="submit"
+                loading={isUpdating === selectedPlastic?._id}
+                loadingText="Updating..."
+              >
+                Update Quantity
+              </LoadingButton>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Plastic Quantity</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to reset the quantity of{' '}
+              <strong>{selectedPlastic?.name}</strong> to 0? This action cannot
+              be undone.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setSelectedPlastic(null);
+                }}
+                disabled={isDeleting === selectedPlastic?._id}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                type="button"
+                variant="destructive"
+                onClick={() =>
+                  selectedPlastic && handleResetPlastic(selectedPlastic._id)
+                }
+                loading={isDeleting === selectedPlastic?._id}
+                loadingText="Resetting..."
+              >
+                Reset
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {plastics.length === 0 ? (
         <EmptyState
           icon={Package}
           title="No Plastic Found"
-          description="Get started by adding your first plastic. Plastic inventory will appear here once added."
-          action={
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Plastic
-            </Button>
-          }
+          description="No plastic items are currently available in the inventory."
         />
       ) : (
         <div className="border rounded-lg">
@@ -260,6 +311,7 @@ export default function PlasticTable() {
                 <TableHead>Width</TableHead>
                 <TableHead>Quantity (pcs)</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -276,6 +328,30 @@ export default function PlasticTable() {
                     >
                       {plastic.quantity < 10 ? 'Low Stock' : 'In Stock'}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <LoadingButton
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openUpdateDialog(plastic)}
+                        loading={isUpdating === plastic._id}
+                        loadingText="Updating..."
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Update
+                      </LoadingButton>
+                      <LoadingButton
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openDeleteDialog(plastic)}
+                        loading={isDeleting === plastic._id}
+                        loadingText="Resetting..."
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Reset
+                      </LoadingButton>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

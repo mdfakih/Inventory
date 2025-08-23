@@ -16,6 +16,18 @@ const designSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  prices: [{
+    currency: {
+      type: String,
+      enum: ['₹', '$'],
+      required: true,
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  }],
   paperConfigurations: [{
     paperSize: {
       type: Number,

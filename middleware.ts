@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/forgot-password', '/api/auth/login', '/api/auth/forgot-password'];
+  const publicRoutes = ['/login', '/forgot-password', '/unauthorized', '/test-unauthorized', '/api/auth/login', '/api/auth/forgot-password'];
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next();
   }

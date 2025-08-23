@@ -33,6 +33,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
+import { useAuth } from '@/lib/auth-context';
+import { authenticatedFetch } from '@/lib/utils';
 import { Upload, X, Edit, Trash2, Eye, Plus, Palette } from 'lucide-react';
 
 interface Stone {
@@ -57,6 +59,10 @@ interface Design {
   name: string;
   number: string;
   imageUrl: string;
+  prices: Array<{
+    currency: '₹' | '$';
+    price: number;
+  }>;
   defaultStones: Array<{
     stoneId: { _id: string; name: string };
     quantity: number;
@@ -78,6 +84,10 @@ interface FormData {
   name: string;
   number: string;
   imageUrl: string;
+  prices: Array<{
+    currency: '₹' | '$';
+    price: number;
+  }>;
   defaultStones: Array<{
     stoneId: string;
     quantity: number;
@@ -92,9 +102,20 @@ interface FormData {
 }
 
 export default function DesignsPage() {
+  // Helper function to ensure proper typing for price updates
+  const updatePrices = (
+    prices: Array<{ currency: string; price: number }>,
+  ): Array<{ currency: '₹' | '$'; price: number }> => {
+    return prices.map((p) => ({
+      currency: p.currency as '₹' | '$',
+      price: p.price,
+    }));
+  };
+
   const [designs, setDesigns] = useState<Design[]>([]);
   const [stones, setStones] = useState<Stone[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -109,6 +130,7 @@ export default function DesignsPage() {
     name: '',
     number: '',
     imageUrl: '',
+    prices: [],
     defaultStones: [],
     paperConfigurations: [],
   });
@@ -116,14 +138,16 @@ export default function DesignsPage() {
     name: '',
     number: '',
     imageUrl: '',
+    prices: [],
     defaultStones: [],
     paperConfigurations: [],
   });
   const { showSuccess, showError } = useSnackbarHelpers();
+  const { loading: authLoading, isAuthenticated } = useAuth();
 
   const fetchUser = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me');
+      const response = await authenticatedFetch('/api/auth/me');
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
@@ -133,11 +157,16 @@ export default function DesignsPage() {
     }
   }, []);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const [designsRes, stonesRes] = await Promise.all([
-        fetch('/api/designs'),
-        fetch('/api/inventory/stones'),
+        authenticatedFetch('/api/designs'),
+        authenticatedFetch('/api/inventory/stones'),
       ]);
 
       const designsData = await designsRes.json();
@@ -150,15 +179,21 @@ export default function DesignsPage() {
       showError('Data Loading Error', 'Failed to load designs data.');
     } finally {
       setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    fetchData();
-    fetchUser();
+    // Only fetch data when authentication is ready and user is authenticated
+    if (!authLoading && isAuthenticated) {
+      fetchData();
+      fetchUser();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   const handleImageUpload = async (file: File) => {
     setUploading(true);
@@ -166,7 +201,7 @@ export default function DesignsPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/upload', {
+      const response = await authenticatedFetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
@@ -193,7 +228,7 @@ export default function DesignsPage() {
     e.preventDefault();
     setIsCreating(true);
     try {
-      const response = await fetch('/api/designs', {
+      const response = await authenticatedFetch('/api/designs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -212,10 +247,11 @@ export default function DesignsPage() {
           name: '',
           number: '',
           imageUrl: '',
+          prices: [],
           defaultStones: [],
           paperConfigurations: [],
         });
-        fetchData();
+        await fetchData(true);
       } else {
         showError(
           'Creation Failed',
@@ -236,20 +272,23 @@ export default function DesignsPage() {
 
     setIsUpdating(true);
     try {
-      const response = await fetch(`/api/designs/${selectedDesign._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await authenticatedFetch(
+        `/api/designs/${selectedDesign._id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(editFormData),
         },
-        body: JSON.stringify(editFormData),
-      });
+      );
 
       const data = await response.json();
       if (data.success) {
         showSuccess('Design Updated', 'Design has been updated successfully.');
         setIsEditDialogOpen(false);
         setSelectedDesign(null);
-        fetchData();
+        await fetchData(true);
       } else {
         showError('Update Failed', data.message || 'Failed to update design.');
       }
@@ -266,14 +305,14 @@ export default function DesignsPage() {
 
     setIsDeleting(designId);
     try {
-      const response = await fetch(`/api/designs/${designId}`, {
+      const response = await authenticatedFetch(`/api/designs/${designId}`, {
         method: 'DELETE',
       });
 
       const data = await response.json();
       if (data.success) {
         showSuccess('Design Deleted', 'Design has been deleted successfully.');
-        fetchData();
+        await fetchData(true);
       } else {
         showError(
           'Deletion Failed',
@@ -294,17 +333,25 @@ export default function DesignsPage() {
       name: design.name,
       number: design.number,
       imageUrl: design.imageUrl,
-      defaultStones: design.defaultStones.map((stone) => ({
-        stoneId: stone.stoneId._id,
-        quantity: stone.quantity,
-      })),
-      paperConfigurations: design.paperConfigurations.map((config) => ({
-        paperSize: config.paperSize,
-        defaultStones: config.defaultStones.map((stone) => ({
-          stoneId: stone.stoneId._id,
+      prices:
+        design.prices?.map((price) => ({
+          currency: price.currency,
+          price: price.price,
+        })) || [],
+      defaultStones:
+        design.defaultStones?.map((stone) => ({
+          stoneId: stone.stoneId?._id || '',
           quantity: stone.quantity,
-        })),
-      })),
+        })) || [],
+      paperConfigurations:
+        design.paperConfigurations?.map((config) => ({
+          paperSize: config.paperSize,
+          defaultStones:
+            config.defaultStones?.map((stone) => ({
+              stoneId: stone.stoneId?._id || '',
+              quantity: stone.quantity,
+            })) || [],
+        })) || [],
     });
     setIsEditDialogOpen(true);
   };
@@ -365,207 +412,329 @@ export default function DesignsPage() {
             Manage design templates and their default stone configurations
           </p>
         </div>
-        <Dialog
-          open={isCreateDialogOpen}
-          onOpenChange={setIsCreateDialogOpen}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Design
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Design</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={handleCreateSubmit}
-              className="space-y-4"
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Design Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    required
-                  />
+        <div className="flex items-center gap-4">
+          {refreshing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              <span>Refreshing...</span>
+            </div>
+          )}
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Design
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Design</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={handleCreateSubmit}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Design Name</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="number">Design Number</Label>
+                    <Input
+                      id="number"
+                      value={formData.number}
+                      onChange={(e) =>
+                        setFormData({ ...formData, number: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="number">Design Number</Label>
-                  <Input
-                    id="number"
-                    value={formData.number}
-                    onChange={(e) =>
-                      setFormData({ ...formData, number: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Design Image</Label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  {formData.imageUrl ? (
-                    <div className="space-y-2">
-                      <Image
-                        src={formData.imageUrl}
-                        alt="Design preview"
-                        width={128}
-                        height={128}
-                        className="mx-auto max-h-32 object-contain"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setFormData({ ...formData, imageUrl: '' })
-                        }
+                <div className="space-y-4">
+                  <Label>Pricing</Label>
+                  <div className="space-y-3">
+                    {formData.prices.map((priceItem, index) => (
+                      <div
+                        key={index}
+                        className="flex gap-2 items-end"
                       >
-                        <X className="h-4 w-4 mr-2" />
-                        Remove Image
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div>
+                        <div className="flex-1">
+                          <Label htmlFor={`currency-${index}`}>Currency</Label>
+                          <Select
+                            value={priceItem.currency}
+                            onValueChange={(value) => {
+                              const newPrices = [...formData.prices];
+                              newPrices[index] = {
+                                ...priceItem,
+                                currency: value as '₹' | '$',
+                              };
+                              setFormData({
+                                ...formData,
+                                prices: updatePrices(newPrices),
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem
+                                value="₹"
+                                disabled={formData.prices.some(
+                                  (p, i) => i !== index && p.currency === '₹',
+                                )}
+                              >
+                                ₹ (Indian Rupee)
+                              </SelectItem>
+                              <SelectItem
+                                value="$"
+                                disabled={formData.prices.some(
+                                  (p, i) => i !== index && p.currency === '$',
+                                )}
+                              >
+                                $ (US Dollar)
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex-1">
+                          <Label htmlFor={`price-${index}`}>Price</Label>
+                          <Input
+                            id={`price-${index}`}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={priceItem.price}
+                            onChange={(e) => {
+                              const newPrices = [...formData.prices];
+                              newPrices[index] = {
+                                ...priceItem,
+                                price: parseFloat(e.target.value) || 0,
+                              };
+                              setFormData({
+                                ...formData,
+                                prices: updatePrices(newPrices),
+                              });
+                            }}
+                            placeholder="Enter price"
+                          />
+                        </div>
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploading}
+                          size="sm"
+                          onClick={() => {
+                            const newPrices = formData.prices.filter(
+                              (_, i) => i !== index,
+                            );
+                            setFormData({
+                              ...formData,
+                              prices: updatePrices(newPrices),
+                            });
+                          }}
                         >
-                          {uploading ? (
-                            <>
-                              <Spinner
-                                size="sm"
-                                className="mr-2"
-                              />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="h-4 w-4 mr-2" />
-                              Upload Image
-                            </>
-                          )}
+                          <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      <p className="text-sm text-gray-500">
-                        PNG, JPG, GIF up to 10MB
-                      </p>
-                    </div>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleImageUpload(file);
-                      }
-                    }}
-                    className="hidden"
-                  />
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const usedCurrencies = formData.prices.map(
+                          (p) => p.currency,
+                        );
+                        const availableCurrency = usedCurrencies.includes('₹')
+                          ? '$'
+                          : '₹';
+                        const newPrices = [
+                          ...formData.prices,
+                          { currency: availableCurrency, price: 0 },
+                        ];
+                        setFormData({
+                          ...formData,
+                          prices: updatePrices(newPrices),
+                        });
+                      }}
+                      disabled={formData.prices.length >= 2}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Price
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <Label>Default Stones</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addDefaultStone}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Stone
-                  </Button>
+                <div className="space-y-2">
+                  <Label>Design Image</Label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    {formData.imageUrl ? (
+                      <div className="space-y-2">
+                        <Image
+                          src={formData.imageUrl}
+                          alt="Design preview"
+                          width={128}
+                          height={128}
+                          className="mx-auto max-h-32 object-contain"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setFormData({ ...formData, imageUrl: '' })
+                          }
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Remove Image
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                        <div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploading}
+                          >
+                            {uploading ? (
+                              <>
+                                <Spinner
+                                  size="sm"
+                                  className="mr-2"
+                                />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload Image
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          PNG, JPG, GIF up to 10MB
+                        </p>
+                      </div>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleImageUpload(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </div>
                 </div>
-                {formData.defaultStones.map((stone, index) => (
-                  <div
-                    key={index}
-                    className="grid grid-cols-3 gap-4 items-end"
-                  >
-                    <div>
-                      <Label>Stone</Label>
-                      <Select
-                        value={stone.stoneId}
-                        onValueChange={(value) =>
-                          updateDefaultStone(index, 'stoneId', value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select stone" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {stones.map((s) => (
-                            <SelectItem
-                              key={s._id}
-                              value={s._id}
-                            >
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Quantity (g)</Label>
-                      <Input
-                        type="number"
-                        value={stone.quantity}
-                        onChange={(e) =>
-                          updateDefaultStone(
-                            index,
-                            'quantity',
-                            parseInt(e.target.value),
-                          )
-                        }
-                        min="0"
-                      />
-                    </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Default Stones</Label>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => removeDefaultStone(index)}
+                      onClick={addDefaultStone}
                     >
-                      <X className="h-4 w-4" />
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Stone
                     </Button>
                   </div>
-                ))}
-              </div>
+                  {formData.defaultStones.map((stone, index) => (
+                    <div
+                      key={index}
+                      className="grid grid-cols-3 gap-4 items-end"
+                    >
+                      <div>
+                        <Label>Stone</Label>
+                        <Select
+                          value={stone.stoneId}
+                          onValueChange={(value) =>
+                            updateDefaultStone(index, 'stoneId', value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select stone" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {stones.map((s) => (
+                              <SelectItem
+                                key={s._id}
+                                value={s._id}
+                              >
+                                {s.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Quantity (g)</Label>
+                        <Input
+                          type="number"
+                          value={stone.quantity}
+                          onChange={(e) =>
+                            updateDefaultStone(
+                              index,
+                              'quantity',
+                              parseInt(e.target.value),
+                            )
+                          }
+                          min="0"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeDefaultStone(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
 
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <LoadingButton
-                  type="submit"
-                  loading={isCreating}
-                  loadingText="Creating..."
-                >
-                  Create Design
-                </LoadingButton>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    disabled={isCreating}
+                  >
+                    Cancel
+                  </Button>
+                  <LoadingButton
+                    type="submit"
+                    loading={isCreating}
+                    loadingText="Creating..."
+                  >
+                    Create Design
+                  </LoadingButton>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -589,6 +758,7 @@ export default function DesignsPage() {
                   <TableHead>Image</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Number</TableHead>
+                  <TableHead>Price</TableHead>
                   <TableHead>Default Stones</TableHead>
                   <TableHead>Paper Configurations</TableHead>
                   <TableHead>Created</TableHead>
@@ -618,7 +788,26 @@ export default function DesignsPage() {
                     <TableCell className="font-medium">{design.name}</TableCell>
                     <TableCell>{design.number}</TableCell>
                     <TableCell>
-                      {design.defaultStones.length > 0 ? (
+                      {design.prices?.length > 0 ? (
+                        <div className="space-y-1">
+                          {design.prices.map((price, index) => (
+                            <div
+                              key={index}
+                              className="font-medium"
+                            >
+                              {price.currency}{' '}
+                              {price.price % 1 === 0
+                                ? price.price.toFixed(0)
+                                : price.price.toFixed(2)}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">Not set</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {design.defaultStones?.length > 0 ? (
                         <div className="space-y-1">
                           {design.defaultStones.map((stone, index) => (
                             <Badge
@@ -626,7 +815,7 @@ export default function DesignsPage() {
                               variant="outline"
                               className="mr-1"
                             >
-                              {stone.stoneId.name}: {stone.quantity}g
+                              {stone.stoneId?.name}: {stone.quantity}g
                             </Badge>
                           ))}
                         </div>
@@ -635,7 +824,7 @@ export default function DesignsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {design.paperConfigurations.length > 0 ? (
+                      {design.paperConfigurations?.length > 0 ? (
                         <div className="space-y-1">
                           {design.paperConfigurations.map((config, index) => (
                             <Badge
@@ -644,7 +833,7 @@ export default function DesignsPage() {
                               className="mr-1"
                             >
                               {config.paperSize}&quot;:{' '}
-                              {config.defaultStones.length} stones
+                              {config.defaultStones?.length || 0} stones
                             </Badge>
                           ))}
                         </div>
@@ -727,6 +916,120 @@ export default function DesignsPage() {
                   }
                   required
                 />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Label>Pricing</Label>
+              <div className="space-y-3">
+                {editFormData.prices.map((priceItem, index) => (
+                  <div
+                    key={index}
+                    className="flex gap-2 items-end"
+                  >
+                    <div className="flex-1">
+                      <Label htmlFor={`edit-currency-${index}`}>Currency</Label>
+                      <Select
+                        value={priceItem.currency}
+                        onValueChange={(value) => {
+                          const newPrices = [...editFormData.prices];
+                          newPrices[index] = {
+                            ...priceItem,
+                            currency: value as '₹' | '$',
+                          };
+                          setEditFormData({
+                            ...editFormData,
+                            prices: updatePrices(newPrices),
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem
+                            value="₹"
+                            disabled={editFormData.prices.some(
+                              (p, i) => i !== index && p.currency === '₹',
+                            )}
+                          >
+                            ₹ (Indian Rupee)
+                          </SelectItem>
+                          <SelectItem
+                            value="$"
+                            disabled={editFormData.prices.some(
+                              (p, i) => i !== index && p.currency === '$',
+                            )}
+                          >
+                            $ (US Dollar)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor={`edit-price-${index}`}>Price</Label>
+                      <Input
+                        id={`edit-price-${index}`}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={priceItem.price}
+                        onChange={(e) => {
+                          const newPrices = [...editFormData.prices];
+                          newPrices[index] = {
+                            ...priceItem,
+                            price: parseFloat(e.target.value) || 0,
+                          };
+                          setEditFormData({
+                            ...editFormData,
+                            prices: updatePrices(newPrices),
+                          });
+                        }}
+                        placeholder="Enter price"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newPrices = editFormData.prices.filter(
+                          (_, i) => i !== index,
+                        );
+                        setEditFormData({
+                          ...editFormData,
+                          prices: updatePrices(newPrices),
+                        });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const usedCurrencies = editFormData.prices.map(
+                      (p) => p.currency,
+                    );
+                    const availableCurrency = usedCurrencies.includes('₹')
+                      ? '$'
+                      : '₹';
+                    const newPrices = [
+                      ...editFormData.prices,
+                      { currency: availableCurrency, price: 0 },
+                    ];
+                    setEditFormData({
+                      ...editFormData,
+                      prices: updatePrices(newPrices),
+                    });
+                  }}
+                  disabled={editFormData.prices.length >= 2}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Price
+                </Button>
               </div>
             </div>
 
@@ -922,6 +1225,28 @@ export default function DesignsPage() {
                 </div>
               </div>
               <div>
+                <Label className="font-semibold">Pricing</Label>
+                {selectedDesign.prices?.length > 0 ? (
+                  <div className="space-y-2 mt-2">
+                    {selectedDesign.prices.map((priceItem, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="font-medium">
+                          {priceItem.currency}{' '}
+                          {priceItem.price % 1 === 0
+                            ? priceItem.price.toFixed(0)
+                            : priceItem.price.toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 mt-2">No prices set</p>
+                )}
+              </div>
+              <div>
                 <Label className="font-semibold">Design Image</Label>
                 {selectedDesign.imageUrl ? (
                   <Image
@@ -937,14 +1262,14 @@ export default function DesignsPage() {
               </div>
               <div>
                 <Label className="font-semibold">Default Stones</Label>
-                {selectedDesign.defaultStones.length > 0 ? (
+                {selectedDesign.defaultStones?.length > 0 ? (
                   <div className="space-y-2 mt-2">
                     {selectedDesign.defaultStones.map((stone, index) => (
                       <div
                         key={index}
                         className="flex justify-between"
                       >
-                        <span>{stone.stoneId.name}</span>
+                        <span>{stone.stoneId?.name}</span>
                         <span>{stone.quantity}g</span>
                       </div>
                     ))}
@@ -955,7 +1280,7 @@ export default function DesignsPage() {
               </div>
               <div>
                 <Label className="font-semibold">Paper Configurations</Label>
-                {selectedDesign.paperConfigurations.length > 0 ? (
+                {selectedDesign.paperConfigurations?.length > 0 ? (
                   <div className="space-y-2 mt-2">
                     {selectedDesign.paperConfigurations.map((config, index) => (
                       <div
@@ -966,12 +1291,12 @@ export default function DesignsPage() {
                           {config.paperSize}&quot; Paper
                         </div>
                         <div className="space-y-1">
-                          {config.defaultStones.map((stone, stoneIndex) => (
+                          {config.defaultStones?.map((stone, stoneIndex) => (
                             <div
                               key={stoneIndex}
                               className="flex justify-between text-sm"
                             >
-                              <span>{stone.stoneId.name}</span>
+                              <span>{stone.stoneId?.name}</span>
                               <span>{stone.quantity}g</span>
                             </div>
                           ))}

@@ -33,6 +33,7 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { authenticatedFetch } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 import { Edit, Trash2, Eye, Package, Plus, CheckCircle } from 'lucide-react';
 
@@ -47,17 +48,10 @@ interface Design {
   _id: string;
   name: string;
   number: string;
-}
-
-interface Stone {
-  _id: string;
-  name: string;
-  number: string;
-  color: string;
-  size: string;
-  quantity: number;
-  unit: string;
-  inventoryType: 'internal' | 'out';
+  prices: Array<{
+    currency: '₹' | '$';
+    price: number;
+  }>;
 }
 
 interface Paper {
@@ -75,35 +69,15 @@ interface Order {
   customerName: string;
   phone: string;
   designId: Design;
-  stonesUsed: Array<{
-    stoneId: Stone;
-    quantity: number;
-  }>;
   paperUsed: {
     sizeInInch: number;
     quantityInPcs: number;
     paperWeightPerPc: number;
   };
-  receivedMaterials?: {
-    stones: Array<{
-      stoneId: Stone;
-      quantity: number;
-    }>;
-    paper: {
-      sizeInInch: number;
-      quantityInPcs: number;
-      paperWeightPerPc: number;
-    };
-  };
   calculatedWeight?: number;
   finalTotalWeight?: number;
   weightDiscrepancy: number;
   discrepancyPercentage: number;
-  stoneUsed?: number;
-  stoneBalance?: number;
-  stoneLoss?: number;
-  paperBalance?: number;
-  paperLoss?: number;
   status: 'pending' | 'completed' | 'cancelled';
   isFinalized: boolean;
   finalizedAt?: string;
@@ -119,18 +93,9 @@ interface CreateOrderData {
   customerName: string;
   phone: string;
   designId: string;
-  stonesUsed: Array<{ stoneId: string; quantity: number }>;
   paperUsed: {
     sizeInInch: number;
     quantityInPcs: number;
-  };
-  receivedMaterials?: {
-    stones: Array<{ stoneId: string; quantity: number }>;
-    paper: {
-      sizeInInch: number;
-      quantityInPcs: number;
-      paperWeightPerPc: number;
-    };
   };
 }
 
@@ -138,8 +103,8 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [designs, setDesigns] = useState<Design[]>([]);
   const [papers, setPapers] = useState<Paper[]>([]);
-  const [stones, setStones] = useState<Stone[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -172,18 +137,9 @@ export default function OrdersPage() {
     customerName: '',
     phone: '',
     designId: '',
-    stonesUsed: [] as Array<{ stoneId: string; quantity: number }>,
     paperUsed: {
       sizeInInch: '',
       quantityInPcs: '',
-    },
-    receivedMaterials: {
-      stones: [] as Array<{ stoneId: string; quantity: string }>,
-      paper: {
-        sizeInInch: '',
-        quantityInPcs: '',
-        paperWeightPerPc: '',
-      },
     },
   });
   const [editFormData, setEditFormData] = useState({
@@ -191,7 +147,6 @@ export default function OrdersPage() {
     customerName: '',
     phone: '',
     designId: '',
-    stonesUsed: [] as Array<{ stoneId: string; quantity: number }>,
     paperUsed: {
       sizeInInch: '',
       quantityInPcs: '',
@@ -201,6 +156,7 @@ export default function OrdersPage() {
     isFinalized: false,
   });
   const { showSuccess, showError } = useSnackbarHelpers();
+  const { loading: authLoading, isAuthenticated } = useAuth();
 
   const fetchUser = useCallback(async () => {
     try {
@@ -214,38 +170,46 @@ export default function OrdersPage() {
     }
   }, []);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     try {
-      const [ordersRes, designsRes, papersRes, stonesRes] = await Promise.all([
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      const [ordersRes, designsRes, papersRes] = await Promise.all([
         authenticatedFetch('/api/orders'),
         authenticatedFetch('/api/designs'),
         authenticatedFetch('/api/inventory/paper'),
-        authenticatedFetch('/api/inventory/stones'),
       ]);
 
       const ordersData = await ordersRes.json();
       const designsData = await designsRes.json();
       const papersData = await papersRes.json();
-      const stonesData = await stonesRes.json();
 
       if (ordersData.success) setOrders(ordersData.data);
       if (designsData.success) setDesigns(designsData.data);
       if (papersData.success) setPapers(papersData.data);
-      if (stonesData.success) setStones(stonesData.data);
     } catch (error) {
       console.error('Error fetching data:', error);
       showError('Data Loading Error', 'Failed to load orders data.');
     } finally {
       setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    fetchData();
-    fetchUser();
+    // Only fetch data when authentication is ready and user is authenticated
+    if (!authLoading && isAuthenticated) {
+      fetchData();
+      fetchUser();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authLoading, isAuthenticated]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,31 +220,11 @@ export default function OrdersPage() {
         customerName: formData.customerName,
         phone: formData.phone,
         designId: formData.designId,
-        stonesUsed: formData.stonesUsed,
         paperUsed: {
           sizeInInch: parseInt(formData.paperUsed.sizeInInch),
           quantityInPcs: parseInt(formData.paperUsed.quantityInPcs),
         },
       };
-
-      // Only include received materials for out orders
-      if (formData.type === 'out') {
-        orderData.receivedMaterials = {
-          stones: formData.receivedMaterials.stones.map((stone) => ({
-            stoneId: stone.stoneId,
-            quantity: parseFloat(stone.quantity),
-          })),
-          paper: {
-            sizeInInch: parseInt(formData.receivedMaterials.paper.sizeInInch),
-            quantityInPcs: parseInt(
-              formData.receivedMaterials.paper.quantityInPcs,
-            ),
-            paperWeightPerPc: parseFloat(
-              formData.receivedMaterials.paper.paperWeightPerPc,
-            ),
-          },
-        };
-      }
 
       const response = await authenticatedFetch('/api/orders', {
         method: 'POST',
@@ -299,21 +243,12 @@ export default function OrdersPage() {
           customerName: '',
           phone: '',
           designId: '',
-          stonesUsed: [],
           paperUsed: {
             sizeInInch: '',
             quantityInPcs: '',
           },
-          receivedMaterials: {
-            stones: [],
-            paper: {
-              sizeInInch: '',
-              quantityInPcs: '',
-              paperWeightPerPc: '',
-            },
-          },
         });
-        fetchData();
+        await fetchData(true);
       } else {
         showError('Creation Failed', data.message || 'Failed to create order.');
       }
@@ -352,7 +287,7 @@ export default function OrdersPage() {
         showSuccess('Order Updated', 'Order has been updated successfully.');
         setIsEditDialogOpen(false);
         setSelectedOrder(null);
-        fetchData();
+        await fetchData(true);
       } else {
         showError('Update Failed', data.message || 'Failed to update order.');
       }
@@ -387,7 +322,7 @@ export default function OrdersPage() {
               'Order Finalized',
               'Order has been finalized and materials deducted from inventory.',
             );
-            fetchData();
+            await fetchData(true);
           } else {
             showError(
               'Finalization Failed',
@@ -439,7 +374,6 @@ export default function OrdersPage() {
             customerName: order.customerName,
             phone: order.phone,
             designId: order.designId._id || order.designId,
-            stonesUsed: order.stonesUsed,
             paperUsed: order.paperUsed,
             calculatedWeight: order.calculatedWeight,
             // Only include finalTotalWeight if it exists, otherwise use calculated weight
@@ -461,7 +395,7 @@ export default function OrdersPage() {
             setIsViewDialogOpen(false);
             setIsEditDialogOpen(false);
             setSelectedOrder(null);
-            fetchData();
+            await fetchData(true);
           } else {
             showError(
               'Completion Failed',
@@ -503,7 +437,7 @@ export default function OrdersPage() {
               'Order Deleted',
               'Order has been deleted successfully.',
             );
-            fetchData();
+            await fetchData(true);
           } else {
             showError(
               'Deletion Failed',
@@ -532,11 +466,6 @@ export default function OrdersPage() {
       customerName: order.customerName,
       phone: order.phone,
       designId: order.designId._id,
-      stonesUsed: order.stonesUsed.map((stone) => ({
-        stoneId:
-          typeof stone.stoneId === 'string' ? stone.stoneId : stone.stoneId._id,
-        quantity: stone.quantity,
-      })),
       paperUsed: {
         sizeInInch: order.paperUsed.sizeInInch.toString(),
         quantityInPcs: order.paperUsed.quantityInPcs.toString(),
@@ -592,388 +521,181 @@ export default function OrdersPage() {
             Track all internal and external orders
           </p>
         </div>
-        <Dialog
-          open={isCreateDialogOpen}
-          onOpenChange={setIsCreateDialogOpen}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Order
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>Create New Order</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={handleCreateSubmit}
-              className="space-y-4"
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="type">Order Type</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) =>
-                      setFormData({
-                        ...formData,
-                        type: value as 'internal' | 'out',
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="internal">Internal</SelectItem>
-                      <SelectItem value="out">Out</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customerName">Customer Name</Label>
-                  <Input
-                    id="customerName"
-                    value={formData.customerName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, customerName: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="designId">Design</Label>
-                  <Select
-                    value={formData.designId}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, designId: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select design" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {designs.map((design) => (
-                        <SelectItem
-                          key={design._id}
-                          value={design._id}
-                        >
-                          {design.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Received Materials Section for Out Orders */}
-              {formData.type === 'out' && (
-                <div className="space-y-4 border p-4 rounded-lg">
-                  <h3 className="font-semibold">
-                    Received Materials (Customer Provided)
-                  </h3>
-
-                  {/* Received Stones */}
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <Label className="font-semibold">Received Stones</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            receivedMaterials: {
-                              ...formData.receivedMaterials,
-                              stones: [
-                                ...formData.receivedMaterials.stones,
-                                { stoneId: '', quantity: '' },
-                              ],
-                            },
-                          });
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Stone
-                      </Button>
-                    </div>
-                    {formData.receivedMaterials.stones.map((stone, index) => (
-                      <div
-                        key={index}
-                        className="grid grid-cols-3 gap-4"
-                      >
-                        <div className="space-y-2">
-                          <Label>Stone</Label>
-                          <Select
-                            value={stone.stoneId}
-                            onValueChange={(value) => {
-                              const updatedStones = [
-                                ...formData.receivedMaterials.stones,
-                              ];
-                              updatedStones[index] = {
-                                ...stone,
-                                stoneId: value,
-                              };
-                              setFormData({
-                                ...formData,
-                                receivedMaterials: {
-                                  ...formData.receivedMaterials,
-                                  stones: updatedStones,
-                                },
-                              });
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select stone" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {stones
-                                .filter((s) => s.inventoryType === 'internal')
-                                .map((stoneItem) => (
-                                  <SelectItem
-                                    key={stoneItem._id}
-                                    value={stoneItem._id}
-                                  >
-                                    {stoneItem.name} ({stoneItem.number})
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Quantity (g)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={stone.quantity}
-                            onChange={(e) => {
-                              const updatedStones = [
-                                ...formData.receivedMaterials.stones,
-                              ];
-                              updatedStones[index] = {
-                                ...stone,
-                                quantity: e.target.value,
-                              };
-                              setFormData({
-                                ...formData,
-                                receivedMaterials: {
-                                  ...formData.receivedMaterials,
-                                  stones: updatedStones,
-                                },
-                              });
-                            }}
-                            required
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const updatedStones =
-                                formData.receivedMaterials.stones.filter(
-                                  (_, i) => i !== index,
-                                );
-                              setFormData({
-                                ...formData,
-                                receivedMaterials: {
-                                  ...formData.receivedMaterials,
-                                  stones: updatedStones,
-                                },
-                              });
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+        <div className="flex items-center gap-4">
+          {refreshing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              <span>Refreshing...</span>
+            </div>
+          )}
+          <Dialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Order
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Create New Order</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={handleCreateSubmit}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Order Type</Label>
+                    <Select
+                      value={formData.type}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          type: value as 'internal' | 'out',
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="internal">Internal</SelectItem>
+                        <SelectItem value="out">Out</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  {/* Received Paper */}
-                  <div className="space-y-4">
-                    <Label className="font-semibold">Received Paper</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="received-paper-size">
-                          Paper Size (inches)
-                        </Label>
-                        <Select
-                          value={formData.receivedMaterials.paper.sizeInInch}
-                          onValueChange={(value) =>
-                            setFormData({
-                              ...formData,
-                              receivedMaterials: {
-                                ...formData.receivedMaterials,
-                                paper: {
-                                  ...formData.receivedMaterials.paper,
-                                  sizeInInch: value,
-                                },
-                              },
-                            })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select paper size" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {papers
-                              .filter((p) => p.inventoryType === 'internal')
-                              .map((paper) => (
-                                <SelectItem
-                                  key={paper._id}
-                                  value={paper.width.toString()}
-                                >
-                                  {paper.width}&quot; ({paper.weightPerPiece}g
-                                  per piece)
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="received-paper-quantity">
-                          Paper Quantity (pieces)
-                        </Label>
-                        <Input
-                          id="received-paper-quantity"
-                          type="number"
-                          value={formData.receivedMaterials.paper.quantityInPcs}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              receivedMaterials: {
-                                ...formData.receivedMaterials,
-                                paper: {
-                                  ...formData.receivedMaterials.paper,
-                                  quantityInPcs: e.target.value,
-                                },
-                              },
-                            })
-                          }
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="received-paper-weight">
-                        Paper Weight per Piece (g)
-                      </Label>
-                      <Input
-                        id="received-paper-weight"
-                        type="number"
-                        step="0.01"
-                        value={
-                          formData.receivedMaterials.paper.paperWeightPerPc
-                        }
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            receivedMaterials: {
-                              ...formData.receivedMaterials,
-                              paper: {
-                                ...formData.receivedMaterials.paper,
-                                paperWeightPerPc: e.target.value,
-                              },
-                            },
-                          })
-                        }
-                        required
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerName">Customer Name</Label>
+                    <Input
+                      id="customerName"
+                      value={formData.customerName}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          customerName: e.target.value,
+                        })
+                      }
+                      required
+                    />
                   </div>
                 </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sizeInInch">Paper Size (inches)</Label>
-                  <Select
-                    value={formData.paperUsed.sizeInInch}
-                    onValueChange={(value) =>
-                      setFormData({
-                        ...formData,
-                        paperUsed: { ...formData.paperUsed, sizeInInch: value },
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select paper size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {papers
-                        .filter(
-                          (p) =>
-                            p.inventoryType ===
-                            getInventoryTypeFilter(formData.type),
-                        )
-                        .map((paper) => (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="designId">Design</Label>
+                    <Select
+                      value={formData.designId}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, designId: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select design" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {designs.map((design) => (
                           <SelectItem
-                            key={paper._id}
-                            value={paper.width.toString()}
+                            key={design._id}
+                            value={design._id}
                           >
-                            {paper.width}&quot; ({paper.weightPerPiece}g per
-                            piece)
+                            {design.name}
                           </SelectItem>
                         ))}
-                    </SelectContent>
-                  </Select>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantityInPcs">Quantity (pieces)</Label>
-                  <Input
-                    id="quantityInPcs"
-                    type="number"
-                    value={formData.paperUsed.quantityInPcs}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        paperUsed: {
-                          ...formData.paperUsed,
-                          quantityInPcs: e.target.value,
-                        },
-                      })
-                    }
-                    required
-                  />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="sizeInInch">Paper Size (inches)</Label>
+                    <Select
+                      value={formData.paperUsed.sizeInInch}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          paperUsed: {
+                            ...formData.paperUsed,
+                            sizeInInch: value,
+                          },
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select paper size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {papers
+                          .filter(
+                            (p) =>
+                              p.inventoryType ===
+                              getInventoryTypeFilter(formData.type),
+                          )
+                          .map((paper) => (
+                            <SelectItem
+                              key={paper._id}
+                              value={paper.width.toString()}
+                            >
+                              {paper.width}&quot; ({paper.weightPerPiece}g per
+                              piece)
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="quantityInPcs">Quantity (pieces)</Label>
+                    <Input
+                      id="quantityInPcs"
+                      type="number"
+                      value={formData.paperUsed.quantityInPcs}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          paperUsed: {
+                            ...formData.paperUsed,
+                            quantityInPcs: e.target.value,
+                          },
+                        })
+                      }
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <LoadingButton
-                  type="submit"
-                  loading={isCreating}
-                  loadingText="Creating..."
-                >
-                  Create Order
-                </LoadingButton>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    disabled={isCreating}
+                  >
+                    Cancel
+                  </Button>
+                  <LoadingButton
+                    type="submit"
+                    loading={isCreating}
+                    loadingText="Creating..."
+                  >
+                    Create Order
+                  </LoadingButton>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -998,6 +720,7 @@ export default function OrdersPage() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Design</TableHead>
+                  <TableHead>Price</TableHead>
                   <TableHead>Paper Used</TableHead>
                   <TableHead>Calculated Weight</TableHead>
                   <TableHead>Final Weight</TableHead>
@@ -1024,6 +747,26 @@ export default function OrdersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{order.designId?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      {order.designId?.prices &&
+                      order.designId.prices.length > 0 ? (
+                        <div className="space-y-1">
+                          {order.designId.prices.map((price, index) => (
+                            <div
+                              key={index}
+                              className="font-medium"
+                            >
+                              {price.currency}{' '}
+                              {price.price % 1 === 0
+                                ? price.price.toFixed(0)
+                                : price.price.toFixed(2)}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">Not set</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {order.paperUsed.sizeInInch}&quot; ×{' '}
                       {order.paperUsed.quantityInPcs} pcs
@@ -1346,9 +1089,34 @@ export default function OrdersPage() {
                   </Badge>
                 </div>
               </div>
-              <div>
-                <Label className="font-semibold">Design</Label>
-                <p>{selectedOrder.designId?.name || 'N/A'}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="font-semibold">Design</Label>
+                  <p>{selectedOrder.designId?.name || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Design Price</Label>
+                  <p>
+                    {selectedOrder.designId?.prices &&
+                    selectedOrder.designId.prices.length > 0 ? (
+                      <div className="space-y-1">
+                        {selectedOrder.designId.prices.map((price, index) => (
+                          <div
+                            key={index}
+                            className="font-medium"
+                          >
+                            {price.currency}{' '}
+                            {price.price % 1 === 0
+                              ? price.price.toFixed(0)
+                              : price.price.toFixed(2)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">Not set</span>
+                    )}
+                  </p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1401,122 +1169,6 @@ export default function OrdersPage() {
                 </div>
               </div>
 
-              {/* Stone Usage and Balance for Out Orders */}
-              {selectedOrder.type === 'out' &&
-                selectedOrder.finalTotalWeight && (
-                  <div className="space-y-4 border p-4 rounded-lg">
-                    <Label className="font-semibold">
-                      Stone Usage Analysis
-                    </Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="font-semibold">Stone Used</Label>
-                        <p>{selectedOrder.stoneUsed?.toFixed(2)}g</p>
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Stone Balance</Label>
-                        <p
-                          className={
-                            selectedOrder.stoneBalance &&
-                            selectedOrder.stoneBalance > 0
-                              ? 'text-green-600'
-                              : 'text-gray-600'
-                          }
-                        >
-                          {selectedOrder.stoneBalance?.toFixed(2)}g
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Stone Loss</Label>
-                        <p
-                          className={
-                            selectedOrder.stoneLoss &&
-                            selectedOrder.stoneLoss > 0
-                              ? 'text-red-600'
-                              : 'text-gray-600'
-                          }
-                        >
-                          {selectedOrder.stoneLoss?.toFixed(2)}g
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Paper Balance</Label>
-                        <p
-                          className={
-                            selectedOrder.paperBalance &&
-                            selectedOrder.paperBalance > 0
-                              ? 'text-green-600'
-                              : 'text-gray-600'
-                          }
-                        >
-                          {selectedOrder.paperBalance?.toFixed(2)} pcs
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Paper Loss</Label>
-                        <p
-                          className={
-                            selectedOrder.paperLoss &&
-                            selectedOrder.paperLoss > 0
-                              ? 'text-red-600'
-                              : 'text-gray-600'
-                          }
-                        >
-                          {selectedOrder.paperLoss?.toFixed(2)} pcs
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              <div>
-                <Label className="font-semibold">Stones Used</Label>
-                <div className="space-y-2">
-                  {selectedOrder.stonesUsed.map((stone, index) => (
-                    <div
-                      key={index}
-                      className="flex justify-between"
-                    >
-                      <span>{stone.stoneId?.name || 'Unknown Stone'}</span>
-                      <span>{stone.quantity}g</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {selectedOrder.type === 'out' &&
-                selectedOrder.receivedMaterials && (
-                  <div className="space-y-4 border p-4 rounded-lg">
-                    <Label className="font-semibold">Received Materials</Label>
-                    <div>
-                      <Label className="font-semibold">Received Paper</Label>
-                      <p>
-                        {selectedOrder.receivedMaterials.paper?.sizeInInch}
-                        &quot; ×{' '}
-                        {
-                          selectedOrder.receivedMaterials.paper?.quantityInPcs
-                        }{' '}
-                        pcs
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Received Stones</Label>
-                      <div className="space-y-2">
-                        {selectedOrder.receivedMaterials.stones.map(
-                          (stone, index) => (
-                            <div
-                              key={index}
-                              className="flex justify-between"
-                            >
-                              <span>
-                                {stone.stoneId?.name || 'Unknown Stone'}
-                              </span>
-                              <span>{stone.quantity}g</span>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="font-semibold">Created By</Label>

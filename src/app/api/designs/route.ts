@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
+import Stone from '@/models/Stone';
+import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
     await dbConnect();
 
     const user = await getCurrentUser(request);
-    console.log('user', user);
+
     if (!user) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
@@ -40,7 +42,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, number, imageUrl, defaultStones, paperConfigurations } = body;
+    const {
+      name,
+      number,
+      imageUrl,
+      prices,
+      defaultStones,
+      paperConfigurations,
+    } = body;
 
     if (!name || !number || !imageUrl) {
       return NextResponse.json(
@@ -62,6 +71,7 @@ export async function POST(request: NextRequest) {
       name,
       number,
       imageUrl,
+      prices: prices || [],
       defaultStones: defaultStones || [],
       paperConfigurations: paperConfigurations || [],
       createdBy: user.id,

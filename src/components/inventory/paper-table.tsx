@@ -4,13 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import {
   Table,
   TableBody,
@@ -25,28 +19,19 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
-import { Package, Plus } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
+import { Package, Edit, Trash2 } from 'lucide-react';
 
 interface Paper {
   _id: string;
   name: string;
   width: number;
   quantity: number;
-  piecesPerRoll: number;
-  weightPerPiece: number;
-  inventoryType: 'internal' | 'out';
-}
-
-interface PaperType {
-  _id: string;
-  name: string;
-  width: number;
   piecesPerRoll: number;
   weightPerPiece: number;
   inventoryType: 'internal' | 'out';
@@ -60,108 +45,131 @@ export default function PaperTable({
   inventoryType = 'internal',
 }: PaperTableProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
-  const [paperTypes, setPaperTypes] = useState<PaperType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [formData, setFormData] = useState({
-    paperTypeId: '',
-    quantity: '',
-    inventoryType: inventoryType as 'internal' | 'out',
-  });
+  const [refreshing, setRefreshing] = useState(false);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
+  const [updateQuantity, setUpdateQuantity] = useState('');
   const { showSuccess, showError } = useSnackbarHelpers();
+  const { loading: authLoading, isAuthenticated } = useAuth();
 
-  const fetchPapers = useCallback(async () => {
-    try {
-      const response = await fetch(
-        `/api/inventory/paper?type=${inventoryType}`,
-      );
-      const data = await response.json();
-      if (data.success) {
-        setPapers(data.data);
+  const fetchPapers = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        }
+        const response = await fetch(
+          `/api/inventory/paper?type=${inventoryType}`,
+        );
+        const data = await response.json();
+        if (data.success) {
+          setPapers(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching papers:', error);
+        showError('Data Loading Error', 'Failed to load paper data.');
+      } finally {
+        setLoading(false);
+        if (isRefresh) {
+          setRefreshing(false);
+        }
       }
-    } catch (error) {
-      console.error('Error fetching papers:', error);
-      showError('Data Loading Error', 'Failed to load paper data.');
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryType]);
-
-  const fetchPaperTypes = useCallback(async () => {
-    try {
-      const response = await fetch(
-        `/api/inventory/paper?type=${inventoryType}`,
-      );
-      const data = await response.json();
-      if (data.success) {
-        setPaperTypes(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching paper types:', error);
-      showError('Data Loading Error', 'Failed to load paper types.');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryType]);
+    },
+    [inventoryType, showError],
+  );
 
   useEffect(() => {
-    fetchPapers();
-    fetchPaperTypes();
-    setFormData((prev) => ({ ...prev, inventoryType }));
+    // Only fetch data when authentication is ready and user is authenticated
+    if (!authLoading && isAuthenticated) {
+      fetchPapers();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryType]);
+  }, [inventoryType, authLoading, isAuthenticated]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
+  const handleUpdateQuantity = async (paperId: string, newQuantity: number) => {
+    setIsUpdating(paperId);
     try {
-      const selectedPaperType = paperTypes.find(pt => pt._id === formData.paperTypeId);
-      if (!selectedPaperType) {
-        showError('Validation Error', 'Please select a valid paper type.');
-        return;
-      }
-
-      const response = await fetch('/api/inventory/paper', {
-        method: 'POST',
+      const response = await fetch(`/api/inventory/paper/${paperId}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: selectedPaperType.name,
-          width: selectedPaperType.width,
-          quantity: parseInt(formData.quantity),
-          piecesPerRoll: selectedPaperType.piecesPerRoll,
-          weightPerPiece: selectedPaperType.weightPerPiece,
-          inventoryType: formData.inventoryType,
-        }),
+        body: JSON.stringify({ quantity: newQuantity }),
       });
 
       const data = await response.json();
       if (data.success) {
         showSuccess(
-          'Paper Added',
-          'New paper roll has been added successfully.',
+          'Quantity Updated',
+          'Paper quantity has been updated successfully.',
         );
-        setIsDialogOpen(false);
-        setFormData({
-          paperTypeId: '',
-          quantity: '',
-          inventoryType,
-        });
-        fetchPapers();
+        await fetchPapers(true);
+        setIsUpdateDialogOpen(false);
+        setSelectedPaper(null);
+        setUpdateQuantity('');
       } else {
         showError(
-          'Creation Failed',
-          data.message || 'Failed to add paper roll.',
+          'Update Failed',
+          data.message || 'Failed to update quantity.',
         );
       }
     } catch (error) {
-      console.error('Error creating paper:', error);
-      showError('Network Error', 'Failed to add paper roll. Please try again.');
+      console.error('Error updating quantity:', error);
+      showError(
+        'Network Error',
+        'Failed to update quantity. Please try again.',
+      );
     } finally {
-      setIsCreating(false);
+      setIsUpdating(null);
     }
+  };
+
+  const handleResetPaper = async (paperId: string) => {
+    setIsDeleting(paperId);
+    try {
+      const response = await fetch(`/api/inventory/paper/${paperId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(
+          'Paper Reset',
+          'Paper quantity has been reset to 0 successfully.',
+        );
+        await fetchPapers(true);
+        setIsDeleteDialogOpen(false);
+        setSelectedPaper(null);
+      } else {
+        showError(
+          'Reset Failed',
+          data.message || 'Failed to reset paper quantity.',
+        );
+      }
+    } catch (error) {
+      console.error('Error resetting paper quantity:', error);
+      showError(
+        'Network Error',
+        'Failed to reset paper quantity. Please try again.',
+      );
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const openUpdateDialog = (paper: Paper) => {
+    setSelectedPaper(paper);
+    setUpdateQuantity(paper.quantity.toString());
+    setIsUpdateDialogOpen(true);
+  };
+
+  const openDeleteDialog = (paper: Paper) => {
+    setSelectedPaper(paper);
+    setIsDeleteDialogOpen(true);
   };
 
   const isOutJob = inventoryType === 'out';
@@ -186,90 +194,123 @@ export default function PaperTable({
               : 'Manage paper rolls with different widths and weights'}
           </p>
         </div>
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Paper
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New {title} Roll</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-4"
-            >
-              <div className="space-y-2">
-                <Label htmlFor="paperType">Paper Type</Label>
-                <Select
-                  value={formData.paperTypeId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, paperTypeId: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select paper type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {paperTypes.map((paperType) => (
-                      <SelectItem key={paperType._id} value={paperType._id}>
-                        {paperType.name} ({paperType.width}&quot;, {paperType.piecesPerRoll} pcs/roll)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity (rolls)</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={formData.quantity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, quantity: e.target.value })
-                  }
-                  placeholder="Enter number of rolls"
-                  required
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <LoadingButton
-                  type="submit"
-                  loading={isCreating}
-                  loadingText="Adding..."
-                >
-                  Add Paper
-                </LoadingButton>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {refreshing && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner size="sm" />
+            <span>Refreshing...</span>
+          </div>
+        )}
       </div>
+
+      {/* Update Quantity Modal */}
+      <Dialog
+        open={isUpdateDialogOpen}
+        onOpenChange={setIsUpdateDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Quantity</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (selectedPaper) {
+                const quantity = parseInt(updateQuantity);
+                if (!isNaN(quantity) && quantity >= 0) {
+                  handleUpdateQuantity(selectedPaper._id, quantity);
+                } else {
+                  showError(
+                    'Invalid Input',
+                    'Please enter a valid positive number.',
+                  );
+                }
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="updateQuantity">New Quantity (rolls)</Label>
+              <Input
+                id="updateQuantity"
+                type="number"
+                value={updateQuantity}
+                onChange={(e) => setUpdateQuantity(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsUpdateDialogOpen(false);
+                  setSelectedPaper(null);
+                  setUpdateQuantity('');
+                }}
+                disabled={isUpdating === selectedPaper?._id}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                type="submit"
+                loading={isUpdating === selectedPaper?._id}
+                loadingText="Updating..."
+              >
+                Update Quantity
+              </LoadingButton>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Paper Quantity</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to reset the quantity of{' '}
+              <strong>{selectedPaper?.name}</strong> to 0? This action cannot be
+              undone.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setSelectedPaper(null);
+                }}
+                disabled={isDeleting === selectedPaper?._id}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                type="button"
+                variant="destructive"
+                onClick={() =>
+                  selectedPaper && handleResetPaper(selectedPaper._id)
+                }
+                loading={isDeleting === selectedPaper?._id}
+                loadingText="Resetting..."
+              >
+                Reset
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {papers.length === 0 ? (
         <EmptyState
           icon={Package}
           title={`No ${title} Rolls Found`}
-          description={`Get started by adding your first ${title.toLowerCase()} roll. ${title} inventory will appear here once added.`}
-          action={
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First {title} Roll
-            </Button>
-          }
+          description={`No ${title.toLowerCase()} rolls are currently available in the inventory.`}
         />
       ) : (
         <div className="border rounded-lg">
@@ -283,14 +324,13 @@ export default function PaperTable({
                 <TableHead>Weight per Piece</TableHead>
                 <TableHead>Total Pieces</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {papers.map((paper) => (
                 <TableRow key={paper._id}>
-                  <TableCell className="font-medium">
-                    {paper.name}
-                  </TableCell>
+                  <TableCell className="font-medium">{paper.name}</TableCell>
                   <TableCell>{paper.width}&quot;</TableCell>
                   <TableCell>{paper.quantity}</TableCell>
                   <TableCell>{paper.piecesPerRoll}</TableCell>
@@ -302,6 +342,30 @@ export default function PaperTable({
                     >
                       {paper.quantity < 5 ? 'Low Stock' : 'In Stock'}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <LoadingButton
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openUpdateDialog(paper)}
+                        loading={isUpdating === paper._id}
+                        loadingText="Updating..."
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Update
+                      </LoadingButton>
+                      <LoadingButton
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openDeleteDialog(paper)}
+                        loading={isDeleting === paper._id}
+                        loadingText="Resetting..."
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Reset
+                      </LoadingButton>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

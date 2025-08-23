@@ -34,147 +34,40 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Get stones error:', error);
-    
+
     // Provide more specific error messages
     if (error instanceof Error) {
       if (error.message.includes('ECONNREFUSED')) {
         return NextResponse.json(
-          { success: false, message: 'Database connection failed. Please check if MongoDB is running.' },
+          {
+            success: false,
+            message:
+              'Database connection failed. Please check if MongoDB is running.',
+          },
           { status: 500 },
         );
       }
       if (error.message.includes('MONGODB_URI')) {
         return NextResponse.json(
-          { success: false, message: 'Database configuration error. Please check environment variables.' },
+          {
+            success: false,
+            message:
+              'Database configuration error. Please check environment variables.',
+          },
           { status: 500 },
         );
       }
       if (error.message.includes('MongoNetworkError')) {
         return NextResponse.json(
-          { success: false, message: 'Database network error. Please check your connection.' },
+          {
+            success: false,
+            message: 'Database network error. Please check your connection.',
+          },
           { status: 500 },
         );
       }
     }
-    
-    return NextResponse.json(
-      { success: false, message: 'Internal server error' },
-      { status: 500 },
-    );
-  }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    // Check if MongoDB URI is configured
-    if (!process.env.MONGODB_URI) {
-      console.error('MONGODB_URI environment variable is not set');
-      return NextResponse.json(
-        { success: false, message: 'Database configuration error' },
-        { status: 500 },
-      );
-    }
-
-    await dbConnect();
-
-    const body = await request.json();
-    const {
-      name,
-      number,
-      color,
-      size,
-      quantity,
-      unit,
-      inventoryType = 'internal',
-    } = body;
-
-    // Validate required fields
-    if (
-      !name ||
-      !number ||
-      !color ||
-      !size ||
-      quantity === undefined ||
-      !unit
-    ) {
-      return NextResponse.json(
-        { success: false, message: 'All fields are required' },
-        { status: 400 },
-      );
-    }
-
-    // Validate inventory type
-    if (!['internal', 'out'].includes(inventoryType)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid inventory type' },
-        { status: 400 },
-      );
-    }
-
-    // Validate unit
-    if (!['g', 'kg'].includes(unit)) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid unit. Must be g or kg' },
-        { status: 400 },
-      );
-    }
-
-    // Validate quantity
-    if (typeof quantity !== 'number' || quantity < 0) {
-      return NextResponse.json(
-        { success: false, message: 'Quantity must be a positive number' },
-        { status: 400 },
-      );
-    }
-
-    // Check if stone number already exists for the same inventory type
-    const existingStone = await Stone.findOne({ number, inventoryType });
-    if (existingStone) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Stone number already exists for this inventory type',
-        },
-        { status: 400 },
-      );
-    }
-
-    const stone = new Stone({
-      name,
-      number,
-      color,
-      size,
-      quantity,
-      unit,
-      inventoryType,
-    });
-
-    await stone.save();
-
-    return NextResponse.json({
-      success: true,
-      message: 'Stone created successfully',
-      data: stone,
-    });
-  } catch (error) {
-    console.error('Create stone error:', error);
-    
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('ECONNREFUSED')) {
-        return NextResponse.json(
-          { success: false, message: 'Database connection failed. Please check if MongoDB is running.' },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MONGODB_URI')) {
-        return NextResponse.json(
-          { success: false, message: 'Database configuration error. Please check environment variables.' },
-          { status: 500 },
-        );
-      }
-    }
-    
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },

@@ -22,20 +22,7 @@ const orderSchema = new mongoose.Schema(
       ref: 'Design',
       required: true,
     },
-    stonesUsed: [
-      {
-        stoneId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'Stone',
-          required: true,
-        },
-        quantity: {
-          type: Number,
-          required: true,
-          min: 0,
-        },
-      },
-    ],
+
     paperUsed: {
       sizeInInch: {
         type: Number,
@@ -56,39 +43,8 @@ const orderSchema = new mongoose.Schema(
         min: 0,
       },
     },
-    // For out orders: track received materials
-    receivedMaterials: {
-      stones: [
-        {
-          stoneId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Stone',
-          },
-          quantity: {
-            type: Number,
-            min: 0,
-          },
-        },
-      ],
-      paper: {
-        sizeInInch: {
-          type: Number,
-        },
-        quantityInPcs: {
-          type: Number,
-          min: 0,
-        },
-        paperWeightPerPc: {
-          type: Number,
-          min: 0,
-        },
-      },
-    },
+
     finalTotalWeight: {
-      type: Number,
-      min: 0,
-    },
-    stoneUsed: {
       type: Number,
       min: 0,
     },
@@ -101,23 +57,6 @@ const orderSchema = new mongoose.Schema(
       default: 0,
     },
     discrepancyPercentage: {
-      type: Number,
-      default: 0,
-    },
-    // For out orders: track stone balance and loss
-    stoneBalance: {
-      type: Number,
-      default: 0,
-    },
-    stoneLoss: {
-      type: Number,
-      default: 0,
-    },
-    paperBalance: {
-      type: Number,
-      default: 0,
-    },
-    paperLoss: {
       type: Number,
       default: 0,
     },

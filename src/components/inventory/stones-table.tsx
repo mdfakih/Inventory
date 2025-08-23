@@ -4,13 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import {
   Table,
   TableBody,
@@ -25,14 +19,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
-import { Gem, Plus } from 'lucide-react';
+import { Gem } from 'lucide-react';
 
 interface Stone {
   _id: string;
@@ -54,109 +47,66 @@ interface StonesTableProps {
 export default function StonesTable({
   inventoryType = 'internal',
 }: StonesTableProps) {
-  const { user } = useAuth();
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [stones, setStones] = useState<Stone[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedStone, setSelectedStone] = useState<Stone | null>(null);
   const [updateQuantity, setUpdateQuantity] = useState('');
-  const [formData, setFormData] = useState({
-    name: '',
-    number: '',
-    color: '',
-    size: '',
-    quantity: '',
-    unit: 'g' as 'g' | 'kg',
-    inventoryType: inventoryType as 'internal' | 'out',
-  });
   const { showSuccess, showError } = useSnackbarHelpers();
 
-  const fetchStones = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `/api/inventory/stones?type=${inventoryType}`,
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        setStones(data.data);
-      } else {
-        showError(
-          'Data Loading Error',
-          data.message || 'Failed to load stones data.',
+  const fetchStones = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+        const response = await fetch(
+          `/api/inventory/stones?type=${inventoryType}`,
         );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.success) {
+          setStones(data.data);
+        } else {
+          showError(
+            'Data Loading Error',
+            data.message || 'Failed to load stones data.',
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching stones:', error);
+        showError(
+          'Network Error',
+          'Failed to load stones data. Please try again.',
+        );
+      } finally {
+        setLoading(false);
+        if (isRefresh) {
+          setRefreshing(false);
+        }
       }
-    } catch (error) {
-      console.error('Error fetching stones:', error);
-      showError(
-        'Network Error',
-        'Failed to load stones data. Please try again.',
-      );
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryType]);
+    },
+    [inventoryType, showError],
+  );
 
   useEffect(() => {
-    fetchStones();
-    setFormData((prev) => ({ ...prev, inventoryType }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryType]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
-    try {
-      const response = await fetch('/api/inventory/stones', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          quantity: parseFloat(formData.quantity),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        showSuccess('Stone Added', 'New stone has been added successfully.');
-        setIsDialogOpen(false);
-        setFormData({
-          name: '',
-          number: '',
-          color: '',
-          size: '',
-          quantity: '',
-          unit: 'g',
-          inventoryType,
-        });
-        fetchStones();
-      } else {
-        showError('Creation Failed', data.message || 'Failed to add stone.');
-      }
-    } catch (error) {
-      console.error('Error adding stone:', error);
-      showError('Network Error', 'Failed to add stone. Please try again.');
-    } finally {
-      setIsCreating(false);
+    // Only fetch data when authentication is ready and user is authenticated
+    if (!authLoading && isAuthenticated) {
+      fetchStones();
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventoryType, authLoading, isAuthenticated]);
 
   const handleUpdateQuantity = async (stoneId: string, newQuantity: number) => {
     setIsUpdating(stoneId);
@@ -179,7 +129,7 @@ export default function StonesTable({
           'Quantity Updated',
           'Stone quantity has been updated successfully.',
         );
-        fetchStones();
+        await fetchStones(true);
         setIsUpdateDialogOpen(false);
         setSelectedStone(null);
         setUpdateQuantity('');
@@ -211,7 +161,7 @@ export default function StonesTable({
     setIsDeleteDialogOpen(true);
   };
 
-  const handleDeleteStone = async (stoneId: string) => {
+  const handleResetStone = async (stoneId: string) => {
     setIsDeleting(stoneId);
     try {
       const response = await fetch(`/api/inventory/stones/${stoneId}`, {
@@ -224,16 +174,25 @@ export default function StonesTable({
 
       const data = await response.json();
       if (data.success) {
-        showSuccess('Stone Deleted', 'Stone has been deleted successfully.');
-        fetchStones();
+        showSuccess(
+          'Stone Reset',
+          'Stone quantity has been reset to 0 successfully.',
+        );
+        await fetchStones(true);
         setIsDeleteDialogOpen(false);
         setSelectedStone(null);
       } else {
-        showError('Delete Failed', data.message || 'Failed to delete stone.');
+        showError(
+          'Reset Failed',
+          data.message || 'Failed to reset stone quantity.',
+        );
       }
     } catch (error) {
-      console.error('Error deleting stone:', error);
-      showError('Network Error', 'Failed to delete stone. Please try again.');
+      console.error('Error resetting stone quantity:', error);
+      showError(
+        'Network Error',
+        'Failed to reset stone quantity. Please try again.',
+      );
     } finally {
       setIsDeleting(null);
     }
@@ -261,124 +220,12 @@ export default function StonesTable({
               : 'Manage internal stone inventory with name, number, color, size, and quantity'}
           </p>
         </div>
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-        >
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Stone
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New {title} Stone</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-4"
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="number">Number</Label>
-                  <Input
-                    id="number"
-                    value={formData.number}
-                    onChange={(e) =>
-                      setFormData({ ...formData, number: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="color">Color</Label>
-                  <Input
-                    id="color"
-                    value={formData.color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, color: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="size">Size</Label>
-                  <Input
-                    id="size"
-                    value={formData.size}
-                    onChange={(e) =>
-                      setFormData({ ...formData, size: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    step="0.01"
-                    value={formData.quantity}
-                    onChange={(e) =>
-                      setFormData({ ...formData, quantity: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unit">Unit</Label>
-                  <Select
-                    value={formData.unit}
-                    onValueChange={(value: 'g' | 'kg') =>
-                      setFormData({ ...formData, unit: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="g">Grams (g)</SelectItem>
-                      <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <LoadingButton
-                  type="submit"
-                  loading={isCreating}
-                  loadingText="Adding..."
-                >
-                  Add Stone
-                </LoadingButton>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {refreshing && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner size="sm" />
+            <span>Refreshing...</span>
+          </div>
+        )}
       </div>
 
       {/* Update Quantity Modal */}
@@ -450,12 +297,12 @@ export default function StonesTable({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Stone</DialogTitle>
+            <DialogTitle>Reset Stone Quantity</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p>
-              Are you sure you want to delete{' '}
-              <strong>{selectedStone?.name}</strong>? This action cannot be
+              Are you sure you want to reset the quantity of{' '}
+              <strong>{selectedStone?.name}</strong> to 0? This action cannot be
               undone.
             </p>
             <div className="flex justify-end space-x-2">
@@ -474,12 +321,12 @@ export default function StonesTable({
                 type="button"
                 variant="destructive"
                 onClick={() =>
-                  selectedStone && handleDeleteStone(selectedStone._id)
+                  selectedStone && handleResetStone(selectedStone._id)
                 }
                 loading={isDeleting === selectedStone?._id}
-                loadingText="Deleting..."
+                loadingText="Resetting..."
               >
-                Delete
+                Reset
               </LoadingButton>
             </div>
           </div>
@@ -490,13 +337,7 @@ export default function StonesTable({
         <EmptyState
           icon={Gem}
           title={`No ${title} Found`}
-          description={`Get started by adding your first ${title.toLowerCase()}. ${title} inventory will appear here once added.`}
-          action={
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First {title} Stone
-            </Button>
-          }
+          description={`No ${title.toLowerCase()} are currently available in the inventory.`}
         />
       ) : (
         <div className="border rounded-lg">
@@ -540,9 +381,9 @@ export default function StonesTable({
                           size="sm"
                           onClick={() => openDeleteDialog(stone)}
                           loading={isDeleting === stone._id}
-                          loadingText="Deleting..."
+                          loadingText="Resetting..."
                         >
-                          Delete
+                          Reset
                         </LoadingButton>
                       )}
                     </div>

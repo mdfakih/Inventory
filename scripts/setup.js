@@ -118,6 +118,18 @@ const designSchema = new mongoose.Schema(
     name: { type: String, required: true },
     number: { type: String, required: true, unique: true },
     imageUrl: { type: String, required: true },
+    prices: [{
+      currency: {
+        type: String,
+        enum: ['₹', '$'],
+        required: true,
+      },
+      price: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+    }],
     paperConfigurations: [
       {
         paperSize: {

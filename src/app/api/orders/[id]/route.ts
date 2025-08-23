@@ -3,7 +3,10 @@ import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import Paper from '@/models/Paper';
 import Stone from '@/models/Stone';
+import Design from '@/models/Design';
+import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 export async function GET(
   request: NextRequest,
@@ -12,10 +15,17 @@ export async function GET(
   try {
     await dbConnect();
     const { id } = await params;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid order ID format' },
+        { status: 400 },
+      );
+    }
+
     const order = await Order.findById(id)
       .populate('designId')
-      .populate('stonesUsed.stoneId')
-      .populate('receivedMaterials.stones.stoneId')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
@@ -60,13 +70,20 @@ export async function PUT(
       customerName,
       phone,
       designId,
-      stonesUsed,
       paperUsed,
       finalTotalWeight,
       status,
       isFinalized,
     } = body;
     const { id } = await params;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid order ID format' },
+        { status: 400 },
+      );
+    }
 
     const order = await Order.findById(id);
     if (!order) {
@@ -150,16 +167,30 @@ export async function PUT(
         inventoryType: type === 'out' ? 'out' : 'internal',
       });
       if (paper) {
-        const paperWeight = paper.weightPerPiece * paperUsed.quantityInPcs;
-        const stoneWeight = stonesUsed.reduce(
-          (total: number, stone: { quantity: number }) => {
-            return total + (stone.quantity || 0);
-          },
-          0,
-        );
-        calculatedWeight = paperWeight + stoneWeight;
+        // Get design to calculate stone weights as per design
+        const Design = await import('@/models/Design').then((m) => m.default);
+        const design = await Design.findById(designId);
+        if (design) {
+          // Calculate stone weight as per design (sum of all stone weights for the design)
+          let designStoneWeight = 0;
+          if (design.defaultStones && design.defaultStones.length > 0) {
+            for (const designStone of design.defaultStones) {
+              const stone = await Stone.findById(designStone.stoneId);
+              if (stone) {
+                // Use weightPerPiece if available, otherwise use quantity as fallback
+                designStoneWeight +=
+                  stone.weightPerPiece || stone.quantity || 0;
+              }
+            }
+          }
 
-        // Calculate paper inventory adjustment
+          // Calculate weights using new formula: (paper weight per pc + stone weight as per design) * number of pieces
+          const paperWeightPerPiece = paper.weightPerPiece;
+          const totalWeightPerPiece = paperWeightPerPiece + designStoneWeight;
+          calculatedWeight = totalWeightPerPiece * paperUsed.quantityInPcs;
+        }
+
+        // Calculate paper inventory adjustment - using piecesPerRoll
         const paperDiff =
           paperUsed.quantityInPcs - oldValues.paperUsed.quantityInPcs;
         if (paperDiff !== 0) {
@@ -183,86 +214,6 @@ export async function PUT(
       }
     }
 
-    // Check if stone usage changed
-    if (
-      stonesUsed &&
-      JSON.stringify(stonesUsed) !== JSON.stringify(oldValues.stonesUsed)
-    ) {
-      const paper = await Paper.findOne({
-        width: paperUsed?.sizeInInch || oldValues.paperUsed.sizeInInch,
-        inventoryType: type === 'out' ? 'out' : 'internal',
-      });
-      if (paper) {
-        const paperWeight =
-          paper.weightPerPiece *
-          (paperUsed?.quantityInPcs || oldValues.paperUsed.quantityInPcs);
-        const stoneWeight = stonesUsed.reduce(
-          (total: number, stone: { quantity: number }) => {
-            return total + (stone.quantity || 0);
-          },
-          0,
-        );
-        calculatedWeight = paperWeight + stoneWeight;
-
-        // Calculate stone inventory adjustments
-        const oldStoneMap = new Map();
-        oldValues.stonesUsed.forEach((stone: { stoneId: string | { _id: string }; quantity: number }) => {
-          const stoneId =
-            typeof stone.stoneId === 'string'
-              ? stone.stoneId
-              : stone.stoneId._id;
-          oldStoneMap.set(stoneId, stone.quantity);
-        });
-
-        const newStoneMap = new Map();
-        stonesUsed.forEach((stone: { stoneId: string | { _id: string }; quantity: number }) => {
-          const stoneId =
-            typeof stone.stoneId === 'string'
-              ? stone.stoneId
-              : stone.stoneId._id;
-          newStoneMap.set(stoneId, stone.quantity);
-        });
-
-        // Calculate differences
-        for (const [stoneId, newQuantity] of newStoneMap) {
-          const oldQuantity = oldStoneMap.get(stoneId) || 0;
-          const difference = newQuantity - oldQuantity;
-          if (difference !== 0) {
-            inventoryChanged = true;
-            inventoryAdjustments.push({
-              type: 'stone',
-              stoneId: stoneId,
-              oldQuantity: oldQuantity,
-              newQuantity: newQuantity,
-              difference: difference,
-            });
-          }
-        }
-
-        // Check for removed stones
-        for (const [stoneId, oldQuantity] of oldStoneMap) {
-          if (!newStoneMap.has(stoneId)) {
-            inventoryChanged = true;
-            inventoryAdjustments.push({
-              type: 'stone',
-              stoneId: stoneId,
-              oldQuantity: oldQuantity,
-              newQuantity: 0,
-              difference: -oldQuantity,
-            });
-          }
-        }
-
-        updateHistory.push({
-          field: 'stonesUsed',
-          oldValue: oldValues.stonesUsed,
-          newValue: stonesUsed,
-          updatedBy: user.id,
-          updatedAt: new Date(),
-        });
-      }
-    }
-
     // Calculate discrepancy if final weight is provided or if order is being completed
     let effectiveFinalWeight: number | undefined;
     if (finalTotalWeight !== undefined || status === 'completed') {
@@ -273,15 +224,6 @@ export async function PUT(
       weightDiscrepancy = effectiveFinalWeight! - calculatedWeight;
       discrepancyPercentage =
         calculatedWeight > 0 ? (weightDiscrepancy / calculatedWeight) * 100 : 0;
-
-      console.log('Discrepancy calculation:', {
-        effectiveFinalWeight,
-        calculatedWeight,
-        weightDiscrepancy,
-        discrepancyPercentage,
-        status,
-        finalTotalWeight,
-      });
 
       // Add discrepancy calculation to history
       updateHistory.push({
@@ -307,98 +249,24 @@ export async function PUT(
         updatedBy: user.id,
         updatedAt: new Date(),
       });
-
-      // For out orders, calculate stone usage and balance
-      if (order.type === 'out' && order.receivedMaterials) {
-        const paperWeight =
-          order.receivedMaterials.paper.paperWeightPerPc *
-          order.receivedMaterials.paper.quantityInPcs;
-        const stoneUsed = effectiveFinalWeight! - paperWeight;
-
-        // Calculate total received stones
-        const totalReceivedStones = order.receivedMaterials.stones.reduce(
-          (total: number, stone: { quantity: number }) =>
-            total + stone.quantity,
-          0,
-        );
-
-        // Calculate balance and loss
-        const stoneBalance = Math.max(0, totalReceivedStones - stoneUsed);
-        const stoneLoss = Math.max(0, stoneUsed - totalReceivedStones);
-
-        // Calculate paper balance and loss
-        const paperUsed = order.paperUsed.quantityInPcs;
-        const paperBalance = Math.max(
-          0,
-          order.receivedMaterials.paper.quantityInPcs - paperUsed,
-        );
-        const paperLoss = Math.max(
-          0,
-          paperUsed - order.receivedMaterials.paper.quantityInPcs,
-        );
-
-        updateData.stoneUsed = stoneUsed;
-        updateData.stoneBalance = stoneBalance;
-        updateData.stoneLoss = stoneLoss;
-        updateData.paperBalance = paperBalance;
-        updateData.paperLoss = paperLoss;
-
-        updateHistory.push({
-          field: 'stoneUsage',
-          oldValue: oldValues.stoneUsed,
-          newValue: stoneUsed,
-          updatedBy: user.id,
-          updatedAt: new Date(),
-        });
-      }
     }
 
     // Validate and adjust inventory if changes were made
     if (inventoryChanged) {
-      const inventoryType = type === 'out' ? 'out' : 'internal';
       const inventoryErrors = [];
 
-      // Validate paper availability
+      // Validate paper availability - check piecesPerRoll
       for (const adjustment of inventoryAdjustments.filter(
         (a) => a.type === 'paper',
       )) {
         if (adjustment.difference > 0) {
           const paper = await Paper.findById(adjustment.paperId);
-          if (!paper || paper.quantity < adjustment.difference) {
+          if (!paper || paper.piecesPerRoll < adjustment.difference) {
             inventoryErrors.push(
               `Insufficient paper stock: ${
                 paper?.width || 'Unknown'
-              }" (available: ${paper?.quantity || 0}, required: ${
-                adjustment.difference
-              })`,
-            );
-          }
-        }
-      }
-
-      // Validate stone availability
-      for (const adjustment of inventoryAdjustments.filter(
-        (a) => a.type === 'stone',
-      )) {
-        if (adjustment.difference > 0) {
-          const stone = await Stone.findById(adjustment.stoneId);
-          if (!stone) {
-            inventoryErrors.push(`Stone not found: ${adjustment.stoneId}`);
-            continue;
-          }
-
-          const inventoryStone = await Stone.findOne({
-            number: stone.number,
-            inventoryType: inventoryType,
-          });
-
-          if (
-            !inventoryStone ||
-            inventoryStone.quantity < adjustment.difference
-          ) {
-            inventoryErrors.push(
-              `Insufficient stone stock: ${stone.name} (available: ${
-                inventoryStone?.quantity || 0
+              }" (available pieces per roll: ${
+                paper?.piecesPerRoll || 0
               }, required: ${adjustment.difference})`,
             );
           }
@@ -421,17 +289,7 @@ export async function PUT(
         for (const adjustment of inventoryAdjustments) {
           if (adjustment.type === 'paper') {
             await Paper.findByIdAndUpdate(adjustment.paperId, {
-              $inc: { quantity: -adjustment.difference },
-            });
-          } else if (adjustment.type === 'stone') {
-            const stone = await Stone.findById(adjustment.stoneId);
-            const inventoryStone = await Stone.findOne({
-              number: stone.number,
-              inventoryType: inventoryType,
-            });
-
-            await Stone.findByIdAndUpdate(inventoryStone._id, {
-              $inc: { quantity: -adjustment.difference },
+              $inc: { piecesPerRoll: -adjustment.difference },
             });
           }
         }
@@ -447,26 +305,15 @@ export async function PUT(
     // Handle order finalization for out orders
     if (isFinalized && !order.isFinalized && order.type === 'out') {
       // Deduct consumed materials from out inventory
-      for (const stoneUsage of stonesUsed) {
-        const outStone = await Stone.findOne({
-          number: stoneUsage.stoneId.number || stoneUsage.stoneId,
-          inventoryType: 'out',
-        });
-        if (outStone) {
-          await Stone.findByIdAndUpdate(outStone._id, {
-            $inc: { quantity: -stoneUsage.quantity },
-          });
-        }
-      }
 
-      // Deduct consumed paper from out inventory
+      // Deduct consumed paper from out inventory - using piecesPerRoll
       const outPaper = await Paper.findOne({
         width: paperUsed.sizeInInch,
         inventoryType: 'out',
       });
       if (outPaper) {
         await Paper.findByIdAndUpdate(outPaper._id, {
-          $inc: { quantity: -paperUsed.quantityInPcs },
+          $inc: { piecesPerRoll: -paperUsed.quantityInPcs },
         });
       }
 
@@ -485,7 +332,6 @@ export async function PUT(
       customerName,
       phone,
       designId,
-      stonesUsed,
       paperUsed: paperUsed
         ? {
             ...paperUsed,
@@ -523,8 +369,6 @@ export async function PUT(
       new: true,
     })
       .populate('designId')
-      .populate('stonesUsed.stoneId')
-      .populate('receivedMaterials.stones.stoneId')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
@@ -565,6 +409,14 @@ export async function DELETE(
       );
     }
     const { id } = await params;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid order ID format' },
+        { status: 400 },
+      );
+    }
 
     const order = await Order.findByIdAndDelete(id);
     if (!order) {

@@ -82,7 +82,7 @@ interface Order {
   type: 'internal' | 'out';
   customerName: string;
   phone: string;
-  designId: { name: string; number: string };
+  designId: { name: string; number: string; price?: number; currency?: '₹' | '$' };
   finalTotalWeight: number;
   calculatedWeight: number;
   weightDiscrepancy: number;
@@ -132,6 +132,7 @@ export default function ReportsPage() {
     tapes: [],
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: '',
@@ -141,8 +142,13 @@ export default function ReportsPage() {
   const { showSuccess, showError } = useSnackbarHelpers();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
 
-  const loadReportData = useCallback(async () => {
+  const loadReportData = useCallback(async (isRefresh = false) => {
     try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       // Use the reports generate API to get all data at once
       const response = await fetch('/api/reports/generate?type=all');
 
@@ -170,6 +176,9 @@ export default function ReportsPage() {
       showError('Data Loading Error', 'Failed to load report data.');
     } finally {
       setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -194,6 +203,7 @@ export default function ReportsPage() {
 
   const handleGenerateReport = async () => {
     try {
+      setRefreshing(true);
       const params = new URLSearchParams({
         type: reportType,
         ...(dateRange.startDate && { startDate: dateRange.startDate }),
@@ -232,6 +242,8 @@ export default function ReportsPage() {
         'Network Error',
         'Failed to generate report. Please try again.',
       );
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -334,6 +346,12 @@ export default function ReportsPage() {
           <p className="text-muted-foreground">
             Generate reports and view system analytics
           </p>
+          {refreshing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+              <Spinner size="sm" />
+              <span>Refreshing...</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />

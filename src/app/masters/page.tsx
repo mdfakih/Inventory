@@ -61,6 +61,7 @@ import {
   Info,
   Edit,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface User {
   _id: string;
@@ -136,12 +137,18 @@ export default function MastersPage() {
   const [plastics, setPlastics] = useState<Plastic[]>([]);
   const [tapes, setTapes] = useState<Tape[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const { showSuccess, showError, showWarning } = useSnackbarHelpers();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
 
-  const loadAllData = useCallback(async () => {
+  const loadAllData = useCallback(async (isRefresh = false) => {
     try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       // Load all master data
       const [
         usersRes,
@@ -193,6 +200,9 @@ export default function MastersPage() {
       showError('Data Loading Error', 'Failed to load master data.');
     } finally {
       setLoading(false);
+      if (isRefresh) {
+        setRefreshing(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -237,7 +247,7 @@ export default function MastersPage() {
             currentStatus === 'active' ? 'blocked' : 'activated'
           } successfully.`,
         );
-        await loadAllData();
+        await loadAllData(true);
       } else {
         showError('Update Failed', 'Failed to update user status.');
       }
@@ -259,7 +269,7 @@ export default function MastersPage() {
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<User | null>(
     null,
   );
-  
+
   // Edit and delete states for master data
   const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
   const [editingPlastic, setEditingPlastic] = useState<Plastic | null>(null);
@@ -291,25 +301,67 @@ export default function MastersPage() {
   };
 
   // Delete handlers for master data
-  const handleDeletePaper = async (paperId: string) => {
-    if (!confirm('Are you sure you want to delete this paper type?')) return;
-    
-    setIsDeleting(paperId);
+  const handleDeleteStone = async (stoneId: string) => {
+    if (!confirm('Are you sure you want to delete this stone type?')) return;
+
+    setIsDeleting(stoneId);
     try {
-      const response = await fetch(`/api/inventory/paper/${paperId}`, {
+      const response = await fetch(`/api/masters/stones/${stoneId}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        showSuccess('Paper Deleted', 'Paper type has been deleted successfully.');
-        await loadAllData();
+        showSuccess(
+          'Stone Deleted',
+          'Stone type has been deleted successfully.',
+        );
+        await loadAllData(true);
       } else {
         const data = await response.json();
-        showError('Delete Failed', data.message || 'Failed to delete paper type.');
+        showError(
+          'Delete Failed',
+          data.message || 'Failed to delete stone type.',
+        );
+      }
+    } catch (error) {
+      console.error('Error deleting stone:', error);
+      showError(
+        'Network Error',
+        'Failed to delete stone type. Please try again.',
+      );
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const handleDeletePaper = async (paperId: string) => {
+    if (!confirm('Are you sure you want to delete this paper type?')) return;
+
+    setIsDeleting(paperId);
+    try {
+      const response = await fetch(`/api/masters/paper/${paperId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        showSuccess(
+          'Paper Deleted',
+          'Paper type has been deleted successfully.',
+        );
+        await loadAllData(true);
+      } else {
+        const data = await response.json();
+        showError(
+          'Delete Failed',
+          data.message || 'Failed to delete paper type.',
+        );
       }
     } catch (error) {
       console.error('Error deleting paper:', error);
-      showError('Network Error', 'Failed to delete paper type. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to delete paper type. Please try again.',
+      );
     } finally {
       setIsDeleting(null);
     }
@@ -317,23 +369,32 @@ export default function MastersPage() {
 
   const handleDeletePlastic = async (plasticId: string) => {
     if (!confirm('Are you sure you want to delete this plastic type?')) return;
-    
+
     setIsDeleting(plasticId);
     try {
-      const response = await fetch(`/api/inventory/plastic/${plasticId}`, {
+      const response = await fetch(`/api/masters/plastic/${plasticId}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        showSuccess('Plastic Deleted', 'Plastic type has been deleted successfully.');
-        await loadAllData();
+        showSuccess(
+          'Plastic Deleted',
+          'Plastic type has been deleted successfully.',
+        );
+        await loadAllData(true);
       } else {
         const data = await response.json();
-        showError('Delete Failed', data.message || 'Failed to delete plastic type.');
+        showError(
+          'Delete Failed',
+          data.message || 'Failed to delete plastic type.',
+        );
       }
     } catch (error) {
       console.error('Error deleting plastic:', error);
-      showError('Network Error', 'Failed to delete plastic type. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to delete plastic type. Please try again.',
+      );
     } finally {
       setIsDeleting(null);
     }
@@ -341,23 +402,29 @@ export default function MastersPage() {
 
   const handleDeleteTape = async (tapeId: string) => {
     if (!confirm('Are you sure you want to delete this tape type?')) return;
-    
+
     setIsDeleting(tapeId);
     try {
-      const response = await fetch(`/api/inventory/tape/${tapeId}`, {
+      const response = await fetch(`/api/masters/tape/${tapeId}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
         showSuccess('Tape Deleted', 'Tape type has been deleted successfully.');
-        await loadAllData();
+        await loadAllData(true);
       } else {
         const data = await response.json();
-        showError('Delete Failed', data.message || 'Failed to delete tape type.');
+        showError(
+          'Delete Failed',
+          data.message || 'Failed to delete tape type.',
+        );
       }
     } catch (error) {
       console.error('Error deleting tape:', error);
-      showError('Network Error', 'Failed to delete tape type. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to delete tape type. Please try again.',
+      );
     } finally {
       setIsDeleting(null);
     }
@@ -388,7 +455,7 @@ export default function MastersPage() {
             'Password reset request has been rejected.',
           );
         }
-        await loadAllData();
+        await loadAllData(true);
       } else {
         showError('Action Failed', 'Failed to process password reset request.');
       }
@@ -429,6 +496,12 @@ export default function MastersPage() {
         <p className="text-muted-foreground">
           Manage all master data and system configurations
         </p>
+        {refreshing && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+            <Spinner size="sm" />
+            <span>Refreshing...</span>
+          </div>
+        )}
       </div>
 
       <Tabs
@@ -783,12 +856,26 @@ export default function MastersPage() {
                           <TableCell>{stone.size}</TableCell>
                           <TableCell>{stone.unit}</TableCell>
                           <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                            >
-                              Edit
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                              {user?.role === 'admin' && (
+                                <LoadingButton
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDeleteStone(stone._id)}
+                                  loading={isDeleting === stone._id}
+                                  loadingText=""
+                                >
+                                  Delete
+                                </LoadingButton>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -810,7 +897,8 @@ export default function MastersPage() {
                 <div>
                   <CardTitle>Paper Master Data</CardTitle>
                   <CardDescription>
-                    Manage paper types and specifications with custom width and pieces per roll
+                    Manage paper types and specifications with custom width and
+                    pieces per roll
                   </CardDescription>
                 </div>
                 <Dialog>
@@ -914,7 +1002,8 @@ export default function MastersPage() {
                 <div>
                   <CardTitle>Plastic Master Data</CardTitle>
                   <CardDescription>
-                    Manage plastic types and specifications with custom width values
+                    Manage plastic types and specifications with custom width
+                    values
                   </CardDescription>
                 </div>
                 <Dialog>
@@ -978,7 +1067,9 @@ export default function MastersPage() {
                                   <LoadingButton
                                     variant="destructive"
                                     size="sm"
-                                    onClick={() => handleDeletePlastic(plastic._id)}
+                                    onClick={() =>
+                                      handleDeletePlastic(plastic._id)
+                                    }
                                     loading={isDeleting === plastic._id}
                                     loadingText=""
                                   >
@@ -1584,12 +1675,12 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
           'New paper type has been added successfully.',
         );
         onSuccess();
-        setFormData({ 
-          name: '', 
-          width: '', 
-          piecesPerRoll: '', 
+        setFormData({
+          name: '',
+          width: '',
+          piecesPerRoll: '',
           weightPerPiece: '',
-          inventoryType: 'internal'
+          inventoryType: 'internal',
         });
       } else {
         const data = await response.json();
@@ -1624,7 +1715,7 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
           className="mt-1"
         />
       </div>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="width">
@@ -1660,7 +1751,7 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="weightPerPiece">
@@ -1699,7 +1790,7 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
           </Select>
         </div>
       </div>
-      
+
       <div className="flex justify-end space-x-2">
         <LoadingButton
           type="submit"
@@ -1778,7 +1869,7 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
           className="mt-1"
         />
       </div>
-      
+
       <div className="space-y-2">
         <Label htmlFor="width">
           Width (inches) <span className="text-red-500">*</span>
@@ -1794,7 +1885,7 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
           className="mt-1"
         />
       </div>
-      
+
       <div className="flex justify-end space-x-2">
         <LoadingButton
           type="submit"
@@ -1822,9 +1913,9 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
       const response = await fetch('/api/inventory/tape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           name: formData.name,
-          quantity: 0 
+          quantity: 0,
         }),
       });
 
@@ -1868,7 +1959,7 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
           className="mt-1"
         />
       </div>
-      
+
       <div className="flex justify-end space-x-2">
         <LoadingButton
           type="submit"
@@ -1883,13 +1974,13 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 // Edit form components
-function EditPaperForm({ 
-  paper, 
-  onSuccess, 
-  onCancel 
-}: { 
-  paper: Paper; 
-  onSuccess: () => void; 
+function EditPaperForm({
+  paper,
+  onSuccess,
+  onCancel,
+}: {
+  paper: Paper;
+  onSuccess: () => void;
   onCancel: () => void;
 }) {
   const [formData, setFormData] = useState({
@@ -1932,7 +2023,10 @@ function EditPaperForm({
       }
     } catch (error) {
       console.error('Error updating paper:', error);
-      showError('Network Error', 'Failed to update paper type. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to update paper type. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -1956,7 +2050,7 @@ function EditPaperForm({
           className="mt-1"
         />
       </div>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="edit-width">
@@ -1992,7 +2086,7 @@ function EditPaperForm({
           />
         </div>
       </div>
-      
+
       <div className="space-y-2">
         <Label htmlFor="edit-weightPerPiece">
           Weight per Piece (g) <span className="text-red-500">*</span>
@@ -2010,7 +2104,7 @@ function EditPaperForm({
           className="mt-1"
         />
       </div>
-      
+
       <div className="flex justify-end space-x-2">
         <Button
           type="button"
@@ -2031,13 +2125,13 @@ function EditPaperForm({
   );
 }
 
-function EditPlasticForm({ 
-  plastic, 
-  onSuccess, 
-  onCancel 
-}: { 
-  plastic: Plastic; 
-  onSuccess: () => void; 
+function EditPlasticForm({
+  plastic,
+  onSuccess,
+  onCancel,
+}: {
+  plastic: Plastic;
+  onSuccess: () => void;
   onCancel: () => void;
 }) {
   const [formData, setFormData] = useState({
@@ -2075,7 +2169,10 @@ function EditPlasticForm({
       }
     } catch (error) {
       console.error('Error updating plastic:', error);
-      showError('Network Error', 'Failed to update plastic type. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to update plastic type. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -2099,7 +2196,7 @@ function EditPlasticForm({
           className="mt-1"
         />
       </div>
-      
+
       <div className="space-y-2">
         <Label htmlFor="edit-plastic-width">
           Width (inches) <span className="text-red-500">*</span>
@@ -2115,7 +2212,7 @@ function EditPlasticForm({
           className="mt-1"
         />
       </div>
-      
+
       <div className="flex justify-end space-x-2">
         <Button
           type="button"
@@ -2136,13 +2233,13 @@ function EditPlasticForm({
   );
 }
 
-function EditTapeForm({ 
-  tape, 
-  onSuccess, 
-  onCancel 
-}: { 
-  tape: Tape; 
-  onSuccess: () => void; 
+function EditTapeForm({
+  tape,
+  onSuccess,
+  onCancel,
+}: {
+  tape: Tape;
+  onSuccess: () => void;
   onCancel: () => void;
 }) {
   const [formData, setFormData] = useState({
@@ -2178,7 +2275,10 @@ function EditTapeForm({
       }
     } catch (error) {
       console.error('Error updating tape:', error);
-      showError('Network Error', 'Failed to update tape type. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to update tape type. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -2202,7 +2302,7 @@ function EditTapeForm({
           className="mt-1"
         />
       </div>
-      
+
       <div className="flex justify-end space-x-2">
         <Button
           type="button"

@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
@@ -75,7 +75,7 @@ export async function PUT(
         name,
         width,
       },
-      { new: true }
+      { new: true },
     );
 
     return NextResponse.json({
@@ -92,9 +92,9 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
@@ -107,11 +107,56 @@ export async function DELETE(
       );
     }
 
-    // Only admin can delete master data
-    if (user.role !== 'admin') {
+    const { id } = await params;
+    const body = await request.json();
+    const { quantity } = body;
+
+    if (quantity === undefined || quantity < 0) {
       return NextResponse.json(
-        { success: false, message: 'Only administrators can delete master data' },
-        { status: 403 },
+        { success: false, message: 'Valid quantity is required' },
+        { status: 400 },
+      );
+    }
+
+    const plastic = await Plastic.findByIdAndUpdate(
+      id,
+      { quantity },
+      { new: true },
+    );
+
+    if (!plastic) {
+      return NextResponse.json(
+        { success: false, message: 'Plastic not found' },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Plastic quantity updated successfully',
+      data: plastic,
+    });
+  } catch (error) {
+    console.error('Error updating plastic quantity:', error);
+    return NextResponse.json(
+      { success: false, message: 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await dbConnect();
+
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
       );
     }
 
@@ -124,22 +169,31 @@ export async function DELETE(
       );
     }
 
-    // Check if plastic has quantity > 0
-    if (plastic.quantity > 0) {
-      return NextResponse.json(
-        { success: false, message: 'Cannot delete plastic with existing stock' },
-        { status: 400 },
-      );
-    }
-
-    await Plastic.findByIdAndDelete(id);
+    // Reset quantity to 0 instead of deleting
+    await Plastic.findByIdAndUpdate(
+      id,
+      {
+        quantity: 0,
+        updatedBy: user.id,
+        $push: {
+          updateHistory: {
+            field: 'quantity',
+            oldValue: plastic.quantity,
+            newValue: 0,
+            updatedBy: user.id,
+            updatedAt: new Date(),
+          },
+        },
+      },
+      { new: true },
+    );
 
     return NextResponse.json({
       success: true,
-      message: 'Plastic deleted successfully',
+      message: 'Plastic quantity reset to 0 successfully',
     });
   } catch (error) {
-    console.error('Delete plastic error:', error);
+    console.error('Reset plastic quantity error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },

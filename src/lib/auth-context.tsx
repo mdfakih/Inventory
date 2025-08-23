@@ -5,6 +5,7 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useCallback,
   ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
@@ -32,15 +33,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const checkAuth = async (): Promise<boolean> => {
+  const checkAuth = useCallback(async (): Promise<boolean> => {
     try {
       const response = await fetch('/api/auth/me');
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
         return true;
+      } else if (response.status === 401) {
+        setUser(null);
+        router.push('/unauthorized');
+        return false;
       } else {
         setUser(null);
+        router.push('/login');
         return false;
       }
     } catch (error) {
@@ -48,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       return false;
     }
-  };
+  }, [router]);
 
   const login = (userData: User) => {
     setUser(userData);
@@ -67,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     checkAuth().finally(() => setLoading(false));
-  }, []);
+  }, [checkAuth]);
 
   const value: AuthContextType = {
     user,

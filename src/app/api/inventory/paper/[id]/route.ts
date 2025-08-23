@@ -132,17 +132,6 @@ export async function DELETE(
       );
     }
 
-    // Only admin can delete master data
-    if (user.role !== 'admin') {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Only administrators can delete master data',
-        },
-        { status: 403 },
-      );
-    }
-
     const { id } = await params;
     const paper = await Paper.findById(id);
     if (!paper) {
@@ -152,22 +141,31 @@ export async function DELETE(
       );
     }
 
-    // Check if paper has quantity > 0
-    if (paper.quantity > 0) {
-      return NextResponse.json(
-        { success: false, message: 'Cannot delete paper with existing stock' },
-        { status: 400 },
-      );
-    }
-
-    await Paper.findByIdAndDelete(id);
+    // Reset quantity to 0 instead of deleting
+    await Paper.findByIdAndUpdate(
+      id,
+      {
+        quantity: 0,
+        updatedBy: user.id,
+        $push: {
+          updateHistory: {
+            field: 'quantity',
+            oldValue: paper.quantity,
+            newValue: 0,
+            updatedBy: user.id,
+            updatedAt: new Date(),
+          },
+        },
+      },
+      { new: true },
+    );
 
     return NextResponse.json({
       success: true,
-      message: 'Paper deleted successfully',
+      message: 'Paper quantity reset to 0 successfully',
     });
   } catch (error) {
-    console.error('Delete paper error:', error);
+    console.error('Reset paper quantity error:', error);
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },

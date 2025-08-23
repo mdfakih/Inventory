@@ -61,6 +61,10 @@ export interface Design {
   name: string;
   number: string;
   imageUrl: string;
+  prices: Array<{
+    currency: '₹' | '$';
+    price: number;
+  }>;
   paperConfigurations: Array<{
     paperSize: 9 | 13 | 16 | 19 | 20 | 24;
     defaultStones: Array<{

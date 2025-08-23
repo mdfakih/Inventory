@@ -32,7 +32,12 @@ interface Order {
   type: 'internal' | 'out';
   customerName: string;
   phone: string;
-  designId: { name: string; number: string };
+  designId: {
+    name: string;
+    number: string;
+    price?: number;
+    currency?: '₹' | '$';
+  };
   calculatedWeight?: number;
   finalTotalWeight?: number;
   weightDiscrepancy?: number;
@@ -57,13 +62,14 @@ export default function EmployeeDashboard() {
     recentOrders: [],
   });
   const [loading, setLoading] = useState(true);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // Only fetch data when authentication is ready and user is authenticated
+    if (!authLoading && isAuthenticated) {
       fetchDashboardData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
   const fetchDashboardData = async () => {
     try {
@@ -209,13 +215,14 @@ export default function EmployeeDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {data.recentOrders.map((order: Order) => (
                 <div
                   key={order._id}
-                  className="p-3 border rounded space-y-2"
+                  className="p-3 border rounded-md hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    {/* Customer Info */}
                     <div>
                       <p className="font-medium text-sm">
                         {order.customerName}
@@ -227,78 +234,67 @@ export default function EmployeeDashboard() {
                         Design: {order.designId?.name || 'N/A'}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <Badge
-                        variant={
-                          order.type === 'internal' ? 'default' : 'secondary'
-                        }
-                        className="text-xs"
-                      >
-                        {order.type}
-                      </Badge>
-                      <Badge
-                        className={`ml-1 text-xs ${
-                          order.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : order.status === 'cancelled'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {order.status}
-                      </Badge>
-                    </div>
-                  </div>
 
-                  {/* Weight Information */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Calculated
-                      </p>
-                      <p className="text-sm font-medium">
-                        {order.calculatedWeight?.toFixed(2) || 'N/A'}g
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Final</p>
-                      <p className="text-sm font-medium">
-                        {order.finalTotalWeight?.toFixed(2) || 'Not set'}g
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Discrepancy
-                      </p>
-                      <p
-                        className={`text-sm font-medium ${
-                          order.weightDiscrepancy !== undefined &&
+                    {/* Weight Info */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">
+                          Calc: {order.calculatedWeight?.toFixed(2) || 'N/A'}g
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Final:{' '}
+                          {order.finalTotalWeight?.toFixed(2) || 'Not set'}g
+                        </p>
+                      </div>
+                      <div>
+                        <p
+                          className={`font-medium ${
+                            order.weightDiscrepancy !== undefined &&
+                            order.weightDiscrepancy !== null
+                              ? order.weightDiscrepancy !== 0
+                                ? order.weightDiscrepancy > 0
+                                  ? 'text-red-600'
+                                  : 'text-green-600'
+                                : 'text-gray-600'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          {order.weightDiscrepancy !== undefined &&
                           order.weightDiscrepancy !== null
-                            ? order.weightDiscrepancy !== 0
-                              ? order.weightDiscrepancy > 0
-                                ? 'text-red-600'
-                                : 'text-green-600'
-                              : 'text-gray-600'
-                            : 'text-gray-500'
-                        }`}
-                      >
-                        {order.weightDiscrepancy !== undefined &&
-                        order.weightDiscrepancy !== null
-                          ? `${order.weightDiscrepancy.toFixed(2)}g`
-                          : 'N/A'}
-                      </p>
+                            ? `${order.weightDiscrepancy.toFixed(2)}g`
+                            : 'N/A'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Status</p>
-                      <Badge
-                        className={`text-xs ${
-                          order.isFinalized
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {order.isFinalized ? 'Finalized' : 'Pending'}
-                      </Badge>
+
+                    {/* Status & Date */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-1">
+                        <Badge
+                          variant={
+                            order.type === 'internal' ? 'default' : 'secondary'
+                          }
+                          className="text-xs"
+                        >
+                          {order.type}
+                        </Badge>
+                        <Badge
+                          className={`text-xs ${
+                            order.status === 'completed'
+                              ? 'bg-green-100 text-green-800'
+                              : order.status === 'cancelled'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {order.status}
+                        </Badge>
+                        {!order.isFinalized && (
+                          <Badge className="text-xs bg-gray-100 text-gray-800">
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
