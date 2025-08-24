@@ -32,6 +32,7 @@ interface Paper {
   name: string;
   width: number;
   quantity: number;
+  totalPieces: number;
   piecesPerRoll: number;
   weightPerPiece: number;
   inventoryType: 'internal' | 'out';
@@ -335,7 +336,7 @@ export default function PaperTable({
                   <TableCell>{paper.quantity}</TableCell>
                   <TableCell>{paper.piecesPerRoll}</TableCell>
                   <TableCell>{paper.weightPerPiece}g</TableCell>
-                  <TableCell>{paper.quantity * paper.piecesPerRoll}</TableCell>
+                  <TableCell>{paper.totalPieces}</TableCell>
                   <TableCell>
                     <Badge
                       variant={paper.quantity < 5 ? 'destructive' : 'default'}

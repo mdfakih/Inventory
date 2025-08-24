@@ -117,6 +117,77 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await dbConnect();
+
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
+
+    const body = await request.json();
+    const { quantity } = body;
+
+    if (quantity === undefined || typeof quantity !== 'number' || quantity < 0) {
+      return NextResponse.json(
+        { success: false, message: 'Quantity must be a non-negative number' },
+        { status: 400 },
+      );
+    }
+
+    const { id } = await params;
+    const paper = await Paper.findById(id);
+    if (!paper) {
+      return NextResponse.json(
+        { success: false, message: 'Paper not found' },
+        { status: 404 },
+      );
+    }
+
+    // Calculate new totalPieces based on quantity and piecesPerRoll
+    const newTotalPieces = quantity * paper.piecesPerRoll;
+
+    // Update the paper
+    const updatedPaper = await Paper.findByIdAndUpdate(
+      id,
+      {
+        quantity,
+        totalPieces: newTotalPieces,
+        updatedBy: user.id,
+        $push: {
+          updateHistory: {
+            field: 'quantity',
+            oldValue: paper.quantity,
+            newValue: quantity,
+            updatedBy: user.id,
+            updatedAt: new Date(),
+          },
+        },
+      },
+      { new: true },
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Paper quantity updated successfully',
+      data: updatedPaper,
+    });
+  } catch (error) {
+    console.error('Update paper quantity error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Internal server error' },
+      { status: 500 },
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -141,11 +212,12 @@ export async function DELETE(
       );
     }
 
-    // Reset quantity to 0 instead of deleting
+    // Reset quantity and totalPieces to 0 instead of deleting
     await Paper.findByIdAndUpdate(
       id,
       {
         quantity: 0,
+        totalPieces: 0,
         updatedBy: user.id,
         $push: {
           updateHistory: {

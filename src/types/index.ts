@@ -24,6 +24,7 @@ export interface Paper {
   _id: string;
   width: 9 | 13 | 16 | 19 | 20 | 24;
   quantity: number;
+  totalPieces: number;
   unit: 'pcs';
   piecesPerRoll: number;
   weightPerPiece: number;

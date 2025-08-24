@@ -253,20 +253,17 @@ export async function PUT(
     if (inventoryChanged) {
       const inventoryErrors = [];
 
-      // Validate paper availability - check total pieces (quantity * piecesPerRoll)
+      // Validate paper availability - check total pieces
       for (const adjustment of inventoryAdjustments.filter(
         (a) => a.type === 'paper',
       )) {
         if (adjustment.difference > 0) {
           const paper = await Paper.findById(adjustment.paperId);
-          const totalAvailablePieces = paper
-            ? paper.quantity * paper.piecesPerRoll
-            : 0;
-          if (!paper || totalAvailablePieces < adjustment.difference) {
+          if (!paper || paper.totalPieces < adjustment.difference) {
             inventoryErrors.push(
               `Insufficient paper stock: ${
                 paper?.width || 'Unknown'
-              }" (available total pieces: ${totalAvailablePieces}, required: ${
+              }" (available total pieces: ${paper?.totalPieces || 0}, required: ${
                 adjustment.difference
               })`,
             );
@@ -291,11 +288,8 @@ export async function PUT(
           if (adjustment.type === 'paper') {
             const paper = await Paper.findById(adjustment.paperId);
             if (paper) {
-              // Calculate current total pieces
-              const currentTotalPieces = paper.quantity * paper.piecesPerRoll;
-
               // Calculate new total pieces after adjustment
-              const newTotalPieces = currentTotalPieces - adjustment.difference;
+              const newTotalPieces = paper.totalPieces - adjustment.difference;
 
               // Calculate new quantity (rolls) based on remaining pieces
               const newQuantity = Math.floor(
@@ -303,6 +297,7 @@ export async function PUT(
               );
 
               await Paper.findByIdAndUpdate(adjustment.paperId, {
+                totalPieces: newTotalPieces,
                 quantity: newQuantity,
               });
             }
@@ -328,13 +323,13 @@ export async function PUT(
       });
       if (outPaper) {
         // Calculate remaining pieces after deduction
-        const currentTotalPieces = outPaper.quantity * outPaper.piecesPerRoll;
-        const remainingPieces = currentTotalPieces - paperUsed.quantityInPcs;
+        const remainingPieces = outPaper.totalPieces - paperUsed.quantityInPcs;
         const newQuantity = Math.floor(
           remainingPieces / outPaper.piecesPerRoll,
         );
 
         await Paper.findByIdAndUpdate(outPaper._id, {
+          totalPieces: remainingPieces,
           quantity: newQuantity,
         });
       }

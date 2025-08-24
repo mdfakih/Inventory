@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     // Validate inventory availability before creating order
     const inventoryErrors = [];
 
-    // Validate paper availability - check if we have enough total pieces (quantity * piecesPerRoll)
+    // Validate paper availability - check if we have enough total pieces
     inventoryPaper = await Paper.findOne({
       width: paperUsed.sizeInInch,
       inventoryType: inventoryType,
@@ -186,16 +186,13 @@ export async function POST(request: NextRequest) {
 
     if (
       !inventoryPaper ||
-      inventoryPaper.quantity * inventoryPaper.piecesPerRoll <
-        paperUsed.quantityInPcs
+      inventoryPaper.totalPieces < paperUsed.quantityInPcs
     ) {
       inventoryErrors.push(
         `Insufficient paper stock: ${
           paperUsed.sizeInInch
         }" (available total pieces: ${
-          inventoryPaper
-            ? inventoryPaper.quantity * inventoryPaper.piecesPerRoll
-            : 0
+          inventoryPaper ? inventoryPaper.totalPieces : 0
         }, required: ${paperUsed.quantityInPcs})`,
       );
     }
@@ -214,15 +211,14 @@ export async function POST(request: NextRequest) {
     // Deduct materials from inventory
     try {
       // Calculate remaining pieces after deduction
-      const currentTotalPieces =
-        inventoryPaper.quantity * inventoryPaper.piecesPerRoll;
-      const remainingPieces = currentTotalPieces - paperUsed.quantityInPcs;
+      const remainingPieces = inventoryPaper.totalPieces - paperUsed.quantityInPcs;
       const newQuantity = Math.floor(
         remainingPieces / inventoryPaper.piecesPerRoll,
       );
 
-      // Update paper inventory with new quantity (rolls)
+      // Update paper inventory with new total pieces and quantity (rolls)
       await Paper.findByIdAndUpdate(inventoryPaper._id, {
+        totalPieces: remainingPieces,
         quantity: newQuantity,
       });
 
@@ -235,14 +231,12 @@ export async function POST(request: NextRequest) {
         try {
           // Restore paper inventory to original state
           if (inventoryPaper && paperUsed) {
-            const originalTotalPieces =
-              inventoryPaper.quantity * inventoryPaper.piecesPerRoll;
-            const restoredTotalPieces =
-              originalTotalPieces + paperUsed.quantityInPcs;
+            const restoredTotalPieces = inventoryPaper.totalPieces + paperUsed.quantityInPcs;
             const restoredQuantity = Math.floor(
               restoredTotalPieces / inventoryPaper.piecesPerRoll,
             );
             await Paper.findByIdAndUpdate(inventoryPaper._id, {
+              totalPieces: restoredTotalPieces,
               quantity: restoredQuantity,
             });
           }

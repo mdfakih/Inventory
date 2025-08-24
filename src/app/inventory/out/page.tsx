@@ -55,6 +55,7 @@ interface Paper {
   _id: string;
   width: number;
   quantity: number;
+  totalPieces: number;
   piecesPerRoll: number;
   weightPerPiece: number;
   inventoryType: 'internal' | 'out';
@@ -703,7 +704,7 @@ export default function OutInventoryPage() {
                       <TableCell>{paper.piecesPerRoll}</TableCell>
                       <TableCell>{paper.weightPerPiece}g</TableCell>
                       <TableCell>
-                        {paper.quantity * paper.piecesPerRoll}
+                        {paper.totalPieces}
                       </TableCell>
                       <TableCell>
                         <Badge

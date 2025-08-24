@@ -18,6 +18,12 @@ const paperSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    totalPieces: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
     unit: {
       type: String,
       default: 'pcs',

@@ -58,6 +58,7 @@ interface Paper {
   _id: string;
   width: number;
   quantity: number;
+  totalPieces: number;
   piecesPerRoll: number;
   weightPerPiece: number;
   inventoryType: 'internal' | 'out';
