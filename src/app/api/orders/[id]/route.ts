@@ -188,7 +188,7 @@ export async function PUT(
           calculatedWeight = totalWeightPerPiece * paperUsed.quantityInPcs;
         }
 
-        // Calculate paper inventory adjustment - using piecesPerRoll
+        // Calculate paper inventory adjustment - using quantity (rolls)
         const paperDiff =
           paperUsed.quantityInPcs - oldValues.paperUsed.quantityInPcs;
         if (paperDiff !== 0) {
@@ -253,19 +253,22 @@ export async function PUT(
     if (inventoryChanged) {
       const inventoryErrors = [];
 
-      // Validate paper availability - check piecesPerRoll
+      // Validate paper availability - check total pieces (quantity * piecesPerRoll)
       for (const adjustment of inventoryAdjustments.filter(
         (a) => a.type === 'paper',
       )) {
         if (adjustment.difference > 0) {
           const paper = await Paper.findById(adjustment.paperId);
-          if (!paper || paper.piecesPerRoll < adjustment.difference) {
+          const totalAvailablePieces = paper
+            ? paper.quantity * paper.piecesPerRoll
+            : 0;
+          if (!paper || totalAvailablePieces < adjustment.difference) {
             inventoryErrors.push(
               `Insufficient paper stock: ${
                 paper?.width || 'Unknown'
-              }" (available pieces per roll: ${
-                paper?.piecesPerRoll || 0
-              }, required: ${adjustment.difference})`,
+              }" (available total pieces: ${totalAvailablePieces}, required: ${
+                adjustment.difference
+              })`,
             );
           }
         }
@@ -286,9 +289,23 @@ export async function PUT(
       try {
         for (const adjustment of inventoryAdjustments) {
           if (adjustment.type === 'paper') {
-            await Paper.findByIdAndUpdate(adjustment.paperId, {
-              $inc: { piecesPerRoll: -adjustment.difference },
-            });
+            const paper = await Paper.findById(adjustment.paperId);
+            if (paper) {
+              // Calculate current total pieces
+              const currentTotalPieces = paper.quantity * paper.piecesPerRoll;
+
+              // Calculate new total pieces after adjustment
+              const newTotalPieces = currentTotalPieces - adjustment.difference;
+
+              // Calculate new quantity (rolls) based on remaining pieces
+              const newQuantity = Math.floor(
+                newTotalPieces / paper.piecesPerRoll,
+              );
+
+              await Paper.findByIdAndUpdate(adjustment.paperId, {
+                quantity: newQuantity,
+              });
+            }
           }
         }
       } catch (error) {
@@ -304,14 +321,21 @@ export async function PUT(
     if (isFinalized && !order.isFinalized && order.type === 'out') {
       // Deduct consumed materials from out inventory
 
-      // Deduct consumed paper from out inventory - using piecesPerRoll
+      // Deduct consumed paper from out inventory - using pieces
       const outPaper = await Paper.findOne({
         width: paperUsed.sizeInInch,
         inventoryType: 'out',
       });
       if (outPaper) {
+        // Calculate remaining pieces after deduction
+        const currentTotalPieces = outPaper.quantity * outPaper.piecesPerRoll;
+        const remainingPieces = currentTotalPieces - paperUsed.quantityInPcs;
+        const newQuantity = Math.floor(
+          remainingPieces / outPaper.piecesPerRoll,
+        );
+
         await Paper.findByIdAndUpdate(outPaper._id, {
-          $inc: { piecesPerRoll: -paperUsed.quantityInPcs },
+          quantity: newQuantity,
         });
       }
 

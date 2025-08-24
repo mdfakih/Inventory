@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     // Validate inventory availability before creating order
     const inventoryErrors = [];
 
-    // Validate paper availability - check if we have enough pieces per roll
+    // Validate paper availability - check if we have enough total pieces (quantity * piecesPerRoll)
     inventoryPaper = await Paper.findOne({
       width: paperUsed.sizeInInch,
       inventoryType: inventoryType,
@@ -186,13 +186,16 @@ export async function POST(request: NextRequest) {
 
     if (
       !inventoryPaper ||
-      inventoryPaper.piecesPerRoll < paperUsed.quantityInPcs
+      inventoryPaper.quantity * inventoryPaper.piecesPerRoll <
+        paperUsed.quantityInPcs
     ) {
       inventoryErrors.push(
         `Insufficient paper stock: ${
           paperUsed.sizeInInch
-        }" (available pieces per roll: ${
-          inventoryPaper?.piecesPerRoll || 0
+        }" (available total pieces: ${
+          inventoryPaper
+            ? inventoryPaper.quantity * inventoryPaper.piecesPerRoll
+            : 0
         }, required: ${paperUsed.quantityInPcs})`,
       );
     }
@@ -210,9 +213,17 @@ export async function POST(request: NextRequest) {
 
     // Deduct materials from inventory
     try {
-      // Deduct paper from inventory - reduce pieces per roll
+      // Calculate remaining pieces after deduction
+      const currentTotalPieces =
+        inventoryPaper.quantity * inventoryPaper.piecesPerRoll;
+      const remainingPieces = currentTotalPieces - paperUsed.quantityInPcs;
+      const newQuantity = Math.floor(
+        remainingPieces / inventoryPaper.piecesPerRoll,
+      );
+
+      // Update paper inventory with new quantity (rolls)
       await Paper.findByIdAndUpdate(inventoryPaper._id, {
-        $inc: { piecesPerRoll: -paperUsed.quantityInPcs },
+        quantity: newQuantity,
       });
 
       // Create the order
@@ -222,10 +233,17 @@ export async function POST(request: NextRequest) {
       // Rollback inventory changes if order creation failed
       if (order) {
         try {
-          // Restore paper inventory
+          // Restore paper inventory to original state
           if (inventoryPaper && paperUsed) {
+            const originalTotalPieces =
+              inventoryPaper.quantity * inventoryPaper.piecesPerRoll;
+            const restoredTotalPieces =
+              originalTotalPieces + paperUsed.quantityInPcs;
+            const restoredQuantity = Math.floor(
+              restoredTotalPieces / inventoryPaper.piecesPerRoll,
+            );
             await Paper.findByIdAndUpdate(inventoryPaper._id, {
-              $inc: { piecesPerRoll: paperUsed.quantityInPcs },
+              quantity: restoredQuantity,
             });
           }
         } catch (rollbackError) {
