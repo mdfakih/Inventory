@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 export async function authenticatedFetchWithRedirect(
   url: string,
   options: RequestInit = {},
-  router?: any,
+  router?: ReturnType<typeof useRouter>,
 ): Promise<Response> {
   const defaultOptions: RequestInit = {
     headers: {

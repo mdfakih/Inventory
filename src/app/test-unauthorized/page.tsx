@@ -25,7 +25,7 @@ export default function TestUnauthorizedPage() {
         <h1 className="text-2xl font-bold mb-4">Testing 401 Handling</h1>
         <p className="text-gray-600">
           This page tests the 401 unauthorized handling. 
-          If you're not authenticated, you should be redirected to the unauthorized page.
+          If you&apos;re not authenticated, you should be redirected to the unauthorized page.
         </p>
       </div>
     </div>

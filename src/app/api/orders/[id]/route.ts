@@ -3,8 +3,6 @@ import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import Paper from '@/models/Paper';
 import Stone from '@/models/Stone';
-import Design from '@/models/Design';
-import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 import mongoose from 'mongoose';
 

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
-import Stone from '@/models/Stone';
-import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {

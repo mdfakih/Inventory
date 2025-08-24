@@ -4,7 +4,6 @@ import Order from '@/models/Order';
 import Stone from '@/models/Stone';
 import Paper from '@/models/Paper';
 import Design from '@/models/Design';
-import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 // Type for creating orders via API
