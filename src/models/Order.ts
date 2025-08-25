@@ -23,6 +23,21 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
+    stonesUsed: [
+      {
+        stoneId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Stone',
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      },
+    ],
+
     paperUsed: {
       sizeInInch: {
         type: Number,

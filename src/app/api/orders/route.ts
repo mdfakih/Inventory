@@ -12,6 +12,10 @@ interface CreateOrderData {
   customerName: string;
   phone: string;
   designId: string;
+  stonesUsed: Array<{
+    stoneId: string;
+    quantity: number;
+  }>;
   paperUsed: {
     sizeInInch: number;
     quantityInPcs: number;
@@ -137,7 +141,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get design to calculate stone weights as per design
-    const design = await Design.findById(designId);
+    const design = await Design.findById(designId).populate(
+      'defaultStones.stoneId',
+    );
     if (!design) {
       return NextResponse.json(
         { success: false, message: 'Design not found' },
@@ -145,11 +151,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate design applicability for the order type
+    if (design.defaultStones && design.defaultStones.length > 0) {
+      for (const designStone of design.defaultStones) {
+        const stone = designStone.stoneId;
+        if (!stone) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: 'Design contains invalid stone references',
+            },
+            { status: 400 },
+          );
+        }
+
+        // Check if stone is available in the correct inventory type
+        if (stone.inventoryType !== inventoryType) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Design not applicable for ${type} orders. Stone "${stone.name}" is only available in ${stone.inventoryType} inventory.`,
+            },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
     // Calculate stone weight as per design (sum of all stone weights for the design)
     let designStoneWeight = 0;
     if (design.defaultStones && design.defaultStones.length > 0) {
       for (const designStone of design.defaultStones) {
-        const stone = await Stone.findById(designStone.stoneId);
+        const stone = designStone.stoneId;
         if (stone) {
           // Use weightPerPiece if available, otherwise use quantity as fallback
           designStoneWeight += stone.weightPerPiece || stone.quantity || 0;
@@ -162,21 +195,9 @@ export async function POST(request: NextRequest) {
     const totalWeightPerPiece = paperWeightPerPiece + designStoneWeight;
     const calculatedWeight = totalWeightPerPiece * paperUsed.quantityInPcs;
 
-    const orderData: CreateOrderData = {
-      type,
-      customerName,
-      phone,
-      designId,
-      paperUsed: {
-        ...paperUsed,
-        paperWeightPerPc: paper.weightPerPiece,
-      },
-      calculatedWeight,
-      createdBy: user.id,
-    };
-
     // Validate inventory availability before creating order
     const inventoryErrors = [];
+    const stonesToDeduct = [];
 
     // Validate paper availability - check if we have enough total pieces
     inventoryPaper = await Paper.findOne({
@@ -197,6 +218,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate stone availability for the design
+    if (design.defaultStones && design.defaultStones.length > 0) {
+      for (const designStone of design.defaultStones) {
+        const stone = designStone.stoneId;
+        const requiredQuantity = designStone.quantity * paperUsed.quantityInPcs; // Total stones needed for all pieces
+
+        // Find the stone in the correct inventory type
+        const inventoryStone = await Stone.findOne({
+          _id: stone._id,
+          inventoryType: inventoryType,
+        });
+
+        if (!inventoryStone) {
+          inventoryErrors.push(
+            `Stone "${stone.name}" not found in ${inventoryType} inventory`,
+          );
+        } else if (inventoryStone.quantity < requiredQuantity) {
+          inventoryErrors.push(
+            `Insufficient stone stock: ${stone.name} (available: ${inventoryStone.quantity}${inventoryStone.unit}, required: ${requiredQuantity}${inventoryStone.unit})`,
+          );
+        } else {
+          stonesToDeduct.push({
+            stoneId: inventoryStone._id,
+            currentQuantity: inventoryStone.quantity,
+            requiredQuantity: requiredQuantity,
+          });
+        }
+      }
+    }
+
     if (inventoryErrors.length > 0) {
       return NextResponse.json(
         {
@@ -208,10 +259,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Prepare stones used data for the order
+    const stonesUsed = stonesToDeduct.map((stoneDeduction) => ({
+      stoneId: stoneDeduction.stoneId,
+      quantity: stoneDeduction.requiredQuantity,
+    }));
+
+    const orderData: CreateOrderData = {
+      type,
+      customerName,
+      phone,
+      designId,
+      stonesUsed,
+      paperUsed: {
+        ...paperUsed,
+        paperWeightPerPc: paper.weightPerPiece,
+      },
+      calculatedWeight,
+      createdBy: user.id,
+    };
+
     // Deduct materials from inventory
     try {
-      // Calculate remaining pieces after deduction
-      const remainingPieces = inventoryPaper.totalPieces - paperUsed.quantityInPcs;
+      // Deduct paper inventory
+      const remainingPieces =
+        inventoryPaper.totalPieces - paperUsed.quantityInPcs;
       const newQuantity = Math.floor(
         remainingPieces / inventoryPaper.piecesPerRoll,
       );
@@ -222,6 +294,15 @@ export async function POST(request: NextRequest) {
         quantity: newQuantity,
       });
 
+      // Deduct stone inventory
+      for (const stoneDeduction of stonesToDeduct) {
+        const newStoneQuantity =
+          stoneDeduction.currentQuantity - stoneDeduction.requiredQuantity;
+        await Stone.findByIdAndUpdate(stoneDeduction.stoneId, {
+          quantity: newStoneQuantity,
+        });
+      }
+
       // Create the order
       order = new Order(orderData);
       await order.save();
@@ -231,13 +312,21 @@ export async function POST(request: NextRequest) {
         try {
           // Restore paper inventory to original state
           if (inventoryPaper && paperUsed) {
-            const restoredTotalPieces = inventoryPaper.totalPieces + paperUsed.quantityInPcs;
+            const restoredTotalPieces =
+              inventoryPaper.totalPieces + paperUsed.quantityInPcs;
             const restoredQuantity = Math.floor(
               restoredTotalPieces / inventoryPaper.piecesPerRoll,
             );
             await Paper.findByIdAndUpdate(inventoryPaper._id, {
               totalPieces: restoredTotalPieces,
               quantity: restoredQuantity,
+            });
+          }
+
+          // Restore stone inventory to original state
+          for (const stoneDeduction of stonesToDeduct) {
+            await Stone.findByIdAndUpdate(stoneDeduction.stoneId, {
+              quantity: stoneDeduction.currentQuantity,
             });
           }
         } catch (rollbackError) {

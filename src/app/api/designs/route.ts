@@ -8,7 +8,6 @@ export async function GET() {
     await dbConnect();
     const designs = await Design.find()
       .populate('defaultStones.stoneId')
-      .populate('paperConfigurations.defaultStones.stoneId')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email')
       .sort({ createdAt: -1 });
@@ -40,14 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const {
-      name,
-      number,
-      imageUrl,
-      prices,
-      defaultStones,
-      paperConfigurations,
-    } = body;
+    const { name, number, imageUrl, prices, defaultStones } = body;
 
     if (!name || !number || !imageUrl) {
       return NextResponse.json(
@@ -71,7 +63,6 @@ export async function POST(request: NextRequest) {
       imageUrl,
       prices: prices || [],
       defaultStones: defaultStones || [],
-      paperConfigurations: paperConfigurations || [],
       createdBy: user.id,
     });
 

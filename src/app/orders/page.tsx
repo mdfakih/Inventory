@@ -70,6 +70,15 @@ interface Order {
   customerName: string;
   phone: string;
   designId: Design;
+  stonesUsed: Array<{
+    stoneId: {
+      _id: string;
+      name: string;
+      color: string;
+      size: string;
+    };
+    quantity: number;
+  }>;
   paperUsed: {
     sizeInInch: number;
     quantityInPcs: number;
@@ -178,19 +187,28 @@ export default function OrdersPage() {
       } else {
         setLoading(true);
       }
-      const [ordersRes, designsRes, papersRes] = await Promise.all([
-        authenticatedFetch('/api/orders'),
-        authenticatedFetch('/api/designs'),
-        authenticatedFetch('/api/inventory/paper'),
-      ]);
+      const [ordersRes, designsRes, internalPapersRes, outPapersRes] =
+        await Promise.all([
+          authenticatedFetch('/api/orders'),
+          authenticatedFetch('/api/designs'),
+          authenticatedFetch('/api/inventory/paper?type=internal'),
+          authenticatedFetch('/api/inventory/paper?type=out'),
+        ]);
 
       const ordersData = await ordersRes.json();
       const designsData = await designsRes.json();
-      const papersData = await papersRes.json();
+      const internalPapersData = await internalPapersRes.json();
+      const outPapersData = await outPapersRes.json();
 
       if (ordersData.success) setOrders(ordersData.data);
       if (designsData.success) setDesigns(designsData.data);
-      if (papersData.success) setPapers(papersData.data);
+
+      // Combine both internal and out papers
+      const allPapers = [];
+      if (internalPapersData.success)
+        allPapers.push(...internalPapersData.data);
+      if (outPapersData.success) allPapers.push(...outPapersData.data);
+      setPapers(allPapers);
     } catch (error) {
       console.error('Error fetching data:', error);
       showError('Data Loading Error', 'Failed to load orders data.');
@@ -211,6 +229,28 @@ export default function OrdersPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated]);
+
+  // Reset paper size when order type changes
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      paperUsed: {
+        ...prev.paperUsed,
+        sizeInInch: '',
+      },
+    }));
+  }, [formData.type]);
+
+  // Reset paper size when edit form order type changes
+  useEffect(() => {
+    setEditFormData((prev) => ({
+      ...prev,
+      paperUsed: {
+        ...prev.paperUsed,
+        sizeInInch: '',
+      },
+    }));
+  }, [editFormData.type]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -722,6 +762,7 @@ export default function OrdersPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Design</TableHead>
                   <TableHead>Price</TableHead>
+                  <TableHead>Stones Used</TableHead>
                   <TableHead>Paper Used</TableHead>
                   <TableHead>Calculated Weight</TableHead>
                   <TableHead>Final Weight</TableHead>
@@ -766,6 +807,23 @@ export default function OrdersPage() {
                         </div>
                       ) : (
                         <span className="text-gray-500">Not set</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {order.stonesUsed && order.stonesUsed.length > 0 ? (
+                        <div className="space-y-1">
+                          {order.stonesUsed.map((stone, index) => (
+                            <div
+                              key={index}
+                              className="text-sm"
+                            >
+                              {stone.stoneId?.name || 'Unknown Stone'} (
+                              {stone.quantity}g)
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">No stones</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -1121,17 +1179,44 @@ export default function OrdersPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label className="font-semibold">Stones Used</Label>
+                  <p>
+                    {selectedOrder.stonesUsed &&
+                    selectedOrder.stonesUsed.length > 0 ? (
+                      <div className="space-y-1">
+                        {selectedOrder.stonesUsed.map((stone, index) => (
+                          <div
+                            key={index}
+                            className="text-sm"
+                          >
+                            {stone.stoneId?.name || 'Unknown Stone'} (
+                            {stone.quantity}g)
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">No stones used</span>
+                    )}
+                  </p>
+                </div>
+                <div>
                   <Label className="font-semibold">Paper Used</Label>
                   <p>
                     {selectedOrder.paperUsed.sizeInInch}&quot; ×{' '}
                     {selectedOrder.paperUsed.quantityInPcs} pcs
                   </p>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="font-semibold">
                     Paper Weight per Piece
                   </Label>
                   <p>{selectedOrder.paperUsed.paperWeightPerPc}g</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Created By</Label>
+                  <p>{selectedOrder.createdBy?.name || 'Unknown'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">

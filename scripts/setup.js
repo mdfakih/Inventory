@@ -118,41 +118,21 @@ const designSchema = new mongoose.Schema(
     name: { type: String, required: true },
     number: { type: String, required: true, unique: true },
     imageUrl: { type: String, required: true },
-    prices: [{
-      currency: {
-        type: String,
-        enum: ['₹', '$'],
-        required: true,
-      },
-      price: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-    }],
-    paperConfigurations: [
+    prices: [
       {
-        paperSize: {
-          type: Number,
-          enum: [9, 13, 16, 19, 20, 24],
+        currency: {
+          type: String,
+          enum: ['₹', '$'],
           required: true,
         },
-        defaultStones: [
-          {
-            stoneId: {
-              type: mongoose.Schema.Types.ObjectId,
-              ref: 'Stone',
-              required: true,
-            },
-            quantity: {
-              type: Number,
-              required: true,
-              min: 0,
-            },
-          },
-        ],
+        price: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
       },
     ],
+
     defaultStones: [
       {
         stoneId: {
@@ -533,12 +513,48 @@ async function setupDatabase() {
     // Create sample internal paper
     console.log('Creating sample internal paper...');
     const internalPapers = [
-      { width: 9, quantity: 10, piecesPerRoll: 1000, weightPerPiece: 20, inventoryType: 'internal' },
-      { width: 13, quantity: 8, piecesPerRoll: 750, weightPerPiece: 28, inventoryType: 'internal' },
-      { width: 16, quantity: 6, piecesPerRoll: 600, weightPerPiece: 35, inventoryType: 'internal' },
-      { width: 19, quantity: 5, piecesPerRoll: 500, weightPerPiece: 42, inventoryType: 'internal' },
-      { width: 20, quantity: 4, piecesPerRoll: 487, weightPerPiece: 45, inventoryType: 'internal' },
-      { width: 24, quantity: 3, piecesPerRoll: 400, weightPerPiece: 55, inventoryType: 'internal' },
+      {
+        width: 9,
+        quantity: 10,
+        piecesPerRoll: 1000,
+        weightPerPiece: 20,
+        inventoryType: 'internal',
+      },
+      {
+        width: 13,
+        quantity: 8,
+        piecesPerRoll: 750,
+        weightPerPiece: 28,
+        inventoryType: 'internal',
+      },
+      {
+        width: 16,
+        quantity: 6,
+        piecesPerRoll: 600,
+        weightPerPiece: 35,
+        inventoryType: 'internal',
+      },
+      {
+        width: 19,
+        quantity: 5,
+        piecesPerRoll: 500,
+        weightPerPiece: 42,
+        inventoryType: 'internal',
+      },
+      {
+        width: 20,
+        quantity: 4,
+        piecesPerRoll: 487,
+        weightPerPiece: 45,
+        inventoryType: 'internal',
+      },
+      {
+        width: 24,
+        quantity: 3,
+        piecesPerRoll: 400,
+        weightPerPiece: 55,
+        inventoryType: 'internal',
+      },
     ];
 
     for (const paperData of internalPapers) {
@@ -549,8 +565,20 @@ async function setupDatabase() {
     // Create sample out job paper
     console.log('Creating sample out job paper...');
     const outPapers = [
-      { width: 9, quantity: 5, piecesPerRoll: 1000, weightPerPiece: 20, inventoryType: 'out' },
-      { width: 13, quantity: 3, piecesPerRoll: 750, weightPerPiece: 28, inventoryType: 'out' },
+      {
+        width: 9,
+        quantity: 5,
+        piecesPerRoll: 1000,
+        weightPerPiece: 20,
+        inventoryType: 'out',
+      },
+      {
+        width: 13,
+        quantity: 3,
+        piecesPerRoll: 750,
+        weightPerPiece: 28,
+        inventoryType: 'out',
+      },
     ];
 
     for (const paperData of outPapers) {
@@ -585,22 +613,7 @@ async function setupDatabase() {
         name: 'Classic Design',
         number: 'DES001',
         imageUrl: 'https://via.placeholder.com/300x200?text=Classic+Design',
-        paperConfigurations: [
-          {
-            paperSize: 9,
-            defaultStones: [
-              { stoneId: createdInternalStones[0]._id, quantity: 50 },
-              { stoneId: createdInternalStones[1]._id, quantity: 30 },
-            ],
-          },
-          {
-            paperSize: 13,
-            defaultStones: [
-              { stoneId: createdInternalStones[0]._id, quantity: 70 },
-              { stoneId: createdInternalStones[1]._id, quantity: 45 },
-            ],
-          },
-        ],
+
         defaultStones: [
           { stoneId: createdInternalStones[0]._id, quantity: 50 },
           { stoneId: createdInternalStones[1]._id, quantity: 30 },
@@ -611,22 +624,7 @@ async function setupDatabase() {
         name: 'Modern Design',
         number: 'DES002',
         imageUrl: 'https://via.placeholder.com/300x200?text=Modern+Design',
-        paperConfigurations: [
-          {
-            paperSize: 16,
-            defaultStones: [
-              { stoneId: createdInternalStones[2]._id, quantity: 100 },
-              { stoneId: createdInternalStones[3]._id, quantity: 40 },
-            ],
-          },
-          {
-            paperSize: 20,
-            defaultStones: [
-              { stoneId: createdInternalStones[2]._id, quantity: 120 },
-              { stoneId: createdInternalStones[3]._id, quantity: 50 },
-            ],
-          },
-        ],
+
         defaultStones: [
           { stoneId: createdInternalStones[2]._id, quantity: 100 },
           { stoneId: createdInternalStones[3]._id, quantity: 40 },
@@ -637,22 +635,7 @@ async function setupDatabase() {
         name: 'Elegant Design',
         number: 'DES003',
         imageUrl: 'https://via.placeholder.com/300x200?text=Elegant+Design',
-        paperConfigurations: [
-          {
-            paperSize: 19,
-            defaultStones: [
-              { stoneId: createdInternalStones[4]._id, quantity: 35 },
-              { stoneId: createdInternalStones[0]._id, quantity: 25 },
-            ],
-          },
-          {
-            paperSize: 24,
-            defaultStones: [
-              { stoneId: createdInternalStones[4]._id, quantity: 45 },
-              { stoneId: createdInternalStones[0]._id, quantity: 35 },
-            ],
-          },
-        ],
+
         defaultStones: [
           { stoneId: createdInternalStones[4]._id, quantity: 35 },
           { stoneId: createdInternalStones[0]._id, quantity: 25 },
@@ -678,7 +661,7 @@ async function setupDatabase() {
     console.log('- 2 out job paper types');
     console.log('- 5 plastic types');
     console.log('- 1 tape entry');
-    console.log('- 3 designs (with paper configurations)');
+    console.log('- 3 designs');
   } catch (error) {
     console.error('Error setting up database:', error);
   } finally {

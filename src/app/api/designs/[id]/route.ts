@@ -9,10 +9,6 @@ interface DesignUpdateData {
   imageUrl: string;
   prices: Array<{ currency: string; price: number }>;
   defaultStones: Array<{ stoneId: string; quantity: number }>;
-  paperConfigurations: Array<{
-    paperSize: number;
-    defaultStones: Array<{ stoneId: string; quantity: number }>;
-  }>;
   updatedBy: string;
   updateHistory: Array<{
     field: string;
@@ -32,7 +28,6 @@ export async function GET(
     const { id } = await params;
     const design = await Design.findById(id)
       .populate('defaultStones.stoneId')
-      .populate('paperConfigurations.defaultStones.stoneId')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
@@ -79,7 +74,6 @@ export async function PUT(
       imageUrl,
       prices,
       defaultStones,
-      paperConfigurations,
     } = body;
 
     if (!name || !number || !imageUrl) {
@@ -114,7 +108,6 @@ export async function PUT(
       imageUrl: design.imageUrl,
       prices: design.prices,
       defaultStones: design.defaultStones,
-      paperConfigurations: design.paperConfigurations,
     };
 
     if (name !== oldValues.name) {
@@ -169,19 +162,6 @@ export async function PUT(
       });
     }
 
-    if (
-      JSON.stringify(paperConfigurations) !==
-      JSON.stringify(oldValues.paperConfigurations)
-    ) {
-      updateHistory.push({
-        field: 'paperConfigurations',
-        oldValue: oldValues.paperConfigurations,
-        newValue: paperConfigurations,
-        updatedBy: user.id,
-        updatedAt: new Date(),
-      });
-    }
-
     // Update design
     const updateData: DesignUpdateData = {
       name,
@@ -189,7 +169,6 @@ export async function PUT(
       imageUrl,
       prices: prices || [],
       defaultStones: defaultStones || [],
-      paperConfigurations: paperConfigurations || [],
       updatedBy: user.id,
       updateHistory: [...(design.updateHistory || []), ...updateHistory],
     };
@@ -198,7 +177,6 @@ export async function PUT(
       new: true,
     })
       .populate('defaultStones.stoneId')
-      .populate('paperConfigurations.defaultStones.stoneId')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 

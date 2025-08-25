@@ -83,7 +83,7 @@ export async function PUT(
       );
     }
 
-    const order = await Order.findById(id);
+    const order = await Order.findById(id).populate('stonesUsed.stoneId');
     if (!order) {
       return NextResponse.json(
         { success: false, message: 'Order not found' },
@@ -153,6 +153,7 @@ export async function PUT(
     let discrepancyPercentage = 0;
     let inventoryChanged = false;
     const inventoryAdjustments = [];
+    const stoneInventoryAdjustments = [];
 
     // Check if paper usage changed
     if (
@@ -263,10 +264,60 @@ export async function PUT(
             inventoryErrors.push(
               `Insufficient paper stock: ${
                 paper?.width || 'Unknown'
-              }" (available total pieces: ${paper?.totalPieces || 0}, required: ${
-                adjustment.difference
-              })`,
+              }" (available total pieces: ${
+                paper?.totalPieces || 0
+              }, required: ${adjustment.difference})`,
             );
+          }
+        }
+      }
+
+      // Validate stone availability if design changed
+      if (designId !== oldValues.designId.toString()) {
+        const Design = await import('@/models/Design').then((m) => m.default);
+        const newDesign = await Design.findById(designId).populate(
+          'defaultStones.stoneId',
+        );
+
+        if (
+          newDesign &&
+          newDesign.defaultStones &&
+          newDesign.defaultStones.length > 0
+        ) {
+          for (const designStone of newDesign.defaultStones) {
+            const stone = designStone.stoneId;
+            if (!stone) continue;
+
+            // Check if stone is available in the correct inventory type
+            if (stone.inventoryType !== (type === 'out' ? 'out' : 'internal')) {
+              inventoryErrors.push(
+                `Design not applicable for ${type} orders. Stone "${stone.name}" is only available in ${stone.inventoryType} inventory.`,
+              );
+              continue;
+            }
+
+            const requiredQuantity =
+              designStone.quantity * paperUsed.quantityInPcs;
+            const inventoryStone = await Stone.findOne({
+              _id: stone._id,
+              inventoryType: type === 'out' ? 'out' : 'internal',
+            });
+
+            if (!inventoryStone) {
+              inventoryErrors.push(
+                `Stone "${stone.name}" not found in ${type} inventory`,
+              );
+            } else if (inventoryStone.quantity < requiredQuantity) {
+              inventoryErrors.push(
+                `Insufficient stone stock: ${stone.name} (available: ${inventoryStone.quantity}${inventoryStone.unit}, required: ${requiredQuantity}${inventoryStone.unit})`,
+              );
+            } else {
+              stoneInventoryAdjustments.push({
+                stoneId: inventoryStone._id,
+                currentQuantity: inventoryStone.quantity,
+                requiredQuantity: requiredQuantity,
+              });
+            }
           }
         }
       }
@@ -303,6 +354,15 @@ export async function PUT(
             }
           }
         }
+
+        // Apply stone inventory adjustments
+        for (const stoneAdjustment of stoneInventoryAdjustments) {
+          const newStoneQuantity =
+            stoneAdjustment.currentQuantity - stoneAdjustment.requiredQuantity;
+          await Stone.findByIdAndUpdate(stoneAdjustment.stoneId, {
+            quantity: newStoneQuantity,
+          });
+        }
       } catch (error) {
         console.error('Failed to adjust inventory:', error);
         return NextResponse.json(
@@ -334,6 +394,22 @@ export async function PUT(
         });
       }
 
+      // Deduct consumed stones from out inventory
+      if (order.stonesUsed && order.stonesUsed.length > 0) {
+        for (const orderStone of order.stonesUsed) {
+          const outStone = await Stone.findOne({
+            _id: orderStone.stoneId._id,
+            inventoryType: 'out',
+          });
+          if (outStone) {
+            const newStoneQuantity = outStone.quantity - orderStone.quantity;
+            await Stone.findByIdAndUpdate(outStone._id, {
+              quantity: newStoneQuantity,
+            });
+          }
+        }
+      }
+
       updateHistory.push({
         field: 'isFinalized',
         oldValue: false,
@@ -343,12 +419,25 @@ export async function PUT(
       });
     }
 
+    // Prepare stones used data if design changed
+    let stonesUsed = order.stonesUsed;
+    if (
+      designId !== oldValues.designId.toString() &&
+      stoneInventoryAdjustments.length > 0
+    ) {
+      stonesUsed = stoneInventoryAdjustments.map((stoneAdjustment) => ({
+        stoneId: stoneAdjustment.stoneId,
+        quantity: stoneAdjustment.requiredQuantity,
+      }));
+    }
+
     // Update order
     Object.assign(updateData, {
       type,
       customerName,
       phone,
       designId,
+      stonesUsed,
       paperUsed: paperUsed
         ? {
             ...paperUsed,

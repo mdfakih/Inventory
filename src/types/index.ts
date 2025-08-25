@@ -16,6 +16,7 @@ export interface Stone {
   size: string;
   quantity: number;
   unit: 'g' | 'kg';
+  inventoryType: 'internal' | 'out';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,13 +66,6 @@ export interface Design {
   prices: Array<{
     currency: '₹' | '$';
     price: number;
-  }>;
-  paperConfigurations: Array<{
-    paperSize: 9 | 13 | 16 | 19 | 20 | 24;
-    defaultStones: Array<{
-      stoneId: string;
-      quantity: number;
-    }>;
   }>;
   defaultStones: Array<{
     stoneId: string;

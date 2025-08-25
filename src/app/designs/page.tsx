@@ -45,6 +45,7 @@ interface Stone {
   size: string;
   quantity: number;
   unit: string;
+  inventoryType: 'internal' | 'out';
 }
 
 interface User {
@@ -64,15 +65,8 @@ interface Design {
     price: number;
   }>;
   defaultStones: Array<{
-    stoneId: { _id: string; name: string };
+    stoneId: { _id: string; name: string; inventoryType: 'internal' | 'out' };
     quantity: number;
-  }>;
-  paperConfigurations: Array<{
-    paperSize: number;
-    defaultStones: Array<{
-      stoneId: { _id: string; name: string };
-      quantity: number;
-    }>;
   }>;
   createdBy: { name: string; email: string };
   updatedBy?: { name: string; email: string };
@@ -91,13 +85,6 @@ interface FormData {
   defaultStones: Array<{
     stoneId: string;
     quantity: number;
-  }>;
-  paperConfigurations: Array<{
-    paperSize: number;
-    defaultStones: Array<{
-      stoneId: string;
-      quantity: number;
-    }>;
   }>;
 }
 
@@ -132,7 +119,6 @@ export default function DesignsPage() {
     imageUrl: '',
     prices: [],
     defaultStones: [],
-    paperConfigurations: [],
   });
   const [editFormData, setEditFormData] = useState<FormData>({
     name: '',
@@ -140,7 +126,6 @@ export default function DesignsPage() {
     imageUrl: '',
     prices: [],
     defaultStones: [],
-    paperConfigurations: [],
   });
   const { showSuccess, showError } = useSnackbarHelpers();
   const { loading: authLoading, isAuthenticated } = useAuth();
@@ -164,16 +149,24 @@ export default function DesignsPage() {
       } else {
         setLoading(true);
       }
-      const [designsRes, stonesRes] = await Promise.all([
+      const [designsRes, internalStonesRes, outStonesRes] = await Promise.all([
         authenticatedFetch('/api/designs'),
-        authenticatedFetch('/api/inventory/stones'),
+        authenticatedFetch('/api/inventory/stones?type=internal'),
+        authenticatedFetch('/api/inventory/stones?type=out'),
       ]);
 
       const designsData = await designsRes.json();
-      const stonesData = await stonesRes.json();
+      const internalStonesData = await internalStonesRes.json();
+      const outStonesData = await outStonesRes.json();
 
       if (designsData.success) setDesigns(designsData.data);
-      if (stonesData.success) setStones(stonesData.data);
+
+      // Combine both internal and out job stones
+      const allStones = [];
+      if (internalStonesData.success)
+        allStones.push(...internalStonesData.data);
+      if (outStonesData.success) allStones.push(...outStonesData.data);
+      setStones(allStones);
     } catch (error) {
       console.error('Error fetching data:', error);
       showError('Data Loading Error', 'Failed to load designs data.');
@@ -249,7 +242,6 @@ export default function DesignsPage() {
           imageUrl: '',
           prices: [],
           defaultStones: [],
-          paperConfigurations: [],
         });
         await fetchData(true);
       } else {
@@ -342,15 +334,6 @@ export default function DesignsPage() {
         design.defaultStones?.map((stone) => ({
           stoneId: stone.stoneId?._id || '',
           quantity: stone.quantity,
-        })) || [],
-      paperConfigurations:
-        design.paperConfigurations?.map((config) => ({
-          paperSize: config.paperSize,
-          defaultStones:
-            config.defaultStones?.map((stone) => ({
-              stoneId: stone.stoneId?._id || '',
-              quantity: stone.quantity,
-            })) || [],
         })) || [],
     });
     setIsEditDialogOpen(true);
@@ -681,7 +664,11 @@ export default function DesignsPage() {
                                 key={s._id}
                                 value={s._id}
                               >
-                                {s.name}
+                                {s.name} (
+                                {s.inventoryType === 'out'
+                                  ? 'Out Job'
+                                  : 'Internal'}
+                                )
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -760,7 +747,6 @@ export default function DesignsPage() {
                   <TableHead>Number</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Default Stones</TableHead>
-                  <TableHead>Paper Configurations</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -815,7 +801,11 @@ export default function DesignsPage() {
                               variant="outline"
                               className="mr-1"
                             >
-                              {stone.stoneId?.name}: {stone.quantity}g
+                              {stone.stoneId?.name} (
+                              {stone.stoneId?.inventoryType === 'out'
+                                ? 'Out Job'
+                                : 'Internal'}
+                              ): {stone.quantity}g
                             </Badge>
                           ))}
                         </div>
@@ -823,24 +813,7 @@ export default function DesignsPage() {
                         <span className="text-gray-500">No default stones</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      {design.paperConfigurations?.length > 0 ? (
-                        <div className="space-y-1">
-                          {design.paperConfigurations.map((config, index) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="mr-1"
-                            >
-                              {config.paperSize}&quot;:{' '}
-                              {config.defaultStones?.length || 0} stones
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">No paper configs</span>
-                      )}
-                    </TableCell>
+
                     <TableCell>
                       {new Date(design.createdAt).toLocaleDateString()}
                     </TableCell>
@@ -1139,7 +1112,9 @@ export default function DesignsPage() {
                             key={s._id}
                             value={s._id}
                           >
-                            {s.name}
+                            {s.name} (
+                            {s.inventoryType === 'out' ? 'Out Job' : 'Internal'}
+                            )
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1269,7 +1244,13 @@ export default function DesignsPage() {
                         key={index}
                         className="flex justify-between"
                       >
-                        <span>{stone.stoneId?.name}</span>
+                        <span>
+                          {stone.stoneId?.name} (
+                          {stone.stoneId?.inventoryType === 'out'
+                            ? 'Out Job'
+                            : 'Internal'}
+                          )
+                        </span>
                         <span>{stone.quantity}g</span>
                       </div>
                     ))}
@@ -1278,36 +1259,7 @@ export default function DesignsPage() {
                   <p className="text-gray-500 mt-2">No default stones</p>
                 )}
               </div>
-              <div>
-                <Label className="font-semibold">Paper Configurations</Label>
-                {selectedDesign.paperConfigurations?.length > 0 ? (
-                  <div className="space-y-2 mt-2">
-                    {selectedDesign.paperConfigurations.map((config, index) => (
-                      <div
-                        key={index}
-                        className="border rounded p-3"
-                      >
-                        <div className="font-medium mb-2">
-                          {config.paperSize}&quot; Paper
-                        </div>
-                        <div className="space-y-1">
-                          {config.defaultStones?.map((stone, stoneIndex) => (
-                            <div
-                              key={stoneIndex}
-                              className="flex justify-between text-sm"
-                            >
-                              <span>{stone.stoneId?.name}</span>
-                              <span>{stone.quantity}g</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 mt-2">No paper configurations</p>
-                )}
-              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="font-semibold">Created By</Label>
