@@ -56,8 +56,10 @@ async function generateReport(request: NextRequest) {
 
       case 'orders':
         const orders = await Order.find(dateFilter)
-          .populate('designId', 'name number')
-          .populate('stonesUsed.stoneId', 'name')
+          .populate('designOrders.designId', 'name number')
+          .populate('designOrders.stonesUsed.stoneId', 'name')
+          .populate('designId', 'name number') // Legacy field
+          .populate('stonesUsed.stoneId', 'name') // Legacy field
           .populate('receivedMaterials.stones.stoneId', 'name')
           .sort({ createdAt: -1 });
         reportData = { orders };
@@ -74,8 +76,10 @@ async function generateReport(request: NextRequest) {
         const [analyticsOrders, analyticsStones, analyticsPapers] =
           await Promise.all([
             Order.find(dateFilter)
-              .populate('designId', 'name')
-              .populate('stonesUsed.stoneId', 'name')
+              .populate('designOrders.designId', 'name')
+              .populate('designOrders.stonesUsed.stoneId', 'name')
+              .populate('designId', 'name') // Legacy field
+              .populate('stonesUsed.stoneId', 'name') // Legacy field
               .populate('receivedMaterials.stones.stoneId', 'name'),
             Stone.find({}),
             Paper.find({}),
@@ -164,8 +168,10 @@ async function generateReport(request: NextRequest) {
           allTapes,
         ] = await Promise.all([
           Order.find(dateFilter)
-            .populate('designId', 'name number')
-            .populate('stonesUsed.stoneId', 'name')
+            .populate('designOrders.designId', 'name number')
+            .populate('designOrders.stonesUsed.stoneId', 'name')
+            .populate('designId', 'name number') // Legacy field
+            .populate('stonesUsed.stoneId', 'name') // Legacy field
             .populate('receivedMaterials.stones.stoneId', 'name'),
           User.find({}).select('-password'),
           Stone.find({}),
@@ -219,7 +225,10 @@ export async function GET(request: NextRequest) {
       // Get all data with pagination
       const [orders, users, stones, papers, plastics, tapes] = await Promise.all([
         Order.find()
-          .populate('designId')
+          .populate('designOrders.designId')
+          .populate('designOrders.stonesUsed.stoneId')
+          .populate('designId') // Legacy field
+          .populate('stonesUsed.stoneId') // Legacy field
           .populate('createdBy', 'name email')
           .sort({ createdAt: -1 })
           .skip(skip)
@@ -307,7 +316,10 @@ export async function GET(request: NextRequest) {
       switch (type) {
         case 'orders':
           const orders = await Order.find()
-            .populate('designId')
+            .populate('designOrders.designId')
+            .populate('designOrders.stonesUsed.stoneId')
+            .populate('designId') // Legacy field
+            .populate('stonesUsed.stoneId') // Legacy field
             .populate('createdBy', 'name email')
             .sort({ createdAt: -1 })
             .skip(skip)

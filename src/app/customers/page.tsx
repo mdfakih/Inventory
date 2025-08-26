@@ -140,7 +140,7 @@ export default function CustomersPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, customerTypeFilter, statusFilter]);
+  }, [currentPage, searchQuery, customerTypeFilter, statusFilter, showError]);
 
   const fetchAnalytics = useCallback(async () => {
     try {

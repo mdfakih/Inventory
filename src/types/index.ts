@@ -117,15 +117,12 @@ export interface Customer {
   updatedAt: Date;
 }
 
-export interface Order {
-  _id: string;
-  type: 'internal' | 'out';
-  customerName: string;
-  phone: string;
-  customerId?: string; // Reference to Customer model
-  designId: string;
+export interface DesignOrder {
+  _id?: string;
+  designId: string | Design;
+  quantity: number;
   stonesUsed: Array<{
-    stoneId: string;
+    stoneId: string | Stone;
     quantity: number;
   }>;
   paperUsed: {
@@ -134,6 +131,36 @@ export interface Order {
     paperWeightPerPc: number;
     customPaperWeight?: number;
   };
+  calculatedWeight?: number;
+  finalWeight?: number;
+  unitPrice?: number;
+  totalPrice?: number;
+}
+
+export interface Order {
+  _id: string;
+  type: 'internal' | 'out';
+  customerName: string;
+  phone: string;
+  customerId?: string; // Reference to Customer model
+  gstNumber?: string;
+  
+  // New structure for multiple design orders
+  designOrders: DesignOrder[];
+  
+  // Legacy fields for backward compatibility
+  designId?: string | Design;
+  stonesUsed?: Array<{
+    stoneId: string | Stone;
+    quantity: number;
+  }>;
+  paperUsed?: {
+    sizeInInch: number;
+    quantityInPcs: number;
+    paperWeightPerPc: number;
+    customPaperWeight?: number;
+  };
+  
   finalTotalWeight?: number;
   calculatedWeight?: number;
   weightDiscrepancy: number;
@@ -150,13 +177,13 @@ export interface Order {
   discountedAmount: number;
   finalAmount: number;
   notes?: string;
-  createdBy: string;
-  updatedBy?: string;
+  createdBy: string | User;
+  updatedBy?: string | User;
   updateHistory: Array<{
     field: string;
     oldValue: string | number | boolean | Date;
     newValue: string | number | boolean | Date;
-    updatedBy: string;
+    updatedBy: string | User;
     updatedAt: Date;
   }>;
   createdAt: Date;

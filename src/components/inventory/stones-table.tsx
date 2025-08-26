@@ -107,7 +107,7 @@ export default function StonesTable({
         }
       }
     },
-    [inventoryType, currentPage, itemsPerPage],
+    [inventoryType, currentPage, itemsPerPage, showError],
   );
 
   useEffect(() => {

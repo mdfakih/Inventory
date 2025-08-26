@@ -83,7 +83,7 @@ export default function TapeTable() {
         setRefreshing(false);
       }
     }
-  }, [currentPage, itemsPerPage]);
+  }, [currentPage, itemsPerPage, showError]);
 
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated

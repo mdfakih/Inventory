@@ -81,7 +81,7 @@ export default function PlasticTable() {
         setRefreshing(false);
       }
     }
-  }, [currentPage, itemsPerPage]);
+  }, [currentPage, itemsPerPage, showError]);
 
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated

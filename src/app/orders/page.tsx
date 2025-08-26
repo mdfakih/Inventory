@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,8 +35,9 @@ import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { authenticatedFetch } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { Pagination } from '@/components/ui/pagination';
+import OrderInvoice from '@/components/invoice/order-invoice';
 
-import { Edit, Trash2, Eye, Package, Plus, CheckCircle } from 'lucide-react';
+import { Edit, Trash2, Eye, Package, Plus, CheckCircle, FileText } from 'lucide-react';
 import { CustomerAutocomplete } from '@/components/customer-autocomplete';
 
 interface User {
@@ -72,7 +73,17 @@ interface Customer {
   phone: string;
   email?: string;
   company?: string;
+  gstNumber?: string;
   customerType: 'retail' | 'wholesale' | 'corporate';
+}
+
+interface DesignOrder {
+  designId: string;
+  quantity: number;
+  paperUsed: {
+    sizeInInch: string;
+    quantityInPcs: string;
+  };
 }
 
 interface Order {
@@ -81,8 +92,10 @@ interface Order {
   customerName: string;
   phone: string;
   customerId?: string;
-  designId: Design;
-  stonesUsed: Array<{
+  gstNumber?: string;
+  designOrders: DesignOrder[];
+  designId?: Design; // Legacy field
+  stonesUsed?: Array<{
     stoneId: {
       _id: string;
       name: string;
@@ -91,7 +104,7 @@ interface Order {
     };
     quantity: number;
   }>;
-  paperUsed: {
+  paperUsed?: {
     sizeInInch: number;
     quantityInPcs: number;
     paperWeightPerPc: number;
@@ -123,12 +136,10 @@ interface CreateOrderData {
   customerName: string;
   phone: string;
   customerId?: string;
-  designId: string;
-  paperUsed: {
-    sizeInInch: number;
-    quantityInPcs: number;
-  };
+  gstNumber?: string;
+  designOrders: DesignOrder[];
   modeOfPayment: 'cash' | 'UPI' | 'card';
+  paymentStatus: 'pending' | 'partial' | 'completed' | 'overdue';
   discountType: 'percentage' | 'flat';
   discountValue: number;
   notes?: string;
@@ -151,6 +162,8 @@ export default function OrdersPage() {
   const [isFinalizing, setIsFinalizing] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState<string | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -171,11 +184,17 @@ export default function OrdersPage() {
     customerName: '',
     phone: '',
     customerId: '',
-    designId: '',
-    paperUsed: {
-      sizeInInch: '',
-      quantityInPcs: '',
-    },
+    gstNumber: '',
+    designOrders: [
+      {
+        designId: '',
+        quantity: 1,
+        paperUsed: {
+          sizeInInch: '',
+          quantityInPcs: '',
+        },
+      },
+    ] as DesignOrder[],
     modeOfPayment: 'cash' as 'cash' | 'UPI' | 'card',
     paymentStatus: 'pending' as 'pending' | 'partial' | 'completed' | 'overdue',
     discountType: 'percentage' as 'percentage' | 'flat',
@@ -187,11 +206,17 @@ export default function OrdersPage() {
     customerName: '',
     phone: '',
     customerId: '',
-    designId: '',
-    paperUsed: {
-      sizeInInch: '',
-      quantityInPcs: '',
-    },
+    gstNumber: '',
+    designOrders: [
+      {
+        designId: '',
+        quantity: 1,
+        paperUsed: {
+          sizeInInch: '',
+          quantityInPcs: '',
+        },
+      },
+    ] as DesignOrder[],
     finalTotalWeight: '',
     status: 'pending' as 'pending' | 'completed' | 'cancelled',
     isFinalized: false,
@@ -212,7 +237,7 @@ export default function OrdersPage() {
   
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
 
-  const fetchData = useCallback(async (isRefresh = false) => {
+  const fetchData = async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -243,7 +268,8 @@ export default function OrdersPage() {
       const allPapers = [];
       if (internalPapersData.success)
         allPapers.push(...internalPapersData.data);
-      if (outPapersData.success) allPapers.push(...outPapersData.data);
+      if (outPapersData.success)
+        allPapers.push(...outPapersData.data);
       setPapers(allPapers);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -254,9 +280,9 @@ export default function OrdersPage() {
         setRefreshing(false);
       }
     }
-  }, [currentPage, itemsPerPage]);
+  };
 
-  const fetchUser = useCallback(async () => {
+  const fetchUser = async () => {
     try {
       const response = await authenticatedFetch('/api/auth/me');
       if (response.ok) {
@@ -266,7 +292,7 @@ export default function OrdersPage() {
     } catch (error) {
       console.error('Error fetching user:', error);
     }
-  }, []);
+  };
 
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated
@@ -274,41 +300,12 @@ export default function OrdersPage() {
       fetchData();
       fetchUser();
     }
-  }, [authLoading, isAuthenticated, fetchData, fetchUser]);
-
-  // Separate useEffect for pagination changes to avoid infinite loops
-  useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      fetchData();
-    }
-  }, [currentPage, itemsPerPage, authLoading, isAuthenticated, fetchData]);
+  }, [authLoading, isAuthenticated, currentPage, itemsPerPage]); // Include currentPage and itemsPerPage
 
   // Update filtered orders when orders change
   useEffect(() => {
     setFilteredOrders(orders);
   }, [orders]);
-
-  // Reset paper size when order type changes
-  useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      paperUsed: {
-        ...prev.paperUsed,
-        sizeInInch: '',
-      },
-    }));
-  }, [formData.type]);
-
-  // Reset paper size when edit form order type changes
-  useEffect(() => {
-    setEditFormData((prev) => ({
-      ...prev,
-      paperUsed: {
-        ...prev.paperUsed,
-        sizeInInch: '',
-      },
-    }));
-  }, [editFormData.type]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,12 +316,16 @@ export default function OrdersPage() {
         customerName: formData.customerName,
         phone: formData.phone,
         customerId: formData.customerId || undefined,
-        designId: formData.designId,
-        paperUsed: {
-          sizeInInch: parseInt(formData.paperUsed.sizeInInch),
-          quantityInPcs: parseInt(formData.paperUsed.quantityInPcs),
-        },
+        gstNumber: formData.gstNumber || undefined,
+        designOrders: formData.designOrders.map(order => ({
+          ...order,
+          paperUsed: {
+            sizeInInch: parseInt(order.paperUsed.sizeInInch),
+            quantityInPcs: parseInt(order.paperUsed.quantityInPcs),
+          },
+        })) as unknown as DesignOrder[],
         modeOfPayment: formData.modeOfPayment,
+        paymentStatus: formData.paymentStatus,
         discountType: formData.discountType,
         discountValue: parseFloat(formData.discountValue) || 0,
         notes: formData.notes || undefined,
@@ -347,11 +348,17 @@ export default function OrdersPage() {
           customerName: '',
           phone: '',
           customerId: '',
-          designId: '',
-          paperUsed: {
-            sizeInInch: '',
-            quantityInPcs: '',
-          },
+          gstNumber: '',
+          designOrders: [
+            {
+              designId: '',
+              quantity: 1,
+              paperUsed: {
+                sizeInInch: '',
+                quantityInPcs: '',
+              },
+            },
+          ],
           modeOfPayment: 'cash',
           paymentStatus: 'pending',
           discountType: 'percentage',
@@ -381,11 +388,14 @@ export default function OrdersPage() {
           method: 'PUT',
           body: JSON.stringify({
             ...editFormData,
-            paperUsed: {
-              ...editFormData.paperUsed,
-              sizeInInch: parseInt(editFormData.paperUsed.sizeInInch),
-              quantityInPcs: parseInt(editFormData.paperUsed.quantityInPcs),
-            },
+            gstNumber: editFormData.gstNumber || undefined,
+            designOrders: editFormData.designOrders.map(order => ({
+              ...order,
+              paperUsed: {
+                sizeInInch: parseInt(order.paperUsed.sizeInInch),
+                quantityInPcs: parseInt(order.paperUsed.quantityInPcs),
+              },
+            })) as unknown as DesignOrder[],
             finalTotalWeight: editFormData.finalTotalWeight
               ? parseFloat(editFormData.finalTotalWeight)
               : undefined,
@@ -429,6 +439,7 @@ export default function OrdersPage() {
         customerName: customer.name,
         phone: customer.phone,
         customerId: customer._id,
+        gstNumber: customer.gstNumber || '',
       });
     } else {
       setFormData({
@@ -436,6 +447,7 @@ export default function OrdersPage() {
         customerName: '',
         phone: '',
         customerId: '',
+        gstNumber: '',
         notes: formData.notes, // Preserve notes when clearing customer
       });
     }
@@ -448,6 +460,7 @@ export default function OrdersPage() {
         customerName: customer.name,
         phone: customer.phone,
         customerId: customer._id,
+        gstNumber: customer.gstNumber || '',
       });
     } else {
       setEditFormData({
@@ -455,8 +468,56 @@ export default function OrdersPage() {
         customerName: '',
         phone: '',
         customerId: '',
+        gstNumber: '',
       });
     }
+  };
+
+  const addDesignOrder = () => {
+    setFormData(prev => ({
+      ...prev,
+      designOrders: [
+        ...prev.designOrders,
+        {
+          designId: '',
+          quantity: 1,
+          paperUsed: {
+            sizeInInch: '',
+            quantityInPcs: '',
+          },
+        },
+      ],
+    }));
+  };
+
+  const removeDesignOrder = (index: number) => {
+    if (formData.designOrders.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        designOrders: prev.designOrders.filter((_, i) => i !== index),
+      }));
+    }
+  };
+
+  const updateDesignOrder = (index: number, field: keyof DesignOrder, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      designOrders: prev.designOrders.map((order, i) => 
+        i === index ? { ...order, [field]: value } : order
+      ),
+    }));
+  };
+
+  const updateDesignOrderPaper = (index: number, field: keyof DesignOrder['paperUsed'], value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      designOrders: prev.designOrders.map((order, i) => 
+        i === index ? {
+          ...order,
+          paperUsed: { ...order.paperUsed, [field]: value }
+        } : order
+      ),
+    }));
   };
 
   const handleFinalize = async (orderId: string) => {
@@ -533,9 +594,7 @@ export default function OrdersPage() {
             type: order.type,
             customerName: order.customerName,
             phone: order.phone,
-            designId: order.designId._id || order.designId,
-            paperUsed: order.paperUsed,
-            calculatedWeight: order.calculatedWeight,
+            designOrders: order.designOrders, // Use the full designOrders array
             // Only include finalTotalWeight if it exists, otherwise use calculated weight
             finalTotalWeight: order.finalTotalWeight || order.calculatedWeight,
           };
@@ -626,11 +685,14 @@ export default function OrdersPage() {
       customerName: order.customerName,
       phone: order.phone,
       customerId: order.customerId || '',
-      designId: order.designId._id,
-      paperUsed: {
-        sizeInInch: order.paperUsed.sizeInInch.toString(),
-        quantityInPcs: order.paperUsed.quantityInPcs.toString(),
-      },
+      gstNumber: order.gstNumber || '',
+      designOrders: order.designOrders.map(order => ({
+        ...order,
+        paperUsed: {
+          sizeInInch: order.paperUsed?.sizeInInch.toString() || '',
+          quantityInPcs: order.paperUsed?.quantityInPcs.toString() || '',
+        },
+      })),
       finalTotalWeight: order.finalTotalWeight?.toString() || '',
       status: order.status,
       isFinalized: order.isFinalized,
@@ -646,6 +708,11 @@ export default function OrdersPage() {
   const openViewDialog = (order: Order) => {
     setSelectedOrder(order);
     setIsViewDialogOpen(true);
+  };
+
+  const openInvoice = (orderId: string) => {
+    setSelectedOrderForInvoice(orderId);
+    setIsInvoiceOpen(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -806,85 +873,149 @@ export default function OrdersPage() {
                            />
                          </div>
                          <div className="space-y-2">
-                           <Label htmlFor="designId">Design</Label>
-                           <Select
-                             value={formData.designId}
-                             onValueChange={(value) =>
-                               setFormData({ ...formData, designId: value })
+                           <Label htmlFor="customerId">Customer ID</Label>
+                           <Input
+                             id="customerId"
+                             value={formData.customerId}
+                             onChange={(e) =>
+                               setFormData({ ...formData, customerId: e.target.value })
                              }
-                           >
-                             <SelectTrigger>
-                               <SelectValue placeholder="Select design" />
-                             </SelectTrigger>
-                             <SelectContent>
-                               {designs.map((design) => (
-                                 <SelectItem
-                                   key={design._id}
-                                   value={design._id}
-                                 >
-                                   {design.name}
-                                 </SelectItem>
-                               ))}
-                             </SelectContent>
-                           </Select>
+                             placeholder="Optional"
+                           />
                          </div>
                        </div>
 
                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                          <div className="space-y-2">
-                           <Label htmlFor="sizeInInch">Paper Size (inches)</Label>
-                           <Select
-                             value={formData.paperUsed.sizeInInch}
-                             onValueChange={(value) =>
-                               setFormData({
-                                 ...formData,
-                                 paperUsed: {
-                                   ...formData.paperUsed,
-                                   sizeInInch: value,
-                                 },
-                               })
-                             }
-                           >
-                             <SelectTrigger>
-                               <SelectValue placeholder="Select paper size" />
-                             </SelectTrigger>
-                             <SelectContent>
-                               {papers
-                                 .filter(
-                                   (p) =>
-                                     p.inventoryType ===
-                                     getInventoryTypeFilter(formData.type),
-                                 )
-                                 .map((paper) => (
-                                   <SelectItem
-                                     key={paper._id}
-                                     value={paper.width.toString()}
-                                   >
-                                     {paper.width}&quot; ({paper.weightPerPiece}g per
-                                     piece)
-                                   </SelectItem>
-                                 ))}
-                             </SelectContent>
-                           </Select>
-                         </div>
-                         <div className="space-y-2">
-                           <Label htmlFor="quantityInPcs">Quantity (pieces)</Label>
+                           <Label htmlFor="gstNumber">GST Number</Label>
                            <Input
-                             id="quantityInPcs"
-                             type="number"
-                             value={formData.paperUsed.quantityInPcs}
+                             id="gstNumber"
+                             value={formData.gstNumber}
                              onChange={(e) =>
-                               setFormData({
-                                 ...formData,
-                                 paperUsed: {
-                                   ...formData.paperUsed,
-                                   quantityInPcs: e.target.value,
-                                 },
-                               })
+                               setFormData({ ...formData, gstNumber: e.target.value })
                              }
-                             required
+                             placeholder="Optional GST number"
                            />
                          </div>
+                       </div>
+
+                       {/* Design Orders Section */}
+                       <div className="space-y-4">
+                         <div className="flex items-center justify-between">
+                           <h3 className="text-lg font-semibold">Design Orders</h3>
+                           <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             onClick={addDesignOrder}
+                           >
+                             <Plus className="h-4 w-4 mr-2" />
+                             Add Design
+                           </Button>
+                         </div>
+                         
+                         {formData.designOrders.map((designOrder, index) => (
+                           <div key={index} className="p-4 border rounded-lg space-y-4">
+                             <div className="flex items-center justify-between">
+                               <h4 className="font-medium">Design {index + 1}</h4>
+                               {formData.designOrders.length > 1 && (
+                                 <Button
+                                   type="button"
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={() => removeDesignOrder(index)}
+                                   className="text-red-600 hover:text-red-700"
+                                 >
+                                   Remove
+                                 </Button>
+                               )}
+                             </div>
+                             
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                               <div className="space-y-2">
+                                 <Label htmlFor={`design-${index}`}>Design</Label>
+                                 <Select
+                                   value={designOrder.designId}
+                                   onValueChange={(value) =>
+                                     updateDesignOrder(index, 'designId', value)
+                                   }
+                                 >
+                                   <SelectTrigger>
+                                     <SelectValue placeholder="Select design" />
+                                   </SelectTrigger>
+                                   <SelectContent>
+                                     {designs.map((design) => (
+                                       <SelectItem
+                                         key={design._id}
+                                         value={design._id}
+                                       >
+                                         {design.name}
+                                       </SelectItem>
+                                     ))}
+                                   </SelectContent>
+                                 </Select>
+                               </div>
+                               <div className="space-y-2">
+                                 <Label htmlFor={`quantity-${index}`}>Quantity</Label>
+                                 <Input
+                                   id={`quantity-${index}`}
+                                   type="number"
+                                   min="1"
+                                   value={designOrder.quantity}
+                                   onChange={(e) =>
+                                     updateDesignOrder(index, 'quantity', parseInt(e.target.value) || 1)
+                                   }
+                                   required
+                                 />
+                               </div>
+                             </div>
+                             
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                               <div className="space-y-2">
+                                 <Label htmlFor={`size-${index}`}>Paper Size (inches)</Label>
+                                 <Select
+                                   value={designOrder.paperUsed.sizeInInch}
+                                   onValueChange={(value) =>
+                                     updateDesignOrderPaper(index, 'sizeInInch', value)
+                                   }
+                                 >
+                                   <SelectTrigger>
+                                     <SelectValue placeholder="Select paper size" />
+                                   </SelectTrigger>
+                                   <SelectContent>
+                                     {papers
+                                       .filter(
+                                         (p) =>
+                                           p.inventoryType ===
+                                           getInventoryTypeFilter(formData.type),
+                                       )
+                                       .map((paper) => (
+                                         <SelectItem
+                                           key={paper._id}
+                                           value={paper.width.toString()}
+                                           >
+                                           {paper.width}&quot; ({paper.weightPerPiece}g per
+                                           piece)
+                                         </SelectItem>
+                                       ))}
+                                   </SelectContent>
+                                 </Select>
+                               </div>
+                               <div className="space-y-2">
+                                 <Label htmlFor={`pieces-${index}`}>Quantity (pieces)</Label>
+                                 <Input
+                                   id={`pieces-${index}`}
+                                   type="number"
+                                   value={designOrder.paperUsed.quantityInPcs}
+                                   onChange={(e) =>
+                                     updateDesignOrderPaper(index, 'quantityInPcs', e.target.value)
+                                   }
+                                   required
+                                 />
+                               </div>
+                             </div>
+                           </div>
+                         ))}
                        </div>
 
                        {/* Payment and Pricing Section */}
@@ -983,14 +1114,18 @@ export default function OrdersPage() {
                                <div className="flex justify-between items-center">
                                  <span className="text-sm">Base Cost:</span>
                                  <span className="font-medium">
-                                   {formData.designId && formData.paperUsed.quantityInPcs
-                                     ? (() => {
-                                         const design = designs.find(d => d._id === formData.designId);
-                                         return design?.prices?.[0]?.price 
-                                           ? `${design.prices[0].currency} ${(design.prices[0].price * parseInt(formData.paperUsed.quantityInPcs)).toFixed(2)}`
-                                           : 'Not set';
-                                       })()
-                                     : 'Not set'}
+                                   {(() => {
+                                     let totalCost = 0;
+                                     formData.designOrders.forEach(order => {
+                                       if (order.designId && order.paperUsed.quantityInPcs) {
+                                         const design = designs.find(d => d._id === order.designId);
+                                         if (design?.prices?.[0]?.price) {
+                                           totalCost += design.prices[0].price * parseInt(order.paperUsed.quantityInPcs);
+                                         }
+                                       }
+                                     });
+                                     return totalCost > 0 ? `₹ ${totalCost.toFixed(2)}` : 'Not set';
+                                   })()}
                                  </span>
                                </div>
                                <div className="flex justify-between items-center">
@@ -998,11 +1133,18 @@ export default function OrdersPage() {
                                  <span className="font-medium text-green-600">
                                    {formData.discountValue && formData.discountType
                                      ? (() => {
-                                         const design = designs.find(d => d._id === formData.designId);
-                                         if (!design?.prices?.[0]?.price || !formData.paperUsed.quantityInPcs) return '₹ 0.00';
-                                         const baseCost = design.prices[0].price * parseInt(formData.paperUsed.quantityInPcs);
+                                         let totalCost = 0;
+                                         formData.designOrders.forEach(order => {
+                                           if (order.designId && order.paperUsed.quantityInPcs) {
+                                             const design = designs.find(d => d._id === order.designId);
+                                             if (design?.prices?.[0]?.price) {
+                                               totalCost += design.prices[0].price * parseInt(order.paperUsed.quantityInPcs);
+                                             }
+                                           }
+                                         });
+                                         if (totalCost === 0) return '₹ 0.00';
                                          const discount = formData.discountType === 'percentage' 
-                                           ? (baseCost * parseFloat(formData.discountValue)) / 100
+                                           ? (totalCost * parseFloat(formData.discountValue)) / 100
                                            : parseFloat(formData.discountValue);
                                          return `₹ ${discount.toFixed(2)}`;
                                        })()
@@ -1012,15 +1154,22 @@ export default function OrdersPage() {
                                <div className="flex justify-between items-center pt-2 border-t">
                                  <span className="font-semibold">Final Amount:</span>
                                  <span className="text-lg font-bold text-primary">
-                                   {formData.designId && formData.paperUsed.quantityInPcs && formData.discountValue
+                                   {formData.discountValue
                                      ? (() => {
-                                         const design = designs.find(d => d._id === formData.designId);
-                                         if (!design?.prices?.[0]?.price) return 'Not set';
-                                         const baseCost = design.prices[0].price * parseInt(formData.paperUsed.quantityInPcs);
+                                         let totalCost = 0;
+                                         formData.designOrders.forEach(order => {
+                                           if (order.designId && order.paperUsed.quantityInPcs) {
+                                             const design = designs.find(d => d._id === order.designId);
+                                             if (design?.prices?.[0]?.price) {
+                                               totalCost += design.prices[0].price * parseInt(order.paperUsed.quantityInPcs);
+                                             }
+                                           }
+                                         });
+                                         if (totalCost === 0) return 'Not set';
                                          const discount = formData.discountType === 'percentage' 
-                                           ? (baseCost * parseFloat(formData.discountValue)) / 100
+                                           ? (totalCost * parseFloat(formData.discountValue)) / 100
                                            : parseFloat(formData.discountValue);
-                                         return `₹ ${(baseCost - discount).toFixed(2)}`;
+                                         return `₹ ${(totalCost - discount).toFixed(2)}`;
                                        })()
                                      : 'Not set'}
                                  </span>
@@ -1039,27 +1188,33 @@ export default function OrdersPage() {
                      <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
                        <div className="space-y-3">
                          <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                           <span className="text-sm font-medium">Paper Weight per Piece:</span>
-                           <span className="text-sm font-semibold text-muted-foreground">
-                             {formData.paperUsed.sizeInInch && formData.paperUsed.quantityInPcs
-                               ? papers.find(p => p.width.toString() === formData.paperUsed.sizeInInch)?.weightPerPiece || 0
-                               : 0}g
-                           </span>
-                         </div>
-                         
-                         <div className="flex justify-between items-center py-2 border-b border-muted/50">
                            <span className="text-sm font-medium">Total Quantity:</span>
                            <span className="text-sm font-semibold text-muted-foreground">
-                             {formData.paperUsed.quantityInPcs || 0} pieces
+                             {(() => {
+                               let totalPieces = 0;
+                               formData.designOrders.forEach(order => {
+                                 if (order.paperUsed.quantityInPcs) {
+                                   totalPieces += parseInt(order.paperUsed.quantityInPcs);
+                                 }
+                               });
+                               return totalPieces;
+                             })()} pieces
                            </span>
                          </div>
                          
                          <div className="flex justify-between items-center py-2">
                            <span className="text-sm font-medium">Calculated Weight:</span>
                            <span className="text-lg font-bold text-primary">
-                             {formData.paperUsed.sizeInInch && formData.paperUsed.quantityInPcs
-                               ? ((papers.find(p => p.width.toString() === formData.paperUsed.sizeInInch)?.weightPerPiece || 0) * parseInt(formData.paperUsed.quantityInPcs))
-                               : 0}g
+                             {(() => {
+                               let totalWeight = 0;
+                               formData.designOrders.forEach(order => {
+                                 if (order.paperUsed.sizeInInch && order.paperUsed.quantityInPcs) {
+                                   const paperWeight = papers.find(p => p.width.toString() === order.paperUsed.sizeInInch)?.weightPerPiece || 0;
+                                   totalWeight += paperWeight * parseInt(order.paperUsed.quantityInPcs);
+                                 }
+                               });
+                               return totalWeight;
+                             })()}g
                            </span>
                          </div>
                        </div>
@@ -1199,6 +1354,7 @@ export default function OrdersPage() {
                 <TableRow>
                   <TableHead>Customer</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>GST Number</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Design</TableHead>
                   <TableHead>Price</TableHead>
@@ -1213,7 +1369,7 @@ export default function OrdersPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Finalized</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead title="Invoice | View | Edit | Actions">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1223,6 +1379,7 @@ export default function OrdersPage() {
                       {order.customerName}
                     </TableCell>
                     <TableCell>{order.phone}</TableCell>
+                    <TableCell>{order.gstNumber || 'Not set'}</TableCell>
                     <TableCell>
                       <Badge
                         variant={
@@ -1232,26 +1389,35 @@ export default function OrdersPage() {
                         {order.type}
                       </Badge>
                     </TableCell>
-                    <TableCell>{order.designId?.name || 'N/A'}</TableCell>
                     <TableCell>
-                      {order.designId?.prices &&
-                      order.designId.prices.length > 0 ? (
+                      {order.designOrders && order.designOrders.length > 0 ? (
                         <div className="space-y-1">
-                          {order.designId.prices.map((price, index) => (
-                            <div
-                              key={index}
-                              className="font-medium"
-                            >
-                              {price.currency}{' '}
-                              {price.price % 1 === 0
-                                ? price.price.toFixed(0)
-                                : price.price.toFixed(2)}
-                            </div>
-                          ))}
+                          {order.designOrders.map((designOrder, index) => {
+                            const design = designs.find(d => d._id === designOrder.designId);
+                            return (
+                              <div key={index} className="text-sm">
+                                {design?.name || 'Unknown'} ({designOrder.quantity} pcs)
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
-                        <span className="text-gray-500">Not set</span>
+                        <span className="text-gray-500">No designs</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        let totalCost = 0;
+                        if (order.designOrders && order.designOrders.length > 0) {
+                          order.designOrders.forEach(designOrder => {
+                            const design = designs.find(d => d._id === designOrder.designId);
+                            if (design?.prices?.[0]?.price) {
+                              totalCost += design.prices[0].price * designOrder.quantity;
+                            }
+                          });
+                        }
+                        return totalCost > 0 ? `₹ ${totalCost.toFixed(2)}` : 'Not set';
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
@@ -1295,8 +1461,17 @@ export default function OrdersPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {order.paperUsed.sizeInInch}&quot; ×{' '}
-                      {order.paperUsed.quantityInPcs} pcs
+                      {order.designOrders && order.designOrders.length > 0 ? (
+                        <div className="space-y-1">
+                          {order.designOrders.map((designOrder, index) => (
+                            <div key={index} className="text-sm">
+                              {designOrder.paperUsed.sizeInInch}&quot; × {designOrder.paperUsed.quantityInPcs} pcs
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">No paper used</span>
+                      )}
                     </TableCell>
                     <TableCell>{order.calculatedWeight?.toFixed(2)}g</TableCell>
                     <TableCell>
@@ -1324,6 +1499,14 @@ export default function OrdersPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openInvoice(order._id)}
+                          title="View Invoice"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1476,11 +1659,42 @@ export default function OrdersPage() {
                    
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="space-y-2">
+                       <Label htmlFor="edit-customerId">Customer ID</Label>
+                       <Input
+                         id="edit-customerId"
+                         value={editFormData.customerId}
+                         onChange={(e) =>
+                           setEditFormData({ ...editFormData, customerId: e.target.value })
+                         }
+                         placeholder="Optional"
+                       />
+                     </div>
+                     <div className="space-y-2">
+                       <Label htmlFor="edit-gstNumber">GST Number</Label>
+                       <Input
+                         id="edit-gstNumber"
+                         value={editFormData.gstNumber}
+                         onChange={(e) =>
+                           setEditFormData({ ...editFormData, gstNumber: e.target.value })
+                         }
+                         placeholder="Optional GST number"
+                       />
+                     </div>
+                   </div>
+                   
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <div className="space-y-2">
                        <Label htmlFor="edit-designId">Design</Label>
                        <Select
-                         value={editFormData.designId}
+                         value={editFormData.designOrders[0]?.designId}
                          onValueChange={(value) =>
-                           setEditFormData({ ...editFormData, designId: value })
+                           setEditFormData({
+                             ...editFormData,
+                             designOrders: editFormData.designOrders.map(order => ({
+                               ...order,
+                               designId: value,
+                             })),
+                           })
                          }
                        >
                          <SelectTrigger>
@@ -1501,14 +1715,17 @@ export default function OrdersPage() {
                      <div className="space-y-2">
                        <Label htmlFor="edit-sizeInInch">Paper Size (inches)</Label>
                        <Select
-                         value={editFormData.paperUsed.sizeInInch}
+                         value={editFormData.designOrders[0]?.paperUsed.sizeInInch}
                          onValueChange={(value) =>
                            setEditFormData({
                              ...editFormData,
-                             paperUsed: {
-                               ...editFormData.paperUsed,
-                               sizeInInch: value,
-                             },
+                             designOrders: editFormData.designOrders.map(order => ({
+                               ...order,
+                               paperUsed: {
+                                 ...order.paperUsed,
+                                 sizeInInch: value,
+                               },
+                             })),
                            })
                          }
                        >
@@ -1542,14 +1759,17 @@ export default function OrdersPage() {
                        <Input
                          id="edit-quantityInPcs"
                          type="number"
-                         value={editFormData.paperUsed.quantityInPcs}
+                         value={editFormData.designOrders[0]?.paperUsed.quantityInPcs}
                          onChange={(e) =>
                            setEditFormData({
                              ...editFormData,
-                             paperUsed: {
-                               ...editFormData.paperUsed,
-                               quantityInPcs: e.target.value,
-                             },
+                             designOrders: editFormData.designOrders.map(order => ({
+                               ...order,
+                               paperUsed: {
+                                 ...order.paperUsed,
+                                 quantityInPcs: e.target.value,
+                               },
+                             })),
                            })
                          }
                          required
@@ -1675,11 +1895,11 @@ export default function OrdersPage() {
                            <div className="flex justify-between items-center">
                              <span className="text-sm">Base Cost:</span>
                              <span className="font-medium">
-                               {editFormData.designId && editFormData.paperUsed.quantityInPcs
+                               {editFormData.designOrders.length > 0 && editFormData.designOrders[0]?.paperUsed.quantityInPcs
                                  ? (() => {
-                                     const design = designs.find(d => d._id === editFormData.designId);
+                                     const design = designs.find(d => d._id === editFormData.designOrders[0]?.designId);
                                      return design?.prices?.[0]?.price 
-                                       ? `${design.prices[0].currency} ${(design.prices[0].price * parseInt(editFormData.paperUsed.quantityInPcs)).toFixed(2)}`
+                                       ? `${design.prices[0].currency} ${(design.prices[0].price * parseInt(editFormData.designOrders[0]?.paperUsed.quantityInPcs)).toFixed(2)}`
                                        : 'Not set';
                                    })()
                                  : 'Not set'}
@@ -1690,9 +1910,9 @@ export default function OrdersPage() {
                              <span className="font-medium text-green-600">
                                {editFormData.discountValue && editFormData.discountType
                                  ? (() => {
-                                     const design = designs.find(d => d._id === editFormData.designId);
-                                     if (!design?.prices?.[0]?.price || !editFormData.paperUsed.quantityInPcs) return '₹ 0.00';
-                                     const baseCost = design.prices[0].price * parseInt(editFormData.paperUsed.quantityInPcs);
+                                     const design = designs.find(d => d._id === editFormData.designOrders[0]?.designId);
+                                     if (!design?.prices?.[0]?.price || !editFormData.designOrders[0]?.paperUsed.quantityInPcs) return '₹ 0.00';
+                                     const baseCost = design.prices[0].price * parseInt(editFormData.designOrders[0]?.paperUsed.quantityInPcs);
                                      const discount = editFormData.discountType === 'percentage' 
                                        ? (baseCost * parseFloat(editFormData.discountValue)) / 100
                                        : parseFloat(editFormData.discountValue);
@@ -1704,11 +1924,11 @@ export default function OrdersPage() {
                            <div className="flex justify-between items-center pt-2 border-t">
                              <span className="font-semibold">Final Amount:</span>
                              <span className="text-lg font-bold text-primary">
-                               {editFormData.designId && editFormData.paperUsed.quantityInPcs && editFormData.discountValue
+                               {editFormData.designOrders.length > 0 && editFormData.designOrders[0]?.paperUsed.quantityInPcs && editFormData.discountValue
                                  ? (() => {
-                                     const design = designs.find(d => d._id === editFormData.designId);
+                                     const design = designs.find(d => d._id === editFormData.designOrders[0]?.designId);
                                      if (!design?.prices?.[0]?.price) return 'Not set';
-                                     const baseCost = design.prices[0].price * parseInt(editFormData.paperUsed.quantityInPcs);
+                                     const baseCost = design.prices[0].price * parseInt(editFormData.designOrders[0]?.paperUsed.quantityInPcs);
                                      const discount = editFormData.discountType === 'percentage' 
                                        ? (baseCost * parseFloat(editFormData.discountValue)) / 100
                                        : parseFloat(editFormData.discountValue);
@@ -1730,8 +1950,8 @@ export default function OrdersPage() {
                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
                          <span className="text-sm font-medium">Paper Weight per Piece:</span>
                          <span className="text-sm font-semibold text-muted-foreground">
-                           {editFormData.paperUsed.sizeInInch
-                             ? papers.find(p => p.width.toString() === editFormData.paperUsed.sizeInInch)?.weightPerPiece || 0
+                           {editFormData.designOrders.length > 0 && editFormData.designOrders[0]?.paperUsed.sizeInInch
+                             ? papers.find(p => p.width.toString() === editFormData.designOrders[0]?.paperUsed.sizeInInch)?.weightPerPiece || 0
                              : 0}g
                          </span>
                        </div>
@@ -1739,15 +1959,15 @@ export default function OrdersPage() {
                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
                          <span className="text-sm font-medium">Total Quantity:</span>
                          <span className="text-sm font-semibold text-muted-foreground">
-                           {editFormData.paperUsed.quantityInPcs || 0} pieces
+                           {editFormData.designOrders.length > 0 && editFormData.designOrders[0]?.paperUsed.quantityInPcs || 0} pieces
                          </span>
                        </div>
                        
                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
                          <span className="text-sm font-medium">Calculated Weight:</span>
                          <span className="text-lg font-bold text-primary">
-                           {editFormData.paperUsed.sizeInInch && editFormData.paperUsed.quantityInPcs
-                             ? ((papers.find(p => p.width.toString() === editFormData.paperUsed.sizeInInch)?.weightPerPiece || 0) * parseInt(editFormData.paperUsed.quantityInPcs))
+                           {editFormData.designOrders.length > 0 && editFormData.designOrders[0]?.paperUsed.sizeInInch && editFormData.designOrders[0]?.paperUsed.quantityInPcs
+                             ? ((papers.find(p => p.width.toString() === editFormData.designOrders[0]?.paperUsed.sizeInInch)?.weightPerPiece || 0) * parseInt(editFormData.designOrders[0]?.paperUsed.quantityInPcs))
                              : 0}g
                            </span>
                        </div>
@@ -1759,16 +1979,16 @@ export default function OrdersPage() {
                          </span>
                        </div>
                        
-                       {editFormData.finalTotalWeight && editFormData.paperUsed.sizeInInch && editFormData.paperUsed.quantityInPcs && (
+                       {editFormData.finalTotalWeight && editFormData.designOrders.length > 0 && editFormData.designOrders[0]?.paperUsed.sizeInInch && editFormData.designOrders[0]?.paperUsed.quantityInPcs && (
                          <div className="pt-2 border-t border-muted/50">
                            <div className="flex justify-between items-center">
                              <span className="text-sm font-medium">Weight Difference:</span>
                              <span className={`text-sm font-semibold ${
-                               (parseFloat(editFormData.finalTotalWeight) - ((papers.find(p => p.width.toString() === editFormData.paperUsed.sizeInInch)?.weightPerPiece || 0) * parseInt(editFormData.paperUsed.quantityInPcs))) > 0 
+                               (parseFloat(editFormData.finalTotalWeight) - ((papers.find(p => p.width.toString() === editFormData.designOrders[0]?.paperUsed.sizeInInch)?.weightPerPiece || 0) * parseInt(editFormData.designOrders[0]?.paperUsed.quantityInPcs))) > 0 
                                  ? 'text-red-600' 
                                  : 'text-green-600'
                              }`}>
-                               {((parseFloat(editFormData.finalTotalWeight) - ((papers.find(p => p.width.toString() === editFormData.paperUsed.sizeInInch)?.weightPerPiece || 0) * parseInt(editFormData.paperUsed.quantityInPcs))).toFixed(2))}g
+                               {((parseFloat(editFormData.finalTotalWeight) - ((papers.find(p => p.width.toString() === editFormData.designOrders[0]?.paperUsed.sizeInInch)?.weightPerPiece || 0) * parseInt(editFormData.designOrders[0]?.paperUsed.quantityInPcs))).toFixed(2))}g
                          </span>
                            </div>
                          </div>
@@ -1850,6 +2070,16 @@ export default function OrdersPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                  <Label className="font-semibold">Customer ID</Label>
+                  <p>{selectedOrder.customerId || 'Not set'}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">GST Number</Label>
+                  <p>{selectedOrder.gstNumber || 'Not set'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
                   <Label className="font-semibold">Order Type</Label>
                   <Badge
                     variant={
@@ -1868,34 +2098,56 @@ export default function OrdersPage() {
                   </Badge>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label className="font-semibold">Design</Label>
-                  <p>{selectedOrder.designId?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="font-semibold">Design Price</Label>
-                  <p>
-                    {selectedOrder.designId?.prices &&
-                    selectedOrder.designId.prices.length > 0 ? (
-                      <div className="space-y-1">
-                        {selectedOrder.designId.prices.map((price, index) => (
-                          <div
-                            key={index}
-                            className="font-medium"
-                          >
-                            {price.currency}{' '}
-                            {price.price % 1 === 0
-                              ? price.price.toFixed(0)
-                              : price.price.toFixed(2)}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Design Orders</h3>
+                {selectedOrder.designOrders && selectedOrder.designOrders.length > 0 ? (
+                  selectedOrder.designOrders.map((designOrder, index) => {
+                    const design = designs.find(d => d._id === designOrder.designId);
+                    return (
+                      <div key={index} className="p-4 border rounded-lg space-y-3">
+                        <h4 className="font-medium">Design {index + 1}: {design?.name || 'Unknown'}</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="font-semibold">Quantity</Label>
+                            <p>{designOrder.quantity} pieces</p>
                           </div>
-                        ))}
+                          <div>
+                            <Label className="font-semibold">Paper Used</Label>
+                            <p>{designOrder.paperUsed.sizeInInch}&quot; × {designOrder.paperUsed.quantityInPcs} pcs</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="font-semibold">Unit Price</Label>
+                            <p>
+                              {design?.prices && design.prices.length > 0 ? (
+                                <span className="font-medium">
+                                  {design.prices[0].currency} {design.prices[0].price.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-gray-500">Not set</span>
+                              )}
+                            </p>
+                          </div>
+                          <div>
+                            <Label className="font-semibold">Total Price</Label>
+                            <p>
+                              {design?.prices && design.prices.length > 0 ? (
+                                <span className="font-bold text-primary">
+                                  ₹ {(design.prices[0].price * designOrder.quantity).toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-gray-500">Not set</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <span className="text-gray-500">Not set</span>
-                    )}
-                  </p>
-                </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-500">No design orders found</p>
+                )}
               </div>
 
               {/* Payment and Pricing Information */}
@@ -1989,24 +2241,15 @@ export default function OrdersPage() {
                     )}
                   </p>
                 </div>
-                <div>
-                  <Label className="font-semibold">Paper Used</Label>
-                  <p>
-                    {selectedOrder.paperUsed.sizeInInch}&quot; ×{' '}
-                    {selectedOrder.paperUsed.quantityInPcs} pcs
-                  </p>
-                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="font-semibold">
-                    Paper Weight per Piece
-                  </Label>
-                  <p>{selectedOrder.paperUsed.paperWeightPerPc}g</p>
-                </div>
-                <div>
                   <Label className="font-semibold">Created By</Label>
                   <p>{selectedOrder.createdBy?.name || 'Unknown'}</p>
+                </div>
+                <div>
+                  <Label className="font-semibold">Last Updated By</Label>
+                  <p>{selectedOrder.updatedBy?.name || 'Not updated'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2110,6 +2353,18 @@ export default function OrdersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Invoice Component */}
+      {selectedOrderForInvoice && (
+        <OrderInvoice
+          orderId={selectedOrderForInvoice}
+          isOpen={isInvoiceOpen}
+          onClose={() => {
+            setIsInvoiceOpen(false);
+            setSelectedOrderForInvoice(null);
+          }}
+        />
+      )}
     </div>
   );
 }

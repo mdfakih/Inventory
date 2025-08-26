@@ -21,40 +21,104 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Customer',
     },
-    designId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Design',
-      required: true,
+    gstNumber: {
+      type: String,
+      trim: true,
     },
-
-    stonesUsed: [
+    
+    // Updated to support multiple design orders
+    designOrders: [
       {
-        stoneId: {
+        designId: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: 'Stone',
+          ref: 'Design',
           required: true,
         },
         quantity: {
           type: Number,
           required: true,
+          min: 1,
+        },
+        stonesUsed: [
+          {
+            stoneId: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: 'Stone',
+              required: true,
+            },
+            quantity: {
+              type: Number,
+              required: true,
+              min: 0,
+            },
+          },
+        ],
+        paperUsed: {
+          sizeInInch: {
+            type: Number,
+            required: true,
+          },
+          quantityInPcs: {
+            type: Number,
+            required: true,
+            min: 0,
+          },
+          paperWeightPerPc: {
+            type: Number,
+            required: true,
+            min: 0,
+          },
+          customPaperWeight: {
+            type: Number,
+            min: 0,
+          },
+        },
+        calculatedWeight: {
+          type: Number,
+          min: 0,
+        },
+        finalWeight: {
+          type: Number,
+          min: 0,
+        },
+        unitPrice: {
+          type: Number,
+          min: 0,
+        },
+        totalPrice: {
+          type: Number,
           min: 0,
         },
       },
     ],
 
+    // Legacy fields for backward compatibility (will be calculated from designOrders)
+    designId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Design',
+    },
+    stonesUsed: [
+      {
+        stoneId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Stone',
+        },
+        quantity: {
+          type: Number,
+          min: 0,
+        },
+      },
+    ],
     paperUsed: {
       sizeInInch: {
         type: Number,
-        required: true,
       },
       quantityInPcs: {
         type: Number,
-        required: true,
         min: 0,
       },
       paperWeightPerPc: {
         type: Number,
-        required: true,
         min: 0,
       },
       customPaperWeight: {
@@ -162,5 +226,53 @@ const orderSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+// Pre-save middleware to calculate totals and maintain backward compatibility
+orderSchema.pre('save', function(next) {
+  if (this.designOrders && this.designOrders.length > 0) {
+    // Calculate total cost from all design orders
+    this.totalCost = this.designOrders.reduce((sum, designOrder) => {
+      return sum + (designOrder.totalPrice || 0);
+    }, 0);
+
+    // Calculate total calculated weight from all design orders
+    this.calculatedWeight = this.designOrders.reduce((sum, designOrder) => {
+      return sum + (designOrder.calculatedWeight || 0);
+    }, 0);
+
+    // Calculate total final weight from all design orders
+    if (this.designOrders.some(designOrder => designOrder.finalWeight)) {
+      this.finalTotalWeight = this.designOrders.reduce((sum, designOrder) => {
+        return sum + (designOrder.finalWeight || 0);
+      }, 0);
+    }
+
+    // Maintain backward compatibility for single design
+    if (this.designOrders.length === 1) {
+      const singleDesign = this.designOrders[0];
+      this.designId = singleDesign.designId;
+      this.stonesUsed = singleDesign.stonesUsed;
+      this.paperUsed = singleDesign.paperUsed;
+    }
+
+    // Calculate weight discrepancy if final weight is set
+    if (this.finalTotalWeight && this.calculatedWeight) {
+      this.weightDiscrepancy = this.finalTotalWeight - this.calculatedWeight;
+      this.discrepancyPercentage = (this.weightDiscrepancy / this.calculatedWeight) * 100;
+    }
+  }
+
+  // Calculate final amount after discount
+  if (this.totalCost > 0) {
+    if (this.discountType === 'percentage') {
+      this.discountedAmount = (this.totalCost * this.discountValue) / 100;
+    } else {
+      this.discountedAmount = this.discountValue;
+    }
+    this.finalAmount = this.totalCost - this.discountedAmount;
+  }
+
+  next();
+});
 
 export default mongoose.models.Order || mongoose.model('Order', orderSchema);

@@ -190,6 +190,14 @@ export function CustomerAutocomplete({
                             <span className="truncate">{customer.company}</span>
                           </div>
                         )}
+                        
+                        {customer.gstNumber && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                              GST: {customer.gstNumber}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -218,6 +226,7 @@ export function CustomerAutocomplete({
                   {selectedCustomer.phone}
                   {selectedCustomer.email && ` • ${selectedCustomer.email}`}
                   {selectedCustomer.company && ` • ${selectedCustomer.company}`}
+                  {selectedCustomer.gstNumber && ` • GST: ${selectedCustomer.gstNumber}`}
                 </div>
               </div>
             </div>

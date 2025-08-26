@@ -90,7 +90,7 @@ export default function PaperTable({
         }
       }
     },
-    [inventoryType, currentPage, itemsPerPage],
+    [inventoryType, currentPage, itemsPerPage, showError],
   );
 
   useEffect(() => {

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import Paper from '@/models/Paper';
-import Stone from '@/models/Stone';
 import { getCurrentUser } from '@/lib/auth';
 import mongoose from 'mongoose';
 
@@ -23,7 +22,10 @@ export async function GET(
     }
 
     const order = await Order.findById(id)
-      .populate('designId')
+      .populate('designOrders.designId')
+      .populate('designOrders.stonesUsed.stoneId')
+      .populate('designId') // Legacy field
+      .populate('stonesUsed.stoneId') // Legacy field
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
@@ -67,14 +69,17 @@ export async function PUT(
       type,
       customerName,
       phone,
-      designId,
-      paperUsed,
+      customerId,
+      gstNumber,
+      designOrders,
       finalTotalWeight,
       status,
       isFinalized,
       modeOfPayment,
+      paymentStatus,
       discountType,
       discountValue,
+      notes,
     } = body;
     const { id } = await params;
 
@@ -86,7 +91,7 @@ export async function PUT(
       );
     }
 
-    const order = await Order.findById(id).populate('stonesUsed.stoneId');
+    const order = await Order.findById(id).populate('designOrders.designId');
     if (!order) {
       return NextResponse.json(
         { success: false, message: 'Order not found' },
@@ -100,7 +105,7 @@ export async function PUT(
     const updateData: Record<string, unknown> = {};
 
     // Check for changes and add to history
-    if (type !== oldValues.type) {
+    if (type !== undefined && type !== oldValues.type) {
       updateHistory.push({
         field: 'type',
         oldValue: oldValues.type,
@@ -110,7 +115,7 @@ export async function PUT(
       });
     }
 
-    if (customerName !== oldValues.customerName) {
+    if (customerName !== undefined && customerName !== oldValues.customerName) {
       updateHistory.push({
         field: 'customerName',
         oldValue: oldValues.customerName,
@@ -120,7 +125,7 @@ export async function PUT(
       });
     }
 
-    if (phone !== oldValues.phone) {
+    if (phone !== undefined && phone !== oldValues.phone) {
       updateHistory.push({
         field: 'phone',
         oldValue: oldValues.phone,
@@ -130,17 +135,27 @@ export async function PUT(
       });
     }
 
-    if (designId !== oldValues.designId.toString()) {
+    if (customerId !== undefined && customerId !== oldValues.customerId?.toString()) {
       updateHistory.push({
-        field: 'designId',
-        oldValue: oldValues.designId,
-        newValue: designId,
+        field: 'customerId',
+        oldValue: oldValues.customerId,
+        newValue: customerId,
         updatedBy: user.id,
         updatedAt: new Date(),
       });
     }
 
-    if (status !== oldValues.status) {
+    if (gstNumber !== undefined && gstNumber !== oldValues.gstNumber) {
+      updateHistory.push({
+        field: 'gstNumber',
+        oldValue: oldValues.gstNumber,
+        newValue: gstNumber,
+        updatedBy: user.id,
+        updatedAt: new Date(),
+      });
+    }
+
+    if (status !== undefined && status !== oldValues.status) {
       updateHistory.push({
         field: 'status',
         oldValue: oldValues.status,
@@ -150,138 +165,174 @@ export async function PUT(
       });
     }
 
-    // Calculate new weights if paper or stones changed
-    let calculatedWeight = order.calculatedWeight;
-    let weightDiscrepancy = 0;
-    let discrepancyPercentage = 0;
-    let inventoryChanged = false;
-    const inventoryAdjustments = [];
-    const stoneInventoryAdjustments = [];
-
-    // Check if paper usage changed
-    if (
-      paperUsed &&
-      (paperUsed.sizeInInch !== oldValues.paperUsed.sizeInInch ||
-        paperUsed.quantityInPcs !== oldValues.paperUsed.quantityInPcs)
-    ) {
-      const paper = await Paper.findOne({
-        width: paperUsed.sizeInInch,
-        inventoryType: type === 'out' ? 'out' : 'internal',
+    // Handle design orders updates
+    let totalCalculatedWeight = order.calculatedWeight || 0;
+    let totalCost = order.totalCost || 0;
+    
+    if (designOrders && Array.isArray(designOrders)) {
+      updateHistory.push({
+        field: 'designOrders',
+        oldValue: oldValues.designOrders,
+        newValue: designOrders,
+        updatedBy: user.id,
+        updatedAt: new Date(),
       });
-      if (paper) {
+
+      // Process design orders and calculate totals
+      const processedDesignOrders = [];
+      totalCalculatedWeight = 0;
+      totalCost = 0;
+
+      for (const designOrder of designOrders) {
+        const { designId, quantity, paperUsed } = designOrder;
+
+        if (!designId || !quantity || !paperUsed || !paperUsed.sizeInInch || !paperUsed.quantityInPcs) {
+          return NextResponse.json(
+            { success: false, message: 'Each design order must have designId, quantity, and paper details' },
+            { status: 400 },
+          );
+        }
+
+        // Get paper data to calculate weight
+        const paper = await Paper.findOne({
+          width: paperUsed.sizeInInch,
+          inventoryType: type === 'out' ? 'out' : 'internal',
+        });
+        if (!paper) {
+          return NextResponse.json(
+            { success: false, message: `Paper size ${paperUsed.sizeInInch}" not found in ${type === 'out' ? 'out' : 'internal'} inventory` },
+            { status: 400 },
+          );
+        }
+
         // Get design to calculate stone weights as per design
         const Design = await import('@/models/Design').then((m) => m.default);
-        const design = await Design.findById(designId);
-        if (design) {
-          // Calculate stone weight as per design (sum of all stone weights for the design)
-          let designStoneWeight = 0;
-          if (design.defaultStones && design.defaultStones.length > 0) {
-            for (const designStone of design.defaultStones) {
-              const stone = await Stone.findById(designStone.stoneId);
-              if (stone) {
-                // Use weightPerPiece if available, otherwise use quantity as fallback
-                designStoneWeight +=
-                  stone.weightPerPiece || stone.quantity || 0;
-              }
+        const design = await Design.findById(designId).populate('defaultStones.stoneId');
+        if (!design) {
+          return NextResponse.json(
+            { success: false, message: 'Design not found' },
+            { status: 400 },
+          );
+        }
+
+        // Calculate stone weight as per design
+        let designStoneWeight = 0;
+        if (design.defaultStones && design.defaultStones.length > 0) {
+          for (const designStone of design.defaultStones) {
+            const stone = designStone.stoneId;
+            if (stone) {
+              designStoneWeight += stone.weightPerPiece || stone.quantity || 0;
             }
           }
-
-          // Calculate weights using new formula: (paper weight per pc + stone weight as per design) * number of pieces
-          const paperWeightPerPiece = paper.weightPerPiece;
-          const totalWeightPerPiece = paperWeightPerPiece + designStoneWeight;
-          calculatedWeight = totalWeightPerPiece * paperUsed.quantityInPcs;
         }
 
-        // Calculate paper inventory adjustment - using quantity (rolls)
-        const paperDiff =
-          paperUsed.quantityInPcs - oldValues.paperUsed.quantityInPcs;
-        if (paperDiff !== 0) {
-          inventoryChanged = true;
-          inventoryAdjustments.push({
-            type: 'paper',
-            oldQuantity: oldValues.paperUsed.quantityInPcs,
-            newQuantity: paperUsed.quantityInPcs,
-            difference: paperDiff,
-            paperId: paper._id,
-          });
+        // Calculate weights
+        const paperWeightPerPiece = paper.weightPerPiece;
+        const totalWeightPerPiece = paperWeightPerPiece + designStoneWeight;
+        const calculatedWeight = totalWeightPerPiece * paperUsed.quantityInPcs;
+
+        // Calculate pricing
+        let unitPrice = 0;
+        let totalPrice = 0;
+        if (design.prices && design.prices.length > 0) {
+          unitPrice = design.prices[0].price;
+          totalPrice = unitPrice * paperUsed.quantityInPcs;
         }
 
+        // Prepare stones used data
+        const stonesUsed = design.defaultStones ? design.defaultStones.map((designStone: { stoneId: { _id: string }; quantity: number }) => ({
+          stoneId: designStone.stoneId._id,
+          quantity: designStone.quantity * paperUsed.quantityInPcs,
+        })) : [];
+
+        processedDesignOrders.push({
+          designId: design._id,
+          quantity: paperUsed.quantityInPcs,
+          stonesUsed,
+          paperUsed: {
+            ...paperUsed,
+            paperWeightPerPc: paper.weightPerPiece,
+          },
+          calculatedWeight,
+          unitPrice,
+          totalPrice,
+        });
+
+        totalCalculatedWeight += calculatedWeight;
+        totalCost += totalPrice;
+      }
+
+      updateData.designOrders = processedDesignOrders;
+      updateData.calculatedWeight = totalCalculatedWeight;
+      updateData.totalCost = totalCost;
+    }
+
+    // Calculate pricing if payment or discount fields changed
+    let discountedAmount = order.discountedAmount || 0;
+    let finalAmount = order.finalAmount || 0;
+
+    if (modeOfPayment !== undefined || paymentStatus !== undefined || discountType !== undefined || discountValue !== undefined) {
+      if (modeOfPayment !== undefined && modeOfPayment !== oldValues.modeOfPayment) {
         updateHistory.push({
-          field: 'paperUsed',
-          oldValue: oldValues.paperUsed,
-          newValue: { ...paperUsed, paperWeightPerPc: paper.weightPerPiece },
+          field: 'modeOfPayment',
+          oldValue: oldValues.modeOfPayment,
+          newValue: modeOfPayment,
           updatedBy: user.id,
           updatedAt: new Date(),
         });
       }
-    }
 
-    // Calculate pricing if payment or discount fields changed
-    let totalCost = order.totalCost || 0;
-    let discountedAmount = order.discountedAmount || 0;
-    let finalAmount = order.finalAmount || 0;
-
-    if (modeOfPayment !== undefined || discountType !== undefined || discountValue !== undefined) {
-      // Get design to calculate total cost
-      const Design = await import('@/models/Design').then((m) => m.default);
-      const design = await Design.findById(designId);
-      
-      if (design && design.prices && design.prices.length > 0) {
-        const designPrice = design.prices[0].price;
-        totalCost = designPrice * (paperUsed?.quantityInPcs || order.paperUsed.quantityInPcs);
-        
-        // Calculate discount
-        if (discountType === 'percentage') {
-          discountedAmount = (totalCost * (discountValue || 0)) / 100;
-        } else {
-          discountedAmount = discountValue || 0;
-        }
-        
-        finalAmount = totalCost - discountedAmount;
-        
-        // Add pricing changes to history
-        if (modeOfPayment !== undefined && modeOfPayment !== oldValues.modeOfPayment) {
-          updateHistory.push({
-            field: 'modeOfPayment',
-            oldValue: oldValues.modeOfPayment,
-            newValue: modeOfPayment,
-            updatedBy: user.id,
-            updatedAt: new Date(),
-          });
-        }
-        
-        if (discountType !== undefined && discountType !== oldValues.discountType) {
-          updateHistory.push({
-            field: 'discountType',
-            oldValue: oldValues.discountType,
-            newValue: discountType,
-            updatedBy: user.id,
-            updatedAt: new Date(),
-          });
-        }
-        
-        if (discountValue !== undefined && discountValue !== oldValues.discountValue) {
-          updateHistory.push({
-            field: 'discountValue',
-            oldValue: oldValues.discountValue,
-            newValue: discountValue,
-            updatedBy: user.id,
-            updatedAt: new Date(),
-          });
-        }
+      if (paymentStatus !== undefined && paymentStatus !== oldValues.paymentStatus) {
+        updateHistory.push({
+          field: 'paymentStatus',
+          oldValue: oldValues.paymentStatus,
+          newValue: paymentStatus,
+          updatedBy: user.id,
+          updatedAt: new Date(),
+        });
       }
+
+      if (discountType !== undefined && discountType !== oldValues.discountType) {
+        updateHistory.push({
+          field: 'discountType',
+          oldValue: oldValues.discountType,
+          newValue: discountType,
+          updatedBy: user.id,
+          updatedAt: new Date(),
+        });
+      }
+
+      if (discountValue !== undefined && discountValue !== oldValues.discountValue) {
+        updateHistory.push({
+          field: 'discountValue',
+          oldValue: oldValues.discountValue,
+          newValue: discountValue,
+          updatedBy: user.id,
+          updatedAt: new Date(),
+        });
+      }
+
+      // Calculate discount
+      if (discountType === 'percentage') {
+        discountedAmount = (totalCost * (discountValue || 0)) / 100;
+      } else {
+        discountedAmount = discountValue || 0;
+      }
+      
+      finalAmount = totalCost - discountedAmount;
+      
+      updateData.discountedAmount = discountedAmount;
+      updateData.finalAmount = finalAmount;
     }
 
     // Calculate discrepancy if final weight is provided or if order is being completed
     let effectiveFinalWeight: number | undefined;
     if (finalTotalWeight !== undefined || status === 'completed') {
       // If finalTotalWeight is not provided but order is being completed, use calculated weight as final weight
-      effectiveFinalWeight =
-        finalTotalWeight !== undefined ? finalTotalWeight : calculatedWeight;
+      effectiveFinalWeight = finalTotalWeight !== undefined ? finalTotalWeight : totalCalculatedWeight;
 
-      weightDiscrepancy = effectiveFinalWeight! - calculatedWeight;
-      discrepancyPercentage =
-        calculatedWeight > 0 ? (weightDiscrepancy / calculatedWeight) * 100 : 0;
+      const weightDiscrepancy = effectiveFinalWeight! - totalCalculatedWeight;
+      const discrepancyPercentage = totalCalculatedWeight > 0 ? (weightDiscrepancy / totalCalculatedWeight) * 100 : 0;
 
       // Add discrepancy calculation to history
       updateHistory.push({
@@ -307,168 +358,14 @@ export async function PUT(
         updatedBy: user.id,
         updatedAt: new Date(),
       });
-    }
 
-    // Validate and adjust inventory if changes were made
-    if (inventoryChanged) {
-      const inventoryErrors = [];
-
-      // Validate paper availability - check total pieces
-      for (const adjustment of inventoryAdjustments.filter(
-        (a) => a.type === 'paper',
-      )) {
-        if (adjustment.difference > 0) {
-          const paper = await Paper.findById(adjustment.paperId);
-          if (!paper || paper.totalPieces < adjustment.difference) {
-            inventoryErrors.push(
-              `Insufficient paper stock: ${
-                paper?.width || 'Unknown'
-              }" (available total pieces: ${
-                paper?.totalPieces || 0
-              }, required: ${adjustment.difference})`,
-            );
-          }
-        }
-      }
-
-      // Validate stone availability if design changed
-      if (designId !== oldValues.designId.toString()) {
-        const Design = await import('@/models/Design').then((m) => m.default);
-        const newDesign = await Design.findById(designId).populate(
-          'defaultStones.stoneId',
-        );
-
-        if (
-          newDesign &&
-          newDesign.defaultStones &&
-          newDesign.defaultStones.length > 0
-        ) {
-          for (const designStone of newDesign.defaultStones) {
-            const stone = designStone.stoneId;
-            if (!stone) continue;
-
-            // Check if stone is available in the correct inventory type
-            if (stone.inventoryType !== (type === 'out' ? 'out' : 'internal')) {
-              inventoryErrors.push(
-                `Design not applicable for ${type} orders. Stone "${stone.name}" is only available in ${stone.inventoryType} inventory.`,
-              );
-              continue;
-            }
-
-            const requiredQuantity =
-              designStone.quantity * paperUsed.quantityInPcs;
-            const inventoryStone = await Stone.findOne({
-              _id: stone._id,
-              inventoryType: type === 'out' ? 'out' : 'internal',
-            });
-
-            if (!inventoryStone) {
-              inventoryErrors.push(
-                `Stone "${stone.name}" not found in ${type} inventory`,
-              );
-            } else if (inventoryStone.quantity < requiredQuantity) {
-              inventoryErrors.push(
-                `Insufficient stone stock: ${stone.name} (available: ${inventoryStone.quantity}${inventoryStone.unit}, required: ${requiredQuantity}${inventoryStone.unit})`,
-              );
-            } else {
-              stoneInventoryAdjustments.push({
-                stoneId: inventoryStone._id,
-                currentQuantity: inventoryStone.quantity,
-                requiredQuantity: requiredQuantity,
-              });
-            }
-          }
-        }
-      }
-
-      if (inventoryErrors.length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'Insufficient inventory for changes',
-            errors: inventoryErrors,
-          },
-          { status: 400 },
-        );
-      }
-
-      // Apply inventory adjustments
-      try {
-        for (const adjustment of inventoryAdjustments) {
-          if (adjustment.type === 'paper') {
-            const paper = await Paper.findById(adjustment.paperId);
-            if (paper) {
-              // Calculate new total pieces after adjustment
-              const newTotalPieces = paper.totalPieces - adjustment.difference;
-
-              // Calculate new quantity (rolls) based on remaining pieces
-              const newQuantity = Math.floor(
-                newTotalPieces / paper.piecesPerRoll,
-              );
-
-              await Paper.findByIdAndUpdate(adjustment.paperId, {
-                totalPieces: newTotalPieces,
-                quantity: newQuantity,
-              });
-            }
-          }
-        }
-
-        // Apply stone inventory adjustments
-        for (const stoneAdjustment of stoneInventoryAdjustments) {
-          const newStoneQuantity =
-            stoneAdjustment.currentQuantity - stoneAdjustment.requiredQuantity;
-          await Stone.findByIdAndUpdate(stoneAdjustment.stoneId, {
-            quantity: newStoneQuantity,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to adjust inventory:', error);
-        return NextResponse.json(
-          { success: false, message: 'Failed to adjust inventory' },
-          { status: 500 },
-        );
-      }
+      updateData.weightDiscrepancy = weightDiscrepancy;
+      updateData.discrepancyPercentage = discrepancyPercentage;
+      updateData.finalTotalWeight = effectiveFinalWeight;
     }
 
     // Handle order finalization for out orders
     if (isFinalized && !order.isFinalized && order.type === 'out') {
-      // Deduct consumed materials from out inventory
-
-      // Deduct consumed paper from out inventory - using pieces
-      const outPaper = await Paper.findOne({
-        width: paperUsed.sizeInInch,
-        inventoryType: 'out',
-      });
-      if (outPaper) {
-        // Calculate remaining pieces after deduction
-        const remainingPieces = outPaper.totalPieces - paperUsed.quantityInPcs;
-        const newQuantity = Math.floor(
-          remainingPieces / outPaper.piecesPerRoll,
-        );
-
-        await Paper.findByIdAndUpdate(outPaper._id, {
-          totalPieces: remainingPieces,
-          quantity: newQuantity,
-        });
-      }
-
-      // Deduct consumed stones from out inventory
-      if (order.stonesUsed && order.stonesUsed.length > 0) {
-        for (const orderStone of order.stonesUsed) {
-          const outStone = await Stone.findOne({
-            _id: orderStone.stoneId._id,
-            inventoryType: 'out',
-          });
-          if (outStone) {
-            const newStoneQuantity = outStone.quantity - orderStone.quantity;
-            await Stone.findByIdAndUpdate(outStone._id, {
-              quantity: newStoneQuantity,
-            });
-          }
-        }
-      }
-
       updateHistory.push({
         field: 'isFinalized',
         oldValue: false,
@@ -476,73 +373,25 @@ export async function PUT(
         updatedBy: user.id,
         updatedAt: new Date(),
       });
-    }
 
-    // Prepare stones used data if design changed
-    let stonesUsed = order.stonesUsed;
-    if (
-      designId !== oldValues.designId.toString() &&
-      stoneInventoryAdjustments.length > 0
-    ) {
-      stonesUsed = stoneInventoryAdjustments.map((stoneAdjustment) => ({
-        stoneId: stoneAdjustment.stoneId,
-        quantity: stoneAdjustment.requiredQuantity,
-      }));
-    }
-
-    // Update order
-    Object.assign(updateData, {
-      type,
-      customerName,
-      phone,
-      designId,
-      stonesUsed,
-      paperUsed: paperUsed
-        ? {
-            ...paperUsed,
-            paperWeightPerPc: (
-              await Paper.findOne({
-                width: paperUsed.sizeInInch,
-                inventoryType: type === 'out' ? 'out' : 'internal',
-              })
-            )?.weightPerPiece,
-          }
-        : order.paperUsed,
-      calculatedWeight,
-      weightDiscrepancy,
-      discrepancyPercentage,
-      status,
-      updatedBy: user.id,
-    });
-
-    // Add payment and pricing fields if they changed
-    if (modeOfPayment !== undefined) {
-      updateData.modeOfPayment = modeOfPayment;
-    }
-    if (discountType !== undefined) {
-      updateData.discountType = discountType;
-    }
-    if (discountValue !== undefined) {
-      updateData.discountValue = discountValue;
-    }
-    if (totalCost !== order.totalCost) {
-      updateData.totalCost = totalCost;
-    }
-    if (discountedAmount !== order.discountedAmount) {
-      updateData.discountedAmount = discountedAmount;
-    }
-    if (finalAmount !== order.finalAmount) {
-      updateData.finalAmount = finalAmount;
-    }
-
-    if (finalTotalWeight !== undefined || status === 'completed') {
-      updateData.finalTotalWeight = effectiveFinalWeight!;
-    }
-
-    if (isFinalized && !order.isFinalized) {
       updateData.isFinalized = true;
       updateData.finalizedAt = new Date();
     }
+
+    // Update basic fields
+    if (type !== undefined) updateData.type = type;
+    if (customerName !== undefined) updateData.customerName = customerName;
+    if (phone !== undefined) updateData.phone = phone;
+    if (customerId !== undefined) updateData.customerId = customerId;
+    if (gstNumber !== undefined) updateData.gstNumber = gstNumber;
+    if (status !== undefined) updateData.status = status;
+    if (notes !== undefined) updateData.notes = notes;
+    if (modeOfPayment !== undefined) updateData.modeOfPayment = modeOfPayment;
+    if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
+    if (discountType !== undefined) updateData.discountType = discountType;
+    if (discountValue !== undefined) updateData.discountValue = discountValue;
+
+    updateData.updatedBy = user.id;
 
     // Add to existing history
     updateData.updateHistory = [
@@ -553,7 +402,10 @@ export async function PUT(
     const updatedOrder = await Order.findByIdAndUpdate(id, updateData, {
       new: true,
     })
-      .populate('designId')
+      .populate('designOrders.designId')
+      .populate('designOrders.stonesUsed.stoneId')
+      .populate('designId') // Legacy field
+      .populate('stonesUsed.stoneId') // Legacy field
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email');
 
