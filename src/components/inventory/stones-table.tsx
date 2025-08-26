@@ -25,7 +25,8 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
-import { Gem } from 'lucide-react';
+import { Package } from 'lucide-react';
+import { Pagination } from '@/components/ui/pagination';
 
 interface Stone {
   _id: string;
@@ -57,6 +58,13 @@ export default function StonesTable({
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedStone, setSelectedStone] = useState<Stone | null>(null);
   const [updateQuantity, setUpdateQuantity] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  
   const { showSuccess, showError } = useSnackbarHelpers();
 
   const fetchStones = useCallback(
@@ -68,7 +76,7 @@ export default function StonesTable({
           setLoading(true);
         }
         const response = await fetch(
-          `/api/inventory/stones?type=${inventoryType}`,
+          `/api/inventory/stones?type=${inventoryType}&page=${currentPage}&limit=${itemsPerPage}`,
         );
 
         if (!response.ok) {
@@ -78,6 +86,8 @@ export default function StonesTable({
         const data = await response.json();
         if (data.success) {
           setStones(data.data);
+          setTotalPages(data.pagination.pages);
+          setTotalItems(data.pagination.total);
         } else {
           showError(
             'Data Loading Error',
@@ -97,7 +107,7 @@ export default function StonesTable({
         }
       }
     },
-    [inventoryType, showError],
+    [inventoryType, currentPage, itemsPerPage],
   );
 
   useEffect(() => {
@@ -106,7 +116,16 @@ export default function StonesTable({
       fetchStones();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventoryType, authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated, currentPage, itemsPerPage]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
 
   const handleUpdateQuantity = async (stoneId: string, newQuantity: number) => {
     setIsUpdating(stoneId);
@@ -335,7 +354,7 @@ export default function StonesTable({
 
       {stones.length === 0 ? (
         <EmptyState
-          icon={Gem}
+          icon={Package}
           title={`No ${title} Found`}
           description={`No ${title.toLowerCase()} are currently available in the inventory.`}
         />
@@ -392,6 +411,19 @@ export default function StonesTable({
               ))}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center py-4">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            itemsPerPage={itemsPerPage}
+            totalItems={totalItems}
+          />
         </div>
       )}
     </div>

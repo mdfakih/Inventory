@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       return false;
     }
-  }, [router]);
+  }, []); // Remove router dependency to prevent infinite loops
 
   const login = (userData: User) => {
     setUser(userData);

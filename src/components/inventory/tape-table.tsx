@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
 import { Package, Edit, Trash2 } from 'lucide-react';
+import { Pagination } from '@/components/ui/pagination';
 
 interface Tape {
   _id: string;
@@ -46,6 +47,13 @@ export default function TapeTable() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedTape, setSelectedTape] = useState<Tape | null>(null);
   const [updateQuantity, setUpdateQuantity] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  
   const { showSuccess, showError } = useSnackbarHelpers();
   const { loading: authLoading, isAuthenticated } = useAuth();
 
@@ -54,32 +62,35 @@ export default function TapeTable() {
       if (isRefresh) {
         setRefreshing(true);
       }
-      const response = await fetch('/api/inventory/tape');
+      const response = await fetch(`/api/inventory/tape?page=${currentPage}&limit=${itemsPerPage}`);
       const data = await response.json();
       if (data.success) {
         setTapes(data.data);
+        setTotalPages(data.pagination.pages);
+        setTotalItems(data.pagination.total);
       } else {
         showError('Data Loading Error', 'Failed to load tape data.');
       }
     } catch (error) {
       console.error('Error fetching tapes:', error);
-      showError('Network Error', 'Failed to load tape data. Please try again.');
+      showError(
+        'Network Error',
+        'Failed to load tape data. Please try again.',
+      );
     } finally {
       setLoading(false);
       if (isRefresh) {
         setRefreshing(false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentPage, itemsPerPage]);
 
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated
     if (!authLoading && isAuthenticated) {
       fetchTapes();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated, currentPage, itemsPerPage, fetchTapes]);
 
   const handleUpdateQuantity = async (tapeId: string, newQuantity: number) => {
     setIsUpdating(tapeId);
@@ -161,6 +172,15 @@ export default function TapeTable() {
   const openDeleteDialog = (tape: Tape) => {
     setSelectedTape(tape);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
   };
 
   if (loading) {
@@ -347,6 +367,14 @@ export default function TapeTable() {
               ))}
             </TableBody>
           </Table>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            totalItems={totalItems}
+          />
         </div>
       )}
     </div>

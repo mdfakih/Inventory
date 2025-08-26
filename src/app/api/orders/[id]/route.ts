@@ -72,6 +72,9 @@ export async function PUT(
       finalTotalWeight,
       status,
       isFinalized,
+      modeOfPayment,
+      discountType,
+      discountValue,
     } = body;
     const { id } = await params;
 
@@ -210,6 +213,62 @@ export async function PUT(
           updatedBy: user.id,
           updatedAt: new Date(),
         });
+      }
+    }
+
+    // Calculate pricing if payment or discount fields changed
+    let totalCost = order.totalCost || 0;
+    let discountedAmount = order.discountedAmount || 0;
+    let finalAmount = order.finalAmount || 0;
+
+    if (modeOfPayment !== undefined || discountType !== undefined || discountValue !== undefined) {
+      // Get design to calculate total cost
+      const Design = await import('@/models/Design').then((m) => m.default);
+      const design = await Design.findById(designId);
+      
+      if (design && design.prices && design.prices.length > 0) {
+        const designPrice = design.prices[0].price;
+        totalCost = designPrice * (paperUsed?.quantityInPcs || order.paperUsed.quantityInPcs);
+        
+        // Calculate discount
+        if (discountType === 'percentage') {
+          discountedAmount = (totalCost * (discountValue || 0)) / 100;
+        } else {
+          discountedAmount = discountValue || 0;
+        }
+        
+        finalAmount = totalCost - discountedAmount;
+        
+        // Add pricing changes to history
+        if (modeOfPayment !== undefined && modeOfPayment !== oldValues.modeOfPayment) {
+          updateHistory.push({
+            field: 'modeOfPayment',
+            oldValue: oldValues.modeOfPayment,
+            newValue: modeOfPayment,
+            updatedBy: user.id,
+            updatedAt: new Date(),
+          });
+        }
+        
+        if (discountType !== undefined && discountType !== oldValues.discountType) {
+          updateHistory.push({
+            field: 'discountType',
+            oldValue: oldValues.discountType,
+            newValue: discountType,
+            updatedBy: user.id,
+            updatedAt: new Date(),
+          });
+        }
+        
+        if (discountValue !== undefined && discountValue !== oldValues.discountValue) {
+          updateHistory.push({
+            field: 'discountValue',
+            oldValue: oldValues.discountValue,
+            newValue: discountValue,
+            updatedBy: user.id,
+            updatedAt: new Date(),
+          });
+        }
       }
     }
 
@@ -455,6 +514,26 @@ export async function PUT(
       status,
       updatedBy: user.id,
     });
+
+    // Add payment and pricing fields if they changed
+    if (modeOfPayment !== undefined) {
+      updateData.modeOfPayment = modeOfPayment;
+    }
+    if (discountType !== undefined) {
+      updateData.discountType = discountType;
+    }
+    if (discountValue !== undefined) {
+      updateData.discountValue = discountValue;
+    }
+    if (totalCost !== order.totalCost) {
+      updateData.totalCost = totalCost;
+    }
+    if (discountedAmount !== order.discountedAmount) {
+      updateData.discountedAmount = discountedAmount;
+    }
+    if (finalAmount !== order.finalAmount) {
+      updateData.finalAmount = finalAmount;
+    }
 
     if (finalTotalWeight !== undefined || status === 'completed') {
       updateData.finalTotalWeight = effectiveFinalWeight!;

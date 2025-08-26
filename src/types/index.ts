@@ -84,11 +84,45 @@ export interface Design {
   updatedAt: Date;
 }
 
+export interface Customer {
+  _id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country: string;
+  };
+  company?: string;
+  gstNumber?: string;
+  customerType: 'retail' | 'wholesale' | 'corporate';
+  creditLimit: number;
+  paymentTerms: 'immediate' | '7days' | '15days' | '30days' | '45days';
+  isActive: boolean;
+  notes?: string;
+  tags: string[];
+  createdBy: string;
+  updatedBy?: string;
+  updateHistory: Array<{
+    field: string;
+    oldValue: string | number | boolean | Date;
+    newValue: string | number | boolean | Date;
+    updatedBy: string;
+    updatedAt: Date;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Order {
   _id: string;
   type: 'internal' | 'out';
   customerName: string;
   phone: string;
+  customerId?: string; // Reference to Customer model
   designId: string;
   stonesUsed: Array<{
     stoneId: string;
@@ -106,6 +140,16 @@ export interface Order {
   discrepancyPercentage: number;
   stoneUsed?: number;
   status: 'pending' | 'completed' | 'cancelled';
+  isFinalized: boolean;
+  finalizedAt?: Date;
+  modeOfPayment: 'cash' | 'UPI' | 'card';
+  paymentStatus: 'pending' | 'partial' | 'completed' | 'overdue';
+  discountType: 'percentage' | 'flat';
+  discountValue: number;
+  totalCost: number;
+  discountedAmount: number;
+  finalAmount: number;
+  notes?: string;
   createdBy: string;
   updatedBy?: string;
   updateHistory: Array<{

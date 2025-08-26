@@ -1,5 +1,11 @@
-import mongoose from 'mongoose';
+require('dotenv').config({ path: '.env.local' });
+const mongoose = require('mongoose');
 
+// MongoDB connection
+const MONGODB_URI = process.env.MONGODB_URI;
+console.log('MONGODB_URI:', MONGODB_URI);
+
+// Order Schema (updated)
 const orderSchema = new mongoose.Schema(
   {
     type: {
@@ -26,7 +32,6 @@ const orderSchema = new mongoose.Schema(
       ref: 'Design',
       required: true,
     },
-
     stonesUsed: [
       {
         stoneId: {
@@ -41,7 +46,6 @@ const orderSchema = new mongoose.Schema(
         },
       },
     ],
-
     paperUsed: {
       sizeInInch: {
         type: Number,
@@ -62,7 +66,6 @@ const orderSchema = new mongoose.Schema(
         min: 0,
       },
     },
-
     // Payment and pricing fields
     modeOfPayment: {
       type: String,
@@ -103,7 +106,6 @@ const orderSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-
     finalTotalWeight: {
       type: Number,
       min: 0,
@@ -125,7 +127,6 @@ const orderSchema = new mongoose.Schema(
       enum: ['pending', 'completed', 'cancelled'],
       default: 'pending',
     },
-    // Track if out order has been finalized (materials consumed)
     isFinalized: {
       type: Boolean,
       default: false,
@@ -163,4 +164,62 @@ const orderSchema = new mongoose.Schema(
   },
 );
 
-export default mongoose.models.Order || mongoose.model('Order', orderSchema);
+const Order = mongoose.model('Order', orderSchema);
+
+async function updateOrders() {
+  try {
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(MONGODB_URI);
+    console.log('Connected to MongoDB successfully!');
+
+    // Check if orders collection exists
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    const ordersCollectionExists = collections.some(col => col.name === 'orders');
+    
+    if (!ordersCollectionExists) {
+      console.log('Orders collection does not exist. Nothing to update.');
+      return;
+    }
+
+    console.log('Updating existing orders...');
+    
+    // Update all existing orders to add missing fields if they don't exist
+    const updateResult = await Order.updateMany(
+      { customerId: { $exists: false } },
+      { 
+        $set: { 
+          customerId: null,
+          notes: '',
+          modeOfPayment: 'cash',
+          paymentStatus: 'pending',
+          discountType: 'percentage',
+          discountValue: 0,
+          totalCost: 0,
+          discountedAmount: 0,
+          finalAmount: 0,
+          isFinalized: false
+        }
+      }
+    );
+
+    console.log(`Updated ${updateResult.modifiedCount} orders successfully!`);
+    
+    // Also update orders that might be missing other fields
+    const updateResult2 = await Order.updateMany(
+      { notes: { $exists: false } },
+      { $set: { notes: '' } }
+    );
+
+    console.log(`Updated ${updateResult2.modifiedCount} orders for notes field!`);
+
+    console.log('Order collection update completed successfully!');
+
+  } catch (error) {
+    console.error('Error updating orders:', error);
+  } finally {
+    await mongoose.disconnect();
+    console.log('Disconnected from MongoDB');
+  }
+}
+
+updateOrders();

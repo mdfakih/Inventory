@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
 import { Package, Edit, Trash2 } from 'lucide-react';
+import { Pagination } from '@/components/ui/pagination';
 
 interface Plastic {
   _id: string;
@@ -44,6 +45,13 @@ export default function PlasticTable() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedPlastic, setSelectedPlastic] = useState<Plastic | null>(null);
   const [updateQuantity, setUpdateQuantity] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  
   const { showSuccess, showError } = useSnackbarHelpers();
   const { loading: authLoading, isAuthenticated } = useAuth();
 
@@ -52,10 +60,12 @@ export default function PlasticTable() {
       if (isRefresh) {
         setRefreshing(true);
       }
-      const response = await fetch('/api/inventory/plastic');
+      const response = await fetch(`/api/inventory/plastic?page=${currentPage}&limit=${itemsPerPage}`);
       const data = await response.json();
       if (data.success) {
         setPlastics(data.data);
+        setTotalPages(data.pagination.pages);
+        setTotalItems(data.pagination.total);
       } else {
         showError('Data Loading Error', 'Failed to load plastic data.');
       }
@@ -71,16 +81,14 @@ export default function PlasticTable() {
         setRefreshing(false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentPage, itemsPerPage]);
 
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated
     if (!authLoading && isAuthenticated) {
       fetchPlastics();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated, currentPage, itemsPerPage, fetchPlastics]);
 
   const handleUpdateQuantity = async (
     plasticId: string,
@@ -165,6 +173,15 @@ export default function PlasticTable() {
   const openDeleteDialog = (plastic: Plastic) => {
     setSelectedPlastic(plastic);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
   };
 
   if (loading) {
@@ -357,6 +374,20 @@ export default function PlasticTable() {
               ))}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-4">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            itemsPerPage={itemsPerPage}
+            totalItems={totalItems}
+          />
         </div>
       )}
     </div>

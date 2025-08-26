@@ -55,6 +55,7 @@ interface Order {
   weightDiscrepancy?: number;
   discrepancyPercentage?: number;
   status: string;
+  paymentStatus: 'pending' | 'partial' | 'completed' | 'overdue';
   isFinalized: boolean;
   createdAt: string;
 }
@@ -285,6 +286,61 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
+      {/* Payment Status Analytics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
+            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Attention</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">
+              {data.orders.filter((order: Order) => order.paymentStatus === 'pending').length}
+            </div>
+            <p className="text-xs text-muted-foreground">Orders awaiting payment</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Partial Payments</CardTitle>
+            <Badge variant="secondary" className="bg-orange-100 text-orange-800">Partial</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              {data.orders.filter((order: Order) => order.paymentStatus === 'partial').length}
+            </div>
+            <p className="text-xs text-muted-foreground">Orders with partial payment</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed Payments</CardTitle>
+            <Badge variant="secondary" className="bg-green-100 text-green-800">Paid</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {data.orders.filter((order: Order) => order.paymentStatus === 'completed').length}
+            </div>
+            <p className="text-xs text-muted-foreground">Fully paid orders</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Overdue Payments</CardTitle>
+            <Badge variant="secondary" className="bg-red-100 text-red-800">Urgent</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {data.orders.filter((order: Order) => order.paymentStatus === 'overdue').length}
+            </div>
+            <p className="text-xs text-muted-foreground">Overdue payments</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -452,6 +508,19 @@ export default function AdminDashboard() {
                         }`}
                       >
                         {order.status}
+                      </Badge>
+                      <Badge
+                        className={`text-xs ${
+                          order.paymentStatus === 'completed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : order.paymentStatus === 'overdue' 
+                            ? 'bg-red-100 text-red-800'
+                            : order.paymentStatus === 'partial'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {order.paymentStatus || 'pending'}
                       </Badge>
                       {!order.isFinalized && (
                         <Badge className="text-xs bg-gray-100 text-gray-800">

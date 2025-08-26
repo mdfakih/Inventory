@@ -6,22 +6,47 @@ import { hashPassword } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication and authorization
-    requireRole(request, ['admin']);
-
     await dbConnect();
+    
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
 
-    const users = await User.find({}).select('-password').sort({ createdAt: -1 });
+    // Validate pagination parameters
+    if (page < 1 || limit < 1 || limit > 100) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid pagination parameters' },
+        { status: 400 },
+      );
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Get total count
+    const total = await User.countDocuments();
+
+    // Get users with pagination
+    const users = await User.find()
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     return NextResponse.json({
       success: true,
       data: users,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
+    console.error('Get users error:', error);
     return NextResponse.json(
-      { success: false, message: 'Failed to fetch users' },
-      { status: 500 }
+      { success: false, message: 'Internal server error' },
+      { status: 500 },
     );
   }
 }

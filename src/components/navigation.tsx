@@ -82,6 +82,7 @@ export default function Navigation() {
     { href: '/inventory', label: 'Inventory' },
     { href: '/designs', label: 'Designs' },
     { href: '/orders', label: 'Orders' },
+    { href: '/customers', label: 'Customers' },
     { href: '/forms', label: 'Forms' },
     ...(user.role === 'admin' ? [{ href: '/masters', label: 'Masters' }] : []),
     { href: '/reports', label: 'Reports' },

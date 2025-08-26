@@ -62,6 +62,7 @@ import {
   Edit,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
+import { Pagination } from '@/components/ui/pagination';
 
 interface User {
   _id: string;
@@ -139,6 +140,12 @@ export default function MastersPage() {
   const [tapes, setTapes] = useState<Tape[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const router = useRouter();
   const { showSuccess, showError, showWarning } = useSnackbarHelpers();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -159,17 +166,21 @@ export default function MastersPage() {
         plasticsRes,
         tapesRes,
       ] = await Promise.all([
-        fetch('/api/masters/users'),
+        fetch(`/api/masters/users?page=${currentPage}&limit=${itemsPerPage}`),
         fetch('/api/auth/password-reset-requests'),
-        fetch('/api/inventory/stones'),
-        fetch('/api/inventory/paper'),
-        fetch('/api/inventory/plastic'),
-        fetch('/api/inventory/tape'),
+        fetch(`/api/inventory/stones?page=${currentPage}&limit=${itemsPerPage}`),
+        fetch(`/api/inventory/paper?page=${currentPage}&limit=${itemsPerPage}`),
+        fetch(`/api/inventory/plastic?page=${currentPage}&limit=${itemsPerPage}`),
+        fetch(`/api/inventory/tape?page=${currentPage}&limit=${itemsPerPage}`),
       ]);
 
       if (usersRes.ok) {
         const usersData = await usersRes.json();
         setUsers(usersData.data || []);
+        if (usersData.pagination) {
+          setTotalPages(usersData.pagination.pages);
+          setTotalItems(usersData.pagination.total);
+        }
       }
 
       if (passwordResetRes.ok) {
@@ -206,7 +217,7 @@ export default function MastersPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentPage, itemsPerPage]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -299,6 +310,16 @@ export default function MastersPage() {
   const handleEditTape = (tape: Tape) => {
     setEditingTape(tape);
     setIsEditTapeDialogOpen(true);
+  };
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
   };
 
   // Delete handlers for master data
@@ -710,6 +731,17 @@ export default function MastersPage() {
                   </div>
                 </div>
               )}
+
+              {totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -796,6 +828,17 @@ export default function MastersPage() {
                     </Table>
                   </div>
                 </div>
+              )}
+
+              {totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
               )}
             </CardContent>
           </Card>
@@ -884,6 +927,17 @@ export default function MastersPage() {
                   </Table>
                 </div>
               </div>
+
+              {totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -989,6 +1043,17 @@ export default function MastersPage() {
                   </div>
                 </div>
               )}
+
+              {totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1086,6 +1151,17 @@ export default function MastersPage() {
                   </div>
                 </div>
               )}
+
+              {totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1175,6 +1251,17 @@ export default function MastersPage() {
                     </Table>
                   </div>
                 </div>
+              )}
+
+              {totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
               )}
             </CardContent>
           </Card>

@@ -22,10 +22,17 @@ interface CreateOrderData {
     paperWeightPerPc: number;
   };
   calculatedWeight: number;
+  modeOfPayment: 'cash' | 'UPI' | 'card';
+  paymentStatus: 'pending' | 'partial' | 'completed' | 'overdue';
+  discountType: 'percentage' | 'flat';
+  discountValue: number;
+  totalCost: number;
+  discountedAmount: number;
+  finalAmount: number;
   createdBy: string;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Check if MongoDB URI is configured
     if (!process.env.MONGODB_URI) {
@@ -38,15 +45,41 @@ export async function GET() {
 
     await dbConnect();
 
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+
+    // Validate pagination parameters
+    if (page < 1 || limit < 1 || limit > 100) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid pagination parameters' },
+        { status: 400 },
+      );
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Get total count
+    const total = await Order.countDocuments();
+
+    // Get orders with pagination
     const orders = await Order.find()
       .populate('designId')
       .populate('createdBy', 'name email')
       .populate('updatedBy', 'name email')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     return NextResponse.json({
       success: true,
       data: orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error('Get orders error:', error);
@@ -265,6 +298,21 @@ export async function POST(request: NextRequest) {
       quantity: stoneDeduction.requiredQuantity,
     }));
 
+    // Calculate pricing
+    let totalCost = 0;
+    let discountedAmount = 0;
+    let finalAmount = 0;
+
+    // Get design price (use first price if multiple exist)
+    if (design.prices && design.prices.length > 0) {
+      const designPrice = design.prices[0].price;
+      totalCost = designPrice * paperUsed.quantityInPcs;
+    }
+
+    // Calculate discount (default to 0 for now, will be updated via PUT request)
+    discountedAmount = 0;
+    finalAmount = totalCost - discountedAmount;
+
     const orderData: CreateOrderData = {
       type,
       customerName,
@@ -276,6 +324,13 @@ export async function POST(request: NextRequest) {
         paperWeightPerPc: paper.weightPerPiece,
       },
       calculatedWeight,
+      modeOfPayment: 'cash', // Default to cash
+      paymentStatus: 'pending', // Default to pending
+      discountType: 'percentage', // Default to percentage
+      discountValue: 0, // Default to 0
+      totalCost,
+      discountedAmount,
+      finalAmount,
       createdBy: user.id,
     };
 

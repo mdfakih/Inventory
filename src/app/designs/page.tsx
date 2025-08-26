@@ -36,6 +36,7 @@ import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/utils';
 import { Upload, X, Edit, Trash2, Eye, Plus, Palette } from 'lucide-react';
+import { Pagination } from '@/components/ui/pagination';
 
 interface Stone {
   _id: string;
@@ -127,6 +128,15 @@ export default function DesignsPage() {
     prices: [],
     defaultStones: [],
   });
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  
+  const [sortBy] = useState('createdAt');
+  const [sortOrder] = useState<'asc' | 'desc'>('desc');
   const { showSuccess, showError } = useSnackbarHelpers();
   const { loading: authLoading, isAuthenticated } = useAuth();
 
@@ -142,33 +152,24 @@ export default function DesignsPage() {
     }
   }, []);
 
-  const fetchData = useCallback(async (isRefresh = false) => {
+  const fetchDesigns = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
       }
-      const [designsRes, internalStonesRes, outStonesRes] = await Promise.all([
-        authenticatedFetch('/api/designs'),
-        authenticatedFetch('/api/inventory/stones?type=internal'),
-        authenticatedFetch('/api/inventory/stones?type=out'),
-      ]);
-
-      const designsData = await designsRes.json();
-      const internalStonesData = await internalStonesRes.json();
-      const outStonesData = await outStonesRes.json();
-
-      if (designsData.success) setDesigns(designsData.data);
-
-      // Combine both internal and out job stones
-      const allStones = [];
-      if (internalStonesData.success)
-        allStones.push(...internalStonesData.data);
-      if (outStonesData.success) allStones.push(...outStonesData.data);
-      setStones(allStones);
+      const response = await authenticatedFetch(
+        `/api/designs?page=${currentPage}&limit=${itemsPerPage}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
+      );
+      const data = await response.json();
+      if (data.success) {
+        setDesigns(data.data);
+        setTotalPages(data.pagination.pages);
+        setTotalItems(data.pagination.total);
+      }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching designs:', error);
       showError('Data Loading Error', 'Failed to load designs data.');
     } finally {
       setLoading(false);
@@ -176,17 +177,45 @@ export default function DesignsPage() {
         setRefreshing(false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentPage, itemsPerPage, sortBy, sortOrder, showError]);
+
+  const fetchStones = useCallback(async () => {
+    try {
+      const [internalStonesRes, outStonesRes] = await Promise.all([
+        authenticatedFetch('/api/inventory/stones?type=internal'),
+        authenticatedFetch('/api/inventory/stones?type=out'),
+      ]);
+
+      const internalStonesData = await internalStonesRes.json();
+      const outStonesData = await outStonesRes.json();
+
+      if (internalStonesData.success)
+        setStones(internalStonesData.data);
+      if (outStonesData.success) setStones(outStonesData.data);
+    } catch (error) {
+      console.error('Error fetching stones:', error);
+      showError('Data Loading Error', 'Failed to load stones data.');
+    }
+  }, [showError]);
 
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated
     if (!authLoading && isAuthenticated) {
-      fetchData();
+      fetchDesigns();
+      fetchStones();
       fetchUser();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated, currentPage, itemsPerPage, sortBy, sortOrder]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
 
   const handleImageUpload = async (file: File) => {
     setUploading(true);
@@ -243,7 +272,7 @@ export default function DesignsPage() {
           prices: [],
           defaultStones: [],
         });
-        await fetchData(true);
+        await fetchDesigns(true);
       } else {
         showError(
           'Creation Failed',
@@ -280,7 +309,7 @@ export default function DesignsPage() {
         showSuccess('Design Updated', 'Design has been updated successfully.');
         setIsEditDialogOpen(false);
         setSelectedDesign(null);
-        await fetchData(true);
+        await fetchDesigns(true);
       } else {
         showError('Update Failed', data.message || 'Failed to update design.');
       }
@@ -304,7 +333,7 @@ export default function DesignsPage() {
       const data = await response.json();
       if (data.success) {
         showSuccess('Design Deleted', 'Design has been deleted successfully.');
-        await fetchData(true);
+        await fetchDesigns(true);
       } else {
         showError(
           'Deletion Failed',
@@ -850,6 +879,18 @@ export default function DesignsPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
           )}
         </CardContent>
       </Card>

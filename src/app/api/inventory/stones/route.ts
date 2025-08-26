@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'internal';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
 
     // Validate inventory type
     if (!['internal', 'out'].includes(type)) {
@@ -26,48 +28,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const stones = await Stone.find({ inventoryType: type }).sort({ name: 1 });
+    // Validate pagination parameters
+    if (page < 1 || limit < 1 || limit > 100) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid pagination parameters' },
+        { status: 400 },
+      );
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Get total count
+    const total = await Stone.countDocuments({ inventoryType: type });
+
+    // Get stones with pagination
+    const stones = await Stone.find({ inventoryType: type })
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit);
 
     return NextResponse.json({
       success: true,
       data: stones,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error('Get stones error:', error);
-
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('ECONNREFUSED')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database connection failed. Please check if MongoDB is running.',
-          },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MONGODB_URI')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              'Database configuration error. Please check environment variables.',
-          },
-          { status: 500 },
-        );
-      }
-      if (error.message.includes('MongoNetworkError')) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'Database network error. Please check your connection.',
-          },
-          { status: 500 },
-        );
-      }
-    }
-
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },

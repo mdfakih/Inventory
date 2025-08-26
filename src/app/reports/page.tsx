@@ -88,6 +88,7 @@ interface Order {
   weightDiscrepancy: number;
   discrepancyPercentage: number;
   status: string;
+  paymentStatus: 'pending' | 'partial' | 'completed' | 'overdue';
   isFinalized: boolean;
   createdAt: string;
   stonesUsed: Array<{ stoneId: { name: string }; quantity: number }>;
@@ -95,7 +96,7 @@ interface Order {
 }
 
 interface ReportData {
-  inventory: unknown[];
+  inventory: Array<Stone | Paper | Plastic | Tape>;
   orders: Order[];
   users: User[];
   stones: Stone[];
@@ -115,6 +116,12 @@ interface ReportData {
       pending: number;
       internal: number;
       out: number;
+      paymentStatus?: {
+        pending: number;
+        partial: number;
+        completed: number;
+        overdue: number;
+      };
     };
     lowStockItems: Array<Stone | Paper>;
   };
@@ -697,6 +704,7 @@ export default function ReportsPage() {
                         <TableHead>Design</TableHead>
                         <TableHead>Weight Details</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Payment Status</TableHead>
                         <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -767,6 +775,21 @@ export default function ReportsPage() {
                             </div>
                           </TableCell>
                           <TableCell>
+                            <Badge 
+                              className={`${
+                                order.paymentStatus === 'completed' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : order.paymentStatus === 'overdue' 
+                                  ? 'bg-red-100 text-red-800'
+                                  : order.paymentStatus === 'partial'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {order.paymentStatus || 'Not set'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
                             {new Date(order.createdAt).toLocaleDateString()}
                           </TableCell>
                         </TableRow>
@@ -804,6 +827,7 @@ export default function ReportsPage() {
                         <TableHead>Final Weight</TableHead>
                         <TableHead>Discrepancy</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Payment Status</TableHead>
                         <TableHead>Finalized</TableHead>
                         <TableHead>Date</TableHead>
                       </TableRow>
@@ -864,6 +888,21 @@ export default function ReportsPage() {
                               }
                             >
                               {order.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              className={`${
+                                order.paymentStatus === 'completed' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : order.paymentStatus === 'overdue' 
+                                  ? 'bg-red-100 text-red-800'
+                                  : order.paymentStatus === 'partial'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {order.paymentStatus || 'Not set'}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1014,6 +1053,37 @@ export default function ReportsPage() {
                       {reportData.analytics.orders.internal}
                     </div>
                     <p className="text-sm text-muted-foreground">Internal</p>
+                  </div>
+                </div>
+
+                {/* Payment Status Analytics */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-3">Payment Status Distribution</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {reportData.analytics?.orders?.paymentStatus?.pending || 0}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Pending Payment</p>
+                    </div>
+                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {reportData.analytics?.orders?.paymentStatus?.partial || 0}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Partial Payment</p>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">
+                        {reportData.analytics?.orders?.paymentStatus?.completed || 0}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Payment Completed</p>
+                    </div>
+                    <div className="text-center p-4 bg-red-50 rounded-lg">
+                      <div className="text-2xl font-bold text-red-600">
+                        {reportData.analytics?.orders?.paymentStatus?.overdue || 0}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Payment Overdue</p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
