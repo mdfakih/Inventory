@@ -32,20 +32,22 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { authenticatedFetch } from '@/lib/utils';
 import { Customer } from '@/types';
+import { CustomerOrderHistoryModal } from '@/components/customer-order-history-modal';
 
-import { 
-  Edit, 
-  Trash2, 
-  Eye, 
-  Plus, 
-  Search, 
+import {
+  Edit,
+  Trash2,
+  Eye,
+  Plus,
+  Search,
   Filter,
   Users,
   TrendingUp,
   Calendar,
   Building2,
   Phone,
-  Mail
+  Mail,
+  Package,
 } from 'lucide-react';
 
 // Define the form data type to match CustomerForm expectations
@@ -79,22 +81,27 @@ type CustomerAnalytics = {
 
 export default function CustomersPage() {
   const { showSuccess, showError } = useSnackbarHelpers();
-  
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [customerTypeFilter, setCustomerTypeFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [analytics, setAnalytics] = useState<CustomerAnalytics | null>(null);
-  
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null,
+  );
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  
+  const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
+  const [selectedCustomerForHistory, setSelectedCustomerForHistory] =
+    useState<Customer | null>(null);
+
   const [formData, setFormData] = useState<CustomerFormData>({
     name: '',
     phone: '',
@@ -123,11 +130,13 @@ export default function CustomersPage() {
         page: currentPage.toString(),
         limit: '10',
       });
-      
+
       if (searchQuery) params.append('search', searchQuery);
-      if (customerTypeFilter) params.append('customerType', customerTypeFilter);
-      if (statusFilter !== '') params.append('isActive', statusFilter);
-      
+      if (customerTypeFilter && customerTypeFilter !== 'all')
+        params.append('customerType', customerTypeFilter);
+      if (statusFilter && statusFilter !== 'all')
+        params.append('isActive', statusFilter);
+
       const response = await authenticatedFetch(`/api/customers?${params}`);
       const result = await response.json();
       if (result.success) {
@@ -140,7 +149,8 @@ export default function CustomersPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, customerTypeFilter, statusFilter, showError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, searchQuery, customerTypeFilter, statusFilter]);
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -157,7 +167,8 @@ export default function CustomersPage() {
   useEffect(() => {
     fetchCustomers();
     fetchAnalytics();
-  }, [fetchCustomers, fetchAnalytics]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, searchQuery, customerTypeFilter, statusFilter]);
 
   const handleSearch = () => {
     setCurrentPage(1);
@@ -171,7 +182,7 @@ export default function CustomersPage() {
         body: JSON.stringify(formData),
       });
       const result = await response.json();
-      
+
       if (result.success) {
         showSuccess('Customer created successfully');
         setIsCreateDialogOpen(false);
@@ -188,14 +199,17 @@ export default function CustomersPage() {
 
   const handleUpdateCustomer = async () => {
     if (!selectedCustomer) return;
-    
+
     try {
-      const response = await authenticatedFetch(`/api/customers/${selectedCustomer._id}`, {
-        method: 'PUT',
-        body: JSON.stringify(formData),
-      });
+      const response = await authenticatedFetch(
+        `/api/customers/${selectedCustomer._id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        },
+      );
       const result = await response.json();
-      
+
       if (result.success) {
         showSuccess('Customer updated successfully');
         setIsEditDialogOpen(false);
@@ -213,13 +227,16 @@ export default function CustomersPage() {
 
   const handleDeleteCustomer = async (customerId: string) => {
     if (!confirm('Are you sure you want to deactivate this customer?')) return;
-    
+
     try {
-      const response = await authenticatedFetch(`/api/customers/${customerId}`, {
-        method: 'DELETE',
-      });
+      const response = await authenticatedFetch(
+        `/api/customers/${customerId}`,
+        {
+          method: 'DELETE',
+        },
+      );
       const result = await response.json();
-      
+
       if (result.success) {
         showSuccess('Customer deactivated successfully');
         fetchCustomers();
@@ -285,6 +302,11 @@ export default function CustomersPage() {
     setIsViewDialogOpen(true);
   };
 
+  const openOrderHistory = (customer: Customer) => {
+    setSelectedCustomerForHistory(customer);
+    setIsOrderHistoryOpen(true);
+  };
+
   const openCreateDialog = () => {
     resetForm();
     setIsCreateDialogOpen(true);
@@ -292,10 +314,14 @@ export default function CustomersPage() {
 
   const getCustomerTypeColor = (type: string) => {
     switch (type) {
-      case 'retail': return 'bg-blue-100 text-blue-800';
-      case 'wholesale': return 'bg-green-100 text-green-800';
-      case 'corporate': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'retail':
+        return 'bg-blue-100 text-blue-800';
+      case 'wholesale':
+        return 'bg-green-100 text-green-800';
+      case 'corporate':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -315,7 +341,10 @@ export default function CustomersPage() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Customer Management</h1>
-        <Button onClick={openCreateDialog} className="flex items-center gap-2">
+        <Button
+          onClick={openCreateDialog}
+          className="flex items-center gap-2"
+        >
           <Plus className="h-4 w-4" />
           Add Customer
         </Button>
@@ -330,24 +359,28 @@ export default function CustomersPage() {
                 <Users className="h-5 w-5 text-blue-600" />
                 <div>
                   <p className="text-sm text-gray-600">Total Customers</p>
-                  <p className="text-2xl font-bold">{analytics.totalCustomers}</p>
+                  <p className="text-2xl font-bold">
+                    {analytics.totalCustomers}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-green-600" />
                 <div>
                   <p className="text-sm text-gray-600">New This Month</p>
-                  <p className="text-2xl font-bold">{analytics.newCustomersThisPeriod}</p>
+                  <p className="text-2xl font-bold">
+                    {analytics.newCustomersThisPeriod}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
@@ -355,13 +388,16 @@ export default function CustomersPage() {
                 <div>
                   <p className="text-sm text-gray-600">Corporate</p>
                   <p className="text-2xl font-bold">
-                    {analytics.customerTypeStats?.find((s: { _id: string; count: number }) => s._id === 'corporate')?.count || 0}
+                    {analytics.customerTypeStats?.find(
+                      (s: { _id: string; count: number }) =>
+                        s._id === 'corporate',
+                    )?.count || 0}
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
@@ -369,7 +405,7 @@ export default function CustomersPage() {
                 <div>
                   <p className="text-sm text-gray-600">Active</p>
                   <p className="text-2xl font-bold">
-                    {customers.filter(c => c.isActive).length}
+                    {customers.filter((c) => c.isActive).length}
                   </p>
                 </div>
               </div>
@@ -394,31 +430,40 @@ export default function CustomersPage() {
                 />
               </div>
             </div>
-            
-            <Select value={customerTypeFilter} onValueChange={setCustomerTypeFilter}>
+
+            <Select
+              value={customerTypeFilter}
+              onValueChange={setCustomerTypeFilter}
+            >
               <SelectTrigger className="w-full md:w-40">
                 <SelectValue placeholder="Customer Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="retail">Retail</SelectItem>
                 <SelectItem value="wholesale">Wholesale</SelectItem>
                 <SelectItem value="corporate">Corporate</SelectItem>
               </SelectContent>
             </Select>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+
+            <Select
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+            >
               <SelectTrigger className="w-full md:w-40">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Status</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="true">Active</SelectItem>
                 <SelectItem value="false">Inactive</SelectItem>
               </SelectContent>
             </Select>
-            
-            <Button onClick={handleSearch} className="flex items-center gap-2">
+
+            <Button
+              onClick={handleSearch}
+              className="flex items-center gap-2"
+            >
               <Filter className="h-4 w-4" />
               Apply Filters
             </Button>
@@ -472,11 +517,13 @@ export default function CustomersPage() {
                           {customer.phone}
                         </div>
                       </TableCell>
+                      <TableCell>{customer.company || '-'}</TableCell>
                       <TableCell>
-                        {customer.company || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getCustomerTypeColor(customer.customerType)}>
+                        <Badge
+                          className={getCustomerTypeColor(
+                            customer.customerType,
+                          )}
+                        >
                           {customer.customerType}
                         </Badge>
                       </TableCell>
@@ -496,6 +543,14 @@ export default function CustomersPage() {
                             onClick={() => openViewDialog(customer)}
                           >
                             <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openOrderHistory(customer)}
+                            title="View Order History"
+                          >
+                            <Package className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"
@@ -530,15 +585,17 @@ export default function CustomersPage() {
                   >
                     Previous
                   </Button>
-                  
+
                   <span className="text-sm">
                     Page {currentPage} of {totalPages}
                   </span>
-                  
+
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
                     disabled={currentPage === totalPages}
                   >
                     Next
@@ -551,12 +608,15 @@ export default function CustomersPage() {
       </Card>
 
       {/* Create Customer Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Customer</DialogTitle>
           </DialogHeader>
-          
+
           <CustomerForm
             formData={formData}
             setFormData={setFormData}
@@ -567,12 +627,15 @@ export default function CustomersPage() {
       </Dialog>
 
       {/* Edit Customer Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Customer</DialogTitle>
           </DialogHeader>
-          
+
           <CustomerForm
             formData={formData}
             setFormData={setFormData}
@@ -583,73 +646,111 @@ export default function CustomersPage() {
       </Dialog>
 
       {/* View Customer Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+      <Dialog
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Customer Details</DialogTitle>
           </DialogHeader>
-          
+
           {selectedCustomer && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Name</Label>
-                  <p className="text-lg font-semibold">{selectedCustomer.name}</p>
+                  <Label className="text-sm font-medium text-gray-600">
+                    Name
+                  </Label>
+                  <p className="text-lg font-semibold">
+                    {selectedCustomer.name}
+                  </p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Phone</Label>
+                  <Label className="text-sm font-medium text-gray-600">
+                    Phone
+                  </Label>
                   <p className="text-lg">{selectedCustomer.phone}</p>
                 </div>
                 {selectedCustomer.email && (
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Email</Label>
+                    <Label className="text-sm font-medium text-gray-600">
+                      Email
+                    </Label>
                     <p className="text-lg">{selectedCustomer.email}</p>
                   </div>
                 )}
                 {selectedCustomer.company && (
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Company</Label>
+                    <Label className="text-sm font-medium text-gray-600">
+                      Company
+                    </Label>
                     <p className="text-lg">{selectedCustomer.company}</p>
                   </div>
                 )}
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Customer Type</Label>
-                  <Badge className={getCustomerTypeColor(selectedCustomer.customerType)}>
+                  <Label className="text-sm font-medium text-gray-600">
+                    Customer Type
+                  </Label>
+                  <Badge
+                    className={getCustomerTypeColor(
+                      selectedCustomer.customerType,
+                    )}
+                  >
                     {selectedCustomer.customerType}
                   </Badge>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Status</Label>
+                  <Label className="text-sm font-medium text-gray-600">
+                    Status
+                  </Label>
                   <Badge className={getStatusColor(selectedCustomer.isActive)}>
                     {selectedCustomer.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
               </div>
-              
+
               {selectedCustomer.address && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Address</Label>
+                  <Label className="text-sm font-medium text-gray-600">
+                    Address
+                  </Label>
                   <div className="mt-1 p-3 bg-gray-50 rounded-md">
                     <p>{selectedCustomer.address.street}</p>
-                    <p>{selectedCustomer.address.city}, {selectedCustomer.address.state}</p>
-                    <p>{selectedCustomer.address.pincode}, {selectedCustomer.address.country}</p>
+                    <p>
+                      {selectedCustomer.address.city},{' '}
+                      {selectedCustomer.address.state}
+                    </p>
+                    <p>
+                      {selectedCustomer.address.pincode},{' '}
+                      {selectedCustomer.address.country}
+                    </p>
                   </div>
                 </div>
               )}
-              
+
               {selectedCustomer.notes && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                  <Label className="text-sm font-medium text-gray-600">
+                    Notes
+                  </Label>
                   <p className="mt-1">{selectedCustomer.notes}</p>
                 </div>
               )}
-              
+
               {selectedCustomer.tags && selectedCustomer.tags.length > 0 && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Tags</Label>
+                  <Label className="text-sm font-medium text-gray-600">
+                    Tags
+                  </Label>
                   <div className="mt-1 flex flex-wrap gap-2">
                     {selectedCustomer.tags.map((tag, index) => (
-                      <Badge key={index} variant="secondary">{tag}</Badge>
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                      >
+                        {tag}
+                      </Badge>
                     ))}
                   </div>
                 </div>
@@ -658,23 +759,39 @@ export default function CustomersPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Order History Modal */}
+      {selectedCustomerForHistory && (
+        <CustomerOrderHistoryModal
+          isOpen={isOrderHistoryOpen}
+          onClose={() => {
+            setIsOrderHistoryOpen(false);
+            setSelectedCustomerForHistory(null);
+          }}
+          customerId={selectedCustomerForHistory._id}
+          customerName={selectedCustomerForHistory.name}
+        />
+      )}
     </div>
   );
 }
 
 // Customer Form Component
-function CustomerForm({ 
-  formData, 
-  setFormData, 
-  onSubmit, 
-  submitLabel 
+function CustomerForm({
+  formData,
+  setFormData,
+  onSubmit,
+  submitLabel,
 }: {
   formData: CustomerFormData;
   setFormData: (data: CustomerFormData) => void;
   onSubmit: () => void;
   submitLabel: string;
 }) {
-  const handleInputChange = (field: string, value: string | number | boolean | string[]) => {
+  const handleInputChange = (
+    field: string,
+    value: string | number | boolean | string[],
+  ) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       if (parent === 'address' && typeof child === 'string') {
@@ -705,7 +822,7 @@ function CustomerForm({
             required
           />
         </div>
-        
+
         <div>
           <Label htmlFor="phone">Phone *</Label>
           <Input
@@ -715,7 +832,7 @@ function CustomerForm({
             required
           />
         </div>
-        
+
         <div>
           <Label htmlFor="email">Email</Label>
           <Input
@@ -725,7 +842,7 @@ function CustomerForm({
             onChange={(e) => handleInputChange('email', e.target.value)}
           />
         </div>
-        
+
         <div>
           <Label htmlFor="company">Company</Label>
           <Input
@@ -734,7 +851,7 @@ function CustomerForm({
             onChange={(e) => handleInputChange('company', e.target.value)}
           />
         </div>
-        
+
         <div>
           <Label htmlFor="gstNumber">GST Number</Label>
           <Input
@@ -743,7 +860,7 @@ function CustomerForm({
             onChange={(e) => handleInputChange('gstNumber', e.target.value)}
           />
         </div>
-        
+
         <div>
           <Label htmlFor="customerType">Customer Type</Label>
           <Select
@@ -760,17 +877,19 @@ function CustomerForm({
             </SelectContent>
           </Select>
         </div>
-        
+
         <div>
           <Label htmlFor="creditLimit">Credit Limit</Label>
           <Input
             id="creditLimit"
             type="number"
             value={formData.creditLimit}
-            onChange={(e) => handleInputChange('creditLimit', parseFloat(e.target.value) || 0)}
+            onChange={(e) =>
+              handleInputChange('creditLimit', parseFloat(e.target.value) || 0)
+            }
           />
         </div>
-        
+
         <div>
           <Label htmlFor="paymentTerms">Payment Terms</Label>
           <Select
@@ -790,7 +909,7 @@ function CustomerForm({
           </Select>
         </div>
       </div>
-      
+
       <div>
         <Label>Address</Label>
         <div className="grid grid-cols-2 gap-4 mt-2">
@@ -799,39 +918,47 @@ function CustomerForm({
             <Input
               id="street"
               value={formData.address.street}
-              onChange={(e) => handleInputChange('address.street', e.target.value)}
+              onChange={(e) =>
+                handleInputChange('address.street', e.target.value)
+              }
             />
           </div>
-          
+
           <div>
             <Label htmlFor="city">City</Label>
             <Input
               id="city"
               value={formData.address.city}
-              onChange={(e) => handleInputChange('address.city', e.target.value)}
+              onChange={(e) =>
+                handleInputChange('address.city', e.target.value)
+              }
             />
           </div>
-          
+
           <div>
             <Label htmlFor="state">State</Label>
             <Input
               id="state"
               value={formData.address.state}
-              onChange={(e) => handleInputChange('address.state', e.target.value)}
+              onChange={(e) =>
+                handleInputChange('address.state', e.target.value)
+              }
             />
           </div>
-          
+
           <div>
             <Label htmlFor="pincode">Pincode</Label>
             <Input
               id="pincode"
               value={formData.address.pincode}
-              onChange={(e) => handleInputChange('address.pincode', e.target.value)}
+              onChange={(e) =>
+                handleInputChange('address.pincode', e.target.value)
+              }
             />
           </div>
         </div>
       </div>
-      
+
       <div>
         <Label htmlFor="notes">Notes</Label>
         <textarea
@@ -842,14 +969,15 @@ function CustomerForm({
           onChange={(e) => handleInputChange('notes', e.target.value)}
         />
       </div>
-      
+
       <div className="flex justify-end gap-2">
-        <Button variant="outline" type="button">
+        <Button
+          variant="outline"
+          type="button"
+        >
           Cancel
         </Button>
-        <Button onClick={onSubmit}>
-          {submitLabel}
-        </Button>
+        <Button onClick={onSubmit}>{submitLabel}</Button>
       </div>
     </div>
   );

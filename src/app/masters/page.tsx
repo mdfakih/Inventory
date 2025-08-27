@@ -102,6 +102,7 @@ interface Stone {
   size: string;
   quantity: number;
   unit: 'g' | 'kg';
+  inventoryType: 'internal' | 'out';
 }
 
 interface Paper {
@@ -141,83 +142,188 @@ export default function MastersPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  // Separate pagination state for each tab
+  const [usersPagination, setUsersPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalPages: 1,
+    totalItems: 0,
+  });
+
+  const [stonesPagination, setStonesPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalPages: 1,
+    totalItems: 0,
+  });
+
+  const [papersPagination, setPapersPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalPages: 1,
+    totalItems: 0,
+  });
+
+  const [plasticsPagination, setPlasticsPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalPages: 1,
+    totalItems: 0,
+  });
+
+  const [tapesPagination, setTapesPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalPages: 1,
+    totalItems: 0,
+  });
+
   const router = useRouter();
   const { showSuccess, showError, showWarning } = useSnackbarHelpers();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
 
-  const loadAllData = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      // Load all master data
-      const [
-        usersRes,
-        passwordResetRes,
-        stonesRes,
-        papersRes,
-        plasticsRes,
-        tapesRes,
-      ] = await Promise.all([
-        fetch(`/api/masters/users?page=${currentPage}&limit=${itemsPerPage}`),
-        fetch('/api/auth/password-reset-requests'),
-        fetch(`/api/inventory/stones?page=${currentPage}&limit=${itemsPerPage}`),
-        fetch(`/api/inventory/paper?page=${currentPage}&limit=${itemsPerPage}`),
-        fetch(`/api/inventory/plastic?page=${currentPage}&limit=${itemsPerPage}`),
-        fetch(`/api/inventory/tape?page=${currentPage}&limit=${itemsPerPage}`),
-      ]);
+  const loadAllData = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+        // Load all master data
+        const [
+          usersRes,
+          passwordResetRes,
+          stonesRes,
+          stonesOutRes,
+          papersRes,
+          plasticsRes,
+          tapesRes,
+        ] = await Promise.all([
+          fetch(
+            `/api/masters/users?page=${usersPagination.currentPage}&limit=${usersPagination.itemsPerPage}`,
+          ),
+          fetch('/api/auth/password-reset-requests'),
+          fetch(
+            `/api/inventory/stones?page=${stonesPagination.currentPage}&limit=${stonesPagination.itemsPerPage}&type=internal`,
+          ),
+          fetch(
+            `/api/inventory/stones?page=${stonesPagination.currentPage}&limit=${stonesPagination.itemsPerPage}&type=out`,
+          ),
+          fetch(
+            `/api/inventory/paper?page=${papersPagination.currentPage}&limit=${papersPagination.itemsPerPage}`,
+          ),
+          fetch(
+            `/api/inventory/plastic?page=${plasticsPagination.currentPage}&limit=${plasticsPagination.itemsPerPage}`,
+          ),
+          fetch(
+            `/api/inventory/tape?page=${tapesPagination.currentPage}&limit=${tapesPagination.itemsPerPage}`,
+          ),
+        ]);
 
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsers(usersData.data || []);
-        if (usersData.pagination) {
-          setTotalPages(usersData.pagination.pages);
-          setTotalItems(usersData.pagination.total);
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          setUsers(usersData.data || []);
+          if (usersData.pagination) {
+            setUsersPagination({
+              currentPage: usersData.pagination.page,
+              itemsPerPage: usersData.pagination.limit,
+              totalPages: usersData.pagination.pages,
+              totalItems: usersData.pagination.total,
+            });
+          }
+        }
+
+        if (passwordResetRes.ok) {
+          const passwordResetData = await passwordResetRes.json();
+          setPasswordResetRequests(passwordResetData.data || []);
+        }
+
+        if (stonesRes.ok && stonesOutRes.ok) {
+          const stonesData = await stonesRes.json();
+          const stonesOutData = await stonesOutRes.json();
+          const allStones = [
+            ...(stonesData.data || []),
+            ...(stonesOutData.data || []),
+          ];
+          setStones(allStones);
+          // Calculate combined pagination for stones
+          const totalInternal = stonesData.pagination?.total || 0;
+          const totalOut = stonesOutData.pagination?.total || 0;
+          const totalStones = totalInternal + totalOut;
+          const totalPages = Math.ceil(
+            totalStones / stonesPagination.itemsPerPage,
+          );
+
+          setStonesPagination((prev) => ({
+            ...prev,
+            totalPages,
+            totalItems: totalStones,
+          }));
+        }
+
+        if (papersRes.ok) {
+          const papersData = await papersRes.json();
+          setPapers(papersData.data || []);
+          if (papersData.pagination) {
+            setPapersPagination({
+              currentPage: papersData.pagination.page,
+              itemsPerPage: papersData.pagination.limit,
+              totalPages: papersData.pagination.pages,
+              totalItems: papersData.pagination.total,
+            });
+          }
+        }
+
+        if (plasticsRes.ok) {
+          const plasticsData = await plasticsRes.json();
+          setPlastics(plasticsData.data || []);
+          if (plasticsData.pagination) {
+            setPlasticsPagination({
+              currentPage: plasticsData.pagination.page,
+              itemsPerPage: plasticsData.pagination.limit,
+              totalPages: plasticsData.pagination.pages,
+              totalItems: plasticsData.pagination.total,
+            });
+          }
+        }
+
+        if (tapesRes.ok) {
+          const tapesData = await tapesRes.json();
+          setTapes(tapesData.data || []);
+          if (tapesData.pagination) {
+            setTapesPagination({
+              currentPage: tapesData.pagination.page,
+              itemsPerPage: tapesData.pagination.limit,
+              totalPages: tapesData.pagination.pages,
+              totalItems: tapesData.pagination.total,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading master data:', error);
+        showError('Data Loading Error', 'Failed to load master data.');
+      } finally {
+        setLoading(false);
+        if (isRefresh) {
+          setRefreshing(false);
         }
       }
-
-      if (passwordResetRes.ok) {
-        const passwordResetData = await passwordResetRes.json();
-        setPasswordResetRequests(passwordResetData.data || []);
-      }
-
-      if (stonesRes.ok) {
-        const stonesData = await stonesRes.json();
-        setStones(stonesData.data || []);
-      }
-
-      if (papersRes.ok) {
-        const papersData = await papersRes.json();
-        setPapers(papersData.data || []);
-      }
-
-      if (plasticsRes.ok) {
-        const plasticsData = await plasticsRes.json();
-        setPlastics(plasticsData.data || []);
-      }
-
-      if (tapesRes.ok) {
-        const tapesData = await tapesRes.json();
-        setTapes(tapesData.data || []);
-      }
-    } catch (error) {
-      console.error('Error loading master data:', error);
-      showError('Data Loading Error', 'Failed to load master data.');
-    } finally {
-      setLoading(false);
-      if (isRefresh) {
-        setRefreshing(false);
-      }
-    }
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage]);
+    [
+      usersPagination.currentPage,
+      usersPagination.itemsPerPage,
+      stonesPagination.currentPage,
+      stonesPagination.itemsPerPage,
+      papersPagination.currentPage,
+      papersPagination.itemsPerPage,
+      plasticsPagination.currentPage,
+      plasticsPagination.itemsPerPage,
+      tapesPagination.currentPage,
+      tapesPagination.itemsPerPage,
+    ],
+  );
 
   useEffect(() => {
     if (!authLoading) {
@@ -283,9 +389,11 @@ export default function MastersPage() {
   );
 
   // Edit and delete states for master data
+  const [editingStone, setEditingStone] = useState<Stone | null>(null);
   const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
   const [editingPlastic, setEditingPlastic] = useState<Plastic | null>(null);
   const [editingTape, setEditingTape] = useState<Tape | null>(null);
+  const [isEditStoneDialogOpen, setIsEditStoneDialogOpen] = useState(false);
   const [isEditPaperDialogOpen, setIsEditPaperDialogOpen] = useState(false);
   const [isEditPlasticDialogOpen, setIsEditPlasticDialogOpen] = useState(false);
   const [isEditTapeDialogOpen, setIsEditTapeDialogOpen] = useState(false);
@@ -297,6 +405,11 @@ export default function MastersPage() {
   };
 
   // Edit handlers for master data
+  const handleEditStone = (stone: Stone) => {
+    setEditingStone(stone);
+    setIsEditStoneDialogOpen(true);
+  };
+
   const handleEditPaper = (paper: Paper) => {
     setEditingPaper(paper);
     setIsEditPaperDialogOpen(true);
@@ -312,14 +425,65 @@ export default function MastersPage() {
     setIsEditTapeDialogOpen(true);
   };
 
-  // Pagination handlers
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+  // Pagination handlers for each tab
+  const handleUsersPageChange = (page: number) => {
+    setUsersPagination((prev) => ({ ...prev, currentPage: page }));
   };
 
-  const handleItemsPerPageChange = (newItemsPerPage: number) => {
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page when changing items per page
+  const handleUsersItemsPerPageChange = (newItemsPerPage: number) => {
+    setUsersPagination((prev) => ({
+      ...prev,
+      itemsPerPage: newItemsPerPage,
+      currentPage: 1, // Reset to first page when changing items per page
+    }));
+  };
+
+  const handleStonesPageChange = (page: number) => {
+    setStonesPagination((prev) => ({ ...prev, currentPage: page }));
+  };
+
+  const handleStonesItemsPerPageChange = (newItemsPerPage: number) => {
+    setStonesPagination((prev) => ({
+      ...prev,
+      itemsPerPage: newItemsPerPage,
+      currentPage: 1, // Reset to first page when changing items per page
+    }));
+  };
+
+  const handlePapersPageChange = (page: number) => {
+    setPapersPagination((prev) => ({ ...prev, currentPage: page }));
+  };
+
+  const handlePapersItemsPerPageChange = (newItemsPerPage: number) => {
+    setPapersPagination((prev) => ({
+      ...prev,
+      itemsPerPage: newItemsPerPage,
+      currentPage: 1, // Reset to first page when changing items per page
+    }));
+  };
+
+  const handlePlasticsPageChange = (page: number) => {
+    setPlasticsPagination((prev) => ({ ...prev, currentPage: page }));
+  };
+
+  const handlePlasticsItemsPerPageChange = (newItemsPerPage: number) => {
+    setPlasticsPagination((prev) => ({
+      ...prev,
+      itemsPerPage: newItemsPerPage,
+      currentPage: 1, // Reset to first page when changing items per page
+    }));
+  };
+
+  const handleTapesPageChange = (page: number) => {
+    setTapesPagination((prev) => ({ ...prev, currentPage: page }));
+  };
+
+  const handleTapesItemsPerPageChange = (newItemsPerPage: number) => {
+    setTapesPagination((prev) => ({
+      ...prev,
+      itemsPerPage: newItemsPerPage,
+      currentPage: 1, // Reset to first page when changing items per page
+    }));
   };
 
   // Delete handlers for master data
@@ -732,16 +896,14 @@ export default function MastersPage() {
                 </div>
               )}
 
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={handlePageChange}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              )}
+              <Pagination
+                currentPage={usersPagination.currentPage}
+                totalPages={usersPagination.totalPages}
+                totalItems={usersPagination.totalItems}
+                itemsPerPage={usersPagination.itemsPerPage}
+                onPageChange={handleUsersPageChange}
+                onItemsPerPageChange={handleUsersItemsPerPageChange}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -830,16 +992,14 @@ export default function MastersPage() {
                 </div>
               )}
 
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={handlePageChange}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              )}
+              <Pagination
+                currentPage={usersPagination.currentPage}
+                totalPages={usersPagination.totalPages}
+                totalItems={usersPagination.totalItems}
+                itemsPerPage={usersPagination.itemsPerPage}
+                onPageChange={handleUsersPageChange}
+                onItemsPerPageChange={handleUsersItemsPerPageChange}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -884,6 +1044,7 @@ export default function MastersPage() {
                         <TableHead>Color</TableHead>
                         <TableHead>Size</TableHead>
                         <TableHead>Unit</TableHead>
+                        <TableHead>Inventory Type</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -900,10 +1061,24 @@ export default function MastersPage() {
                           <TableCell>{stone.size}</TableCell>
                           <TableCell>{stone.unit}</TableCell>
                           <TableCell>
+                            <Badge
+                              variant={
+                                stone.inventoryType === 'internal'
+                                  ? 'default'
+                                  : 'secondary'
+                              }
+                            >
+                              {stone.inventoryType === 'internal'
+                                ? 'Internal'
+                                : 'Out'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
+                                onClick={() => handleEditStone(stone)}
                               >
                                 <Edit className="h-4 w-4 mr-1" />
                                 Edit
@@ -928,16 +1103,14 @@ export default function MastersPage() {
                 </div>
               </div>
 
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={handlePageChange}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              )}
+              <Pagination
+                currentPage={stonesPagination.currentPage}
+                totalPages={stonesPagination.totalPages}
+                totalItems={stonesPagination.totalItems}
+                itemsPerPage={stonesPagination.itemsPerPage}
+                onPageChange={handleStonesPageChange}
+                onItemsPerPageChange={handleStonesItemsPerPageChange}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1044,16 +1217,14 @@ export default function MastersPage() {
                 </div>
               )}
 
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={handlePageChange}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              )}
+              <Pagination
+                currentPage={papersPagination.currentPage}
+                totalPages={papersPagination.totalPages}
+                totalItems={papersPagination.totalItems}
+                itemsPerPage={papersPagination.itemsPerPage}
+                onPageChange={handlePapersPageChange}
+                onItemsPerPageChange={handlePapersItemsPerPageChange}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1152,16 +1323,14 @@ export default function MastersPage() {
                 </div>
               )}
 
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={handlePageChange}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              )}
+              <Pagination
+                currentPage={plasticsPagination.currentPage}
+                totalPages={plasticsPagination.totalPages}
+                totalItems={plasticsPagination.totalItems}
+                itemsPerPage={plasticsPagination.itemsPerPage}
+                onPageChange={handlePlasticsPageChange}
+                onItemsPerPageChange={handlePlasticsItemsPerPageChange}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1253,16 +1422,14 @@ export default function MastersPage() {
                 </div>
               )}
 
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={totalItems}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={handlePageChange}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              )}
+              <Pagination
+                currentPage={tapesPagination.currentPage}
+                totalPages={tapesPagination.totalPages}
+                totalItems={tapesPagination.totalItems}
+                itemsPerPage={tapesPagination.itemsPerPage}
+                onPageChange={handleTapesPageChange}
+                onItemsPerPageChange={handleTapesItemsPerPageChange}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1288,6 +1455,32 @@ export default function MastersPage() {
               onCancel={() => {
                 setIsEditDialogOpen(false);
                 setSelectedUserForEdit(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Stone Dialog */}
+      <Dialog
+        open={isEditStoneDialogOpen}
+        onOpenChange={setIsEditStoneDialogOpen}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Stone Type</DialogTitle>
+          </DialogHeader>
+          {editingStone && (
+            <EditStoneForm
+              stone={editingStone}
+              onSuccess={() => {
+                setIsEditStoneDialogOpen(false);
+                setEditingStone(null);
+                loadAllData();
+              }}
+              onCancel={() => {
+                setIsEditStoneDialogOpen(false);
+                setEditingStone(null);
               }}
             />
           )}
@@ -1600,6 +1793,7 @@ function StoneForm({ onSuccess }: { onSuccess: () => void }) {
     color: '',
     size: '',
     unit: 'g' as 'g' | 'kg',
+    inventoryType: 'internal' as 'internal' | 'out',
   });
   const [loading, setLoading] = useState(false);
   const { showSuccess, showError } = useSnackbarHelpers();
@@ -1620,7 +1814,14 @@ function StoneForm({ onSuccess }: { onSuccess: () => void }) {
           'New stone type has been added successfully.',
         );
         onSuccess();
-        setFormData({ name: '', number: '', color: '', size: '', unit: 'g' });
+        setFormData({
+          name: '',
+          number: '',
+          color: '',
+          size: '',
+          unit: 'g',
+          inventoryType: 'internal',
+        });
       } else {
         const data = await response.json();
         showError(
@@ -1697,24 +1898,45 @@ function StoneForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="unit">
-          Unit <span className="text-red-500">*</span>
-        </Label>
-        <Select
-          value={formData.unit}
-          onValueChange={(value: 'g' | 'kg') =>
-            setFormData({ ...formData, unit: value })
-          }
-        >
-          <SelectTrigger className="mt-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="g">Grams (g)</SelectItem>
-            <SelectItem value="kg">Kilograms (kg)</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="unit">
+            Unit <span className="text-red-500">*</span>
+          </Label>
+          <Select
+            value={formData.unit}
+            onValueChange={(value: 'g' | 'kg') =>
+              setFormData({ ...formData, unit: value })
+            }
+          >
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="g">Grams (g)</SelectItem>
+              <SelectItem value="kg">Kilograms (kg)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="inventoryType">
+            Inventory Type <span className="text-red-500">*</span>
+          </Label>
+          <Select
+            value={formData.inventoryType}
+            onValueChange={(value: 'internal' | 'out') =>
+              setFormData({ ...formData, inventoryType: value })
+            }
+          >
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="internal">Internal</SelectItem>
+              <SelectItem value="out">Out</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="flex justify-end space-x-2">
         <LoadingButton
@@ -2062,6 +2284,183 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
 }
 
 // Edit form components
+function EditStoneForm({
+  stone,
+  onSuccess,
+  onCancel,
+}: {
+  stone: Stone;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    name: stone.name,
+    number: stone.number,
+    color: stone.color,
+    size: stone.size,
+    unit: stone.unit,
+    inventoryType: stone.inventoryType,
+  });
+  const [loading, setLoading] = useState(false);
+  const { showSuccess, showError } = useSnackbarHelpers();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/inventory/stones/${stone._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        showSuccess(
+          'Stone Type Updated',
+          'Stone type has been updated successfully.',
+        );
+        onSuccess();
+      } else {
+        const data = await response.json();
+        showError(
+          'Update Failed',
+          data.message || 'Failed to update stone type.',
+        );
+      }
+    } catch (error) {
+      console.error('Error updating stone:', error);
+      showError(
+        'Network Error',
+        'Failed to update stone type. Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4"
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-name">
+            Name <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="edit-name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+            className="mt-1"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-number">
+            Number <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="edit-number"
+            value={formData.number}
+            onChange={(e) =>
+              setFormData({ ...formData, number: e.target.value })
+            }
+            required
+            className="mt-1"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-color">
+            Color <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="edit-color"
+            value={formData.color}
+            onChange={(e) =>
+              setFormData({ ...formData, color: e.target.value })
+            }
+            required
+            className="mt-1"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-size">
+            Size <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="edit-size"
+            value={formData.size}
+            onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+            required
+            className="mt-1"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-unit">
+            Unit <span className="text-red-500">*</span>
+          </Label>
+          <Select
+            value={formData.unit}
+            onValueChange={(value: 'g' | 'kg') =>
+              setFormData({ ...formData, unit: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select unit" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="g">Grams (g)</SelectItem>
+              <SelectItem value="kg">Kilograms (kg)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-inventoryType">
+            Inventory Type <span className="text-red-500">*</span>
+          </Label>
+          <Select
+            value={formData.inventoryType}
+            onValueChange={(value: 'internal' | 'out') =>
+              setFormData({ ...formData, inventoryType: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select inventory type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="internal">Internal</SelectItem>
+              <SelectItem value="out">Out</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-4">
+        <LoadingButton
+          type="submit"
+          loading={loading}
+          className="flex-1"
+        >
+          Update Stone Type
+        </LoadingButton>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          className="flex-1"
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function EditPaperForm({
   paper,
   onSuccess,

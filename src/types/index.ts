@@ -120,10 +120,15 @@ export interface Customer {
 export interface DesignOrder {
   _id?: string;
   designId: string | Design;
-  quantity: number;
   stonesUsed: Array<{
     stoneId: string | Stone;
     quantity: number;
+  }>;
+  otherItemsUsed?: Array<{
+    itemType: 'plastic' | 'tape' | 'other';
+    itemId: string | Plastic | Tape;
+    quantity: number;
+    unit?: string;
   }>;
   paperUsed: {
     sizeInInch: number;
@@ -144,10 +149,10 @@ export interface Order {
   phone: string;
   customerId?: string; // Reference to Customer model
   gstNumber?: string;
-  
+
   // New structure for multiple design orders
   designOrders: DesignOrder[];
-  
+
   // Legacy fields for backward compatibility
   designId?: string | Design;
   stonesUsed?: Array<{
@@ -160,7 +165,7 @@ export interface Order {
     paperWeightPerPc: number;
     customPaperWeight?: number;
   };
-  
+
   finalTotalWeight?: number;
   calculatedWeight?: number;
   weightDiscrepancy: number;

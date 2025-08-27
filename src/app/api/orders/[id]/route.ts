@@ -135,7 +135,10 @@ export async function PUT(
       });
     }
 
-    if (customerId !== undefined && customerId !== oldValues.customerId?.toString()) {
+    if (
+      customerId !== undefined &&
+      customerId !== oldValues.customerId?.toString()
+    ) {
       updateHistory.push({
         field: 'customerId',
         oldValue: oldValues.customerId,
@@ -168,7 +171,7 @@ export async function PUT(
     // Handle design orders updates
     let totalCalculatedWeight = order.calculatedWeight || 0;
     let totalCost = order.totalCost || 0;
-    
+
     if (designOrders && Array.isArray(designOrders)) {
       updateHistory.push({
         field: 'designOrders',
@@ -184,11 +187,19 @@ export async function PUT(
       totalCost = 0;
 
       for (const designOrder of designOrders) {
-        const { designId, quantity, paperUsed } = designOrder;
+        const { designId, paperUsed } = designOrder;
 
-        if (!designId || !quantity || !paperUsed || !paperUsed.sizeInInch || !paperUsed.quantityInPcs) {
+        if (
+          !designId ||
+          !paperUsed ||
+          !paperUsed.sizeInInch ||
+          !paperUsed.quantityInPcs
+        ) {
           return NextResponse.json(
-            { success: false, message: 'Each design order must have designId, quantity, and paper details' },
+            {
+              success: false,
+              message: 'Each design order must have designId and paper details',
+            },
             { status: 400 },
           );
         }
@@ -200,14 +211,21 @@ export async function PUT(
         });
         if (!paper) {
           return NextResponse.json(
-            { success: false, message: `Paper size ${paperUsed.sizeInInch}" not found in ${type === 'out' ? 'out' : 'internal'} inventory` },
+            {
+              success: false,
+              message: `Paper size ${paperUsed.sizeInInch}" not found in ${
+                type === 'out' ? 'out' : 'internal'
+              } inventory`,
+            },
             { status: 400 },
           );
         }
 
         // Get design to calculate stone weights as per design
         const Design = await import('@/models/Design').then((m) => m.default);
-        const design = await Design.findById(designId).populate('defaultStones.stoneId');
+        const design = await Design.findById(designId).populate(
+          'defaultStones.stoneId',
+        );
         if (!design) {
           return NextResponse.json(
             { success: false, message: 'Design not found' },
@@ -219,10 +237,8 @@ export async function PUT(
         let designStoneWeight = 0;
         if (design.defaultStones && design.defaultStones.length > 0) {
           for (const designStone of design.defaultStones) {
-            const stone = designStone.stoneId;
-            if (stone) {
-              designStoneWeight += stone.weightPerPiece || stone.quantity || 0;
-            }
+            // Use designStone.quantity directly as it represents the weight of this stone used in the design
+            designStoneWeight += designStone.quantity || 0;
           }
         }
 
@@ -240,14 +256,20 @@ export async function PUT(
         }
 
         // Prepare stones used data
-        const stonesUsed = design.defaultStones ? design.defaultStones.map((designStone: { stoneId: { _id: string }; quantity: number }) => ({
-          stoneId: designStone.stoneId._id,
-          quantity: designStone.quantity * paperUsed.quantityInPcs,
-        })) : [];
+        const stonesUsed = design.defaultStones
+          ? design.defaultStones.map(
+              (designStone: {
+                stoneId: { _id: string };
+                quantity: number;
+              }) => ({
+                stoneId: designStone.stoneId._id,
+                quantity: designStone.quantity * paperUsed.quantityInPcs,
+              }),
+            )
+          : [];
 
         processedDesignOrders.push({
           designId: design._id,
-          quantity: paperUsed.quantityInPcs,
           stonesUsed,
           paperUsed: {
             ...paperUsed,
@@ -271,8 +293,16 @@ export async function PUT(
     let discountedAmount = order.discountedAmount || 0;
     let finalAmount = order.finalAmount || 0;
 
-    if (modeOfPayment !== undefined || paymentStatus !== undefined || discountType !== undefined || discountValue !== undefined) {
-      if (modeOfPayment !== undefined && modeOfPayment !== oldValues.modeOfPayment) {
+    if (
+      modeOfPayment !== undefined ||
+      paymentStatus !== undefined ||
+      discountType !== undefined ||
+      discountValue !== undefined
+    ) {
+      if (
+        modeOfPayment !== undefined &&
+        modeOfPayment !== oldValues.modeOfPayment
+      ) {
         updateHistory.push({
           field: 'modeOfPayment',
           oldValue: oldValues.modeOfPayment,
@@ -282,7 +312,10 @@ export async function PUT(
         });
       }
 
-      if (paymentStatus !== undefined && paymentStatus !== oldValues.paymentStatus) {
+      if (
+        paymentStatus !== undefined &&
+        paymentStatus !== oldValues.paymentStatus
+      ) {
         updateHistory.push({
           field: 'paymentStatus',
           oldValue: oldValues.paymentStatus,
@@ -292,7 +325,10 @@ export async function PUT(
         });
       }
 
-      if (discountType !== undefined && discountType !== oldValues.discountType) {
+      if (
+        discountType !== undefined &&
+        discountType !== oldValues.discountType
+      ) {
         updateHistory.push({
           field: 'discountType',
           oldValue: oldValues.discountType,
@@ -302,7 +338,10 @@ export async function PUT(
         });
       }
 
-      if (discountValue !== undefined && discountValue !== oldValues.discountValue) {
+      if (
+        discountValue !== undefined &&
+        discountValue !== oldValues.discountValue
+      ) {
         updateHistory.push({
           field: 'discountValue',
           oldValue: oldValues.discountValue,
@@ -318,9 +357,9 @@ export async function PUT(
       } else {
         discountedAmount = discountValue || 0;
       }
-      
+
       finalAmount = totalCost - discountedAmount;
-      
+
       updateData.discountedAmount = discountedAmount;
       updateData.finalAmount = finalAmount;
     }
@@ -329,10 +368,16 @@ export async function PUT(
     let effectiveFinalWeight: number | undefined;
     if (finalTotalWeight !== undefined || status === 'completed') {
       // If finalTotalWeight is not provided but order is being completed, use calculated weight as final weight
-      effectiveFinalWeight = finalTotalWeight !== undefined ? finalTotalWeight : totalCalculatedWeight;
+      effectiveFinalWeight =
+        finalTotalWeight !== undefined
+          ? finalTotalWeight
+          : totalCalculatedWeight;
 
       const weightDiscrepancy = effectiveFinalWeight! - totalCalculatedWeight;
-      const discrepancyPercentage = totalCalculatedWeight > 0 ? (weightDiscrepancy / totalCalculatedWeight) * 100 : 0;
+      const discrepancyPercentage =
+        totalCalculatedWeight > 0
+          ? (weightDiscrepancy / totalCalculatedWeight) * 100
+          : 0;
 
       // Add discrepancy calculation to history
       updateHistory.push({

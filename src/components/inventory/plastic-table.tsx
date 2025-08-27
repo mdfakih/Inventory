@@ -378,18 +378,16 @@ export default function PlasticTable() {
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center mt-4">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            onItemsPerPageChange={handleItemsPerPageChange}
-            itemsPerPage={itemsPerPage}
-            totalItems={totalItems}
-          />
-        </div>
-      )}
+      <div className="flex justify-center mt-4">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          onItemsPerPageChange={handleItemsPerPageChange}
+          itemsPerPage={itemsPerPage}
+          totalItems={totalItems}
+        />
+      </div>
     </div>
   );
 }

@@ -4,6 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { authenticatedFetch } from '@/lib/utils';
 import { Customer } from '@/types';
 import { Search, X, User, Building2, Phone, Mail } from 'lucide-react';
@@ -14,25 +20,33 @@ interface CustomerAutocompleteProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  allowCreate?: boolean;
 }
 
 export function CustomerAutocomplete({
   onChange,
   onCustomerSelect,
-  placeholder = "Search customers...",
-  className = "",
-  disabled = false
+  placeholder = 'Search customers...',
+  className = '',
+  disabled = false,
+  allowCreate = false,
 }: CustomerAutocompleteProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null,
+  );
+  const [isSelecting, setIsSelecting] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -42,23 +56,48 @@ export function CustomerAutocomplete({
   }, []);
 
   useEffect(() => {
+    console.log('useEffect triggered:', {
+      searchQuery,
+      isSelecting,
+      selectedCustomer: selectedCustomer?.name,
+    });
+
+    if (isSelecting) {
+      setIsSelecting(false);
+      return;
+    }
+
+    // Don't search if we have a selected customer
+    if (selectedCustomer) {
+      console.log('Customer selected, preventing search');
+      setSuggestions([]);
+      setIsOpen(false);
+      return;
+    }
+
     if (searchQuery.trim().length >= 2) {
       searchCustomers(searchQuery);
     } else {
       setSuggestions([]);
       setIsOpen(false);
     }
-  }, [searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, isSelecting, selectedCustomer]);
 
   const searchCustomers = async (query: string) => {
     try {
       setLoading(true);
-      const response = await authenticatedFetch(`/api/customers/search?q=${encodeURIComponent(query)}&limit=10`);
+      const response = await authenticatedFetch(
+        `/api/customers/search?q=${encodeURIComponent(query)}&limit=10`,
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           setSuggestions(data.data);
-          setIsOpen(data.data.length > 0);
+          // Only open dropdown if we don't have a selected customer
+          if (!selectedCustomer) {
+            setIsOpen(data.data.length > 0);
+          }
         }
       }
     } catch (error) {
@@ -70,11 +109,20 @@ export function CustomerAutocomplete({
   };
 
   const handleCustomerSelect = (customer: Customer) => {
+    console.log('Customer selected:', customer.name);
+    // Immediately close dropdown and clear suggestions
+    setIsOpen(false);
+    setSuggestions([]);
+
     setSelectedCustomer(customer);
-    setSearchQuery(customer.name);
+    setIsSelecting(true);
     onChange(customer.name);
     onCustomerSelect?.(customer);
-    setIsOpen(false);
+
+    // Set search query after a small delay to avoid triggering useEffect
+    setTimeout(() => {
+      setSearchQuery(customer.name);
+    }, 50);
   };
 
   const handleClear = () => {
@@ -90,10 +138,43 @@ export function CustomerAutocomplete({
     const newValue = e.target.value;
     setSearchQuery(newValue);
     onChange(newValue);
-    
+
+    // Clear selected customer if user types something different
+    if (selectedCustomer && newValue !== selectedCustomer.name) {
+      setSelectedCustomer(null);
+      onCustomerSelect?.(null);
+    }
+
     if (!newValue) {
       setSelectedCustomer(null);
       onCustomerSelect?.(null);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (
+      e.key === 'Enter' &&
+      allowCreate &&
+      searchQuery.trim() &&
+      suggestions.length === 0
+    ) {
+      e.preventDefault();
+      // Create a temporary customer object for new customer
+      const newCustomer: Customer = {
+        _id: 'temp-' + Date.now(),
+        name: searchQuery.trim(),
+        phone: '',
+        customerType: 'retail',
+        creditLimit: 0,
+        paymentTerms: 'immediate',
+        isActive: true,
+        tags: [],
+        createdBy: '',
+        updateHistory: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      handleCustomerSelect(newCustomer);
     }
   };
 
@@ -110,132 +191,158 @@ export function CustomerAutocomplete({
 
   const getCustomerTypeColor = (type: string) => {
     switch (type) {
-      case 'retail': return 'bg-blue-100 text-blue-800';
-      case 'wholesale': return 'bg-green-100 text-green-800';
-      case 'corporate': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'retail':
+        return 'bg-blue-900 text-blue-200';
+      case 'wholesale':
+        return 'bg-green-900 text-green-200';
+      case 'corporate':
+        return 'bg-purple-900 text-purple-200';
+      default:
+        return 'bg-gray-700 text-gray-200';
     }
   };
 
   return (
-    <div ref={wrapperRef} className={`relative ${className}`}>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          value={searchQuery}
-          onChange={handleInputChange}
-          placeholder={placeholder}
-          disabled={disabled}
-          className="pl-10 pr-10"
-          onFocus={() => {
-            if (suggestions.length > 0) setIsOpen(true);
-          }}
-        />
-        {selectedCustomer && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleClear}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
+    <TooltipProvider>
+      <div
+        ref={wrapperRef}
+        className={`relative ${className}`}
+      >
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            value={searchQuery}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled}
+            className="pl-10 pr-10"
+            onFocus={() => {
+              // Only open dropdown if we have suggestions and no customer is selected
+              if (suggestions.length > 0 && !selectedCustomer) {
+                setIsOpen(true);
+              } else if (selectedCustomer) {
+                // If customer is selected, keep dropdown closed
+                setIsOpen(false);
+                setSuggestions([]);
+              }
+            }}
+          />
+          {selectedCustomer && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleClear}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
 
-      {/* Suggestions Dropdown */}
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-          {loading ? (
-            <div className="p-4 text-center text-gray-500">
-              Searching...
-            </div>
-          ) : suggestions.length > 0 ? (
-            <div>
-              {suggestions.map((customer) => (
-                <div
-                  key={customer._id}
-                  className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                  onClick={() => handleCustomerSelect(customer)}
-                >
-                  <div className="flex items-center gap-3">
-                    {getCustomerTypeIcon(customer.customerType)}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900 truncate">
-                          {customer.name}
-                        </span>
-                        <Badge className={`text-xs ${getCustomerTypeColor(customer.customerType)}`}>
-                          {customer.customerType}
-                        </Badge>
+        {/* Suggestions Dropdown */}
+        {isOpen && !selectedCustomer && (
+          <div className="absolute z-50 w-full mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+            {loading ? (
+              <div className="p-3 text-center text-gray-400 text-sm">
+                Searching...
+              </div>
+            ) : suggestions.length > 0 ? (
+              <div className="py-1">
+                {suggestions.map((customer) => (
+                  <div
+                    key={customer._id}
+                    className="px-3 py-2.5 hover:bg-gray-800 cursor-pointer transition-colors duration-150 border-b border-gray-700 last:border-b-0"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleCustomerSelect(customer);
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0">
+                        {getCustomerTypeIcon(customer.customerType)}
                       </div>
-                      
-                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          <span>{customer.phone}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="font-medium text-gray-100 truncate text-sm block max-w-[200px]">
+                                {customer.name}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{customer.name}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Badge
+                            className={`text-xs px-1.5 py-0.5 ${getCustomerTypeColor(
+                              customer.customerType,
+                            )}`}
+                          >
+                            {customer.customerType}
+                          </Badge>
                         </div>
-                        
-                        {customer.email && (
-                          <div className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            <span className="truncate">{customer.email}</span>
-                          </div>
-                        )}
-                        
-                        {customer.company && (
-                          <div className="flex items-center gap-1">
-                            <Building2 className="h-3 w-3" />
-                            <span className="truncate">{customer.company}</span>
-                          </div>
-                        )}
-                        
-                        {customer.gstNumber && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              GST: {customer.gstNumber}
-                            </span>
-                          </div>
-                        )}
+
+                        <div className="flex flex-col gap-1 text-xs text-gray-400">
+                          {customer.phone && (
+                            <div className="flex items-center gap-1">
+                              <Phone className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{customer.phone}</span>
+                            </div>
+                          )}
+
+                          {customer.email && (
+                            <div className="flex items-center gap-1">
+                              <Mail className="h-3 w-3 flex-shrink-0" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="truncate block max-w-[200px]">
+                                    {customer.email}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{customer.email}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          )}
+
+                          {customer.company && (
+                            <div className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">
+                                {customer.company}
+                              </span>
+                            </div>
+                          )}
+
+                          {customer.gstNumber && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">
+                                GST: {customer.gstNumber}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : searchQuery.trim().length >= 2 ? (
-            <div className="p-4 text-center text-gray-500">
-              No customers found. Press Enter to create new customer.
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      {/* Selected Customer Info */}
-      {selectedCustomer && (
-        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {getCustomerTypeIcon(selectedCustomer.customerType)}
-              <div>
-                <div className="font-medium text-blue-900">
-                  {selectedCustomer.name}
-                </div>
-                <div className="text-sm text-blue-700">
-                  {selectedCustomer.phone}
-                  {selectedCustomer.email && ` • ${selectedCustomer.email}`}
-                  {selectedCustomer.company && ` • ${selectedCustomer.company}`}
-                  {selectedCustomer.gstNumber && ` • GST: ${selectedCustomer.gstNumber}`}
-                </div>
+                ))}
               </div>
-            </div>
-            <Badge className={getCustomerTypeColor(selectedCustomer.customerType)}>
-              {selectedCustomer.customerType}
-            </Badge>
+            ) : searchQuery.trim().length >= 2 ? (
+              <div className="p-3 text-center text-gray-400 text-sm">
+                {allowCreate ? (
+                  <>No customers found. Press Enter to create new customer.</>
+                ) : (
+                  'No customers found.'
+                )}
+              </div>
+            ) : null}
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

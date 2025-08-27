@@ -3,7 +3,10 @@ import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import Stone from '@/models/Stone';
 import Paper from '@/models/Paper';
+import Plastic from '@/models/Plastic';
+import Tape from '@/models/Tape';
 import Design from '@/models/Design';
+import Customer from '@/models/Customer';
 import { getCurrentUser } from '@/lib/auth';
 
 // Updated interface for creating orders with multiple designs
@@ -20,6 +23,12 @@ interface CreateOrderData {
       sizeInInch: number;
       quantityInPcs: number;
     };
+    otherItemsUsed?: Array<{
+      itemType: 'plastic' | 'tape' | 'other';
+      itemId: string;
+      quantity: number;
+      unit?: string;
+    }>;
   }>;
   modeOfPayment: 'cash' | 'UPI' | 'card';
   paymentStatus: 'pending' | 'partial' | 'completed' | 'overdue';
@@ -116,14 +125,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   let order = null;
-  const inventoryPapers: Array<{ 
-    paper: { 
-      _id: string; 
-      totalPieces: number; 
-      piecesPerRoll: number; 
-      weightPerPiece: number; 
-    }; 
-    requiredPieces: number 
+  const inventoryPapers: Array<{
+    paper: {
+      _id: string;
+      totalPieces: number;
+      piecesPerRoll: number;
+      weightPerPiece: number;
+    };
+    requiredPieces: number;
+  }> = [];
+  const inventoryOtherItems: Array<{
+    itemType: string;
+    itemId: string;
+    currentQuantity: number;
+    requiredQuantity: number;
   }> = [];
   let inventoryType = 'internal';
 
@@ -162,11 +177,109 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    if (!type || !customerName || !phone || !designOrders || !Array.isArray(designOrders) || designOrders.length === 0) {
+    if (
+      !type ||
+      !customerName ||
+      !phone ||
+      !designOrders ||
+      !Array.isArray(designOrders) ||
+      designOrders.length === 0
+    ) {
       return NextResponse.json(
-        { success: false, message: 'Order type, customer details, and at least one design order are required' },
+        {
+          success: false,
+          message:
+            'Order type, customer details, and at least one design order are required',
+        },
         { status: 400 },
       );
+    }
+
+    // Handle customer creation if customerId is not provided
+    let finalCustomerId = customerId;
+    if (!customerId) {
+      try {
+        // First try to find existing customer by phone
+        let customer = await Customer.findOne({ phone: phone.trim() });
+
+        if (customer) {
+          // Update customer if new information is provided
+          const updates: {
+            name?: string;
+            gstNumber?: string;
+            updatedBy?: string;
+            updateHistory?: Array<{
+              field: string;
+              oldValue: string | null;
+              newValue: string;
+              updatedBy: string;
+              updatedAt: Date;
+            }>;
+          } = {};
+          let hasUpdates = false;
+
+          if (customerName && customerName !== customer.name) {
+            updates.name = customerName.trim();
+            hasUpdates = true;
+          }
+
+          if (gstNumber && gstNumber !== customer.gstNumber) {
+            updates.gstNumber = gstNumber?.trim() || undefined;
+            hasUpdates = true;
+          }
+
+          if (hasUpdates) {
+            updates.updatedBy = user._id;
+            updates.updateHistory = [
+              ...(customer.updateHistory || []),
+              {
+                field: 'order_update',
+                oldValue: 'Customer updated via order',
+                newValue: 'Customer updated via order',
+                updatedBy: user._id,
+                updatedAt: new Date(),
+              },
+            ];
+
+            customer = await Customer.findByIdAndUpdate(customer._id, updates, {
+              new: true,
+              runValidators: true,
+            });
+          }
+
+          finalCustomerId = customer._id;
+        } else {
+          // Create new customer
+          const newCustomer = new Customer({
+            name: customerName.trim(),
+            phone: phone.trim(),
+            gstNumber: gstNumber?.trim() || undefined,
+            customerType: 'retail', // Default type
+            creditLimit: 0,
+            paymentTerms: 'immediate',
+            isActive: true,
+            createdBy: user._id,
+            updateHistory: [
+              {
+                field: 'created',
+                oldValue: null,
+                newValue: 'Customer created via order',
+                updatedBy: user._id,
+                updatedAt: new Date(),
+              },
+            ],
+          });
+
+          await newCustomer.save();
+          finalCustomerId = newCustomer._id;
+        }
+      } catch (error) {
+        console.error('Error handling customer creation:', error);
+        return NextResponse.json(
+          { success: false, message: 'Failed to process customer information' },
+          { status: 500 },
+        );
+      }
     }
 
     inventoryType = type === 'out' ? 'out' : 'internal';
@@ -177,11 +290,19 @@ export async function POST(request: NextRequest) {
     const stonesToDeduct = [];
 
     for (const designOrder of designOrders) {
-      const { designId, quantity, paperUsed } = designOrder;
+      const { designId, paperUsed } = designOrder;
 
-      if (!designId || !quantity || !paperUsed || !paperUsed.sizeInInch || !paperUsed.quantityInPcs) {
+      if (
+        !designId ||
+        !paperUsed ||
+        !paperUsed.sizeInInch ||
+        !paperUsed.quantityInPcs
+      ) {
         return NextResponse.json(
-          { success: false, message: 'Each design order must have designId, quantity, and paper details' },
+          {
+            success: false,
+            message: 'Each design order must have designId and paper details',
+          },
           { status: 400 },
         );
       }
@@ -193,7 +314,10 @@ export async function POST(request: NextRequest) {
       });
       if (!paper) {
         return NextResponse.json(
-          { success: false, message: `Paper size ${paperUsed.sizeInInch}" not found in ${inventoryType} inventory` },
+          {
+            success: false,
+            message: `Paper size ${paperUsed.sizeInInch}" not found in ${inventoryType} inventory`,
+          },
           { status: 400 },
         );
       }
@@ -240,11 +364,8 @@ export async function POST(request: NextRequest) {
       let designStoneWeight = 0;
       if (design.defaultStones && design.defaultStones.length > 0) {
         for (const designStone of design.defaultStones) {
-          const stone = designStone.stoneId;
-          if (stone) {
-            // Use weightPerPiece if available, otherwise use quantity as fallback
-            designStoneWeight += stone.weightPerPiece || stone.quantity || 0;
-          }
+          // Use designStone.quantity directly as it represents the weight of this stone used in the design
+          designStoneWeight += designStone.quantity || 0;
         }
       }
 
@@ -265,7 +386,8 @@ export async function POST(request: NextRequest) {
       if (design.defaultStones && design.defaultStones.length > 0) {
         for (const designStone of design.defaultStones) {
           const stone = designStone.stoneId;
-          const requiredQuantity = designStone.quantity * paperUsed.quantityInPcs; // Total stones needed for all pieces
+          const requiredQuantity =
+            designStone.quantity * paperUsed.quantityInPcs; // Total stones needed for all pieces
 
           // Find the stone in the correct inventory type
           const inventoryStone = await Stone.findOne({
@@ -291,11 +413,65 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Validate other inventory items if provided
+      const otherItemsToDeduct: Array<{
+        itemType: string;
+        itemId: string;
+        currentQuantity: number;
+        requiredQuantity: number;
+      }> = [];
+
+      if (designOrder.otherItemsUsed && designOrder.otherItemsUsed.length > 0) {
+        for (const item of designOrder.otherItemsUsed) {
+          let inventoryItem;
+
+          // Find the item in the appropriate collection based on itemType
+          switch (item.itemType) {
+            case 'plastic':
+              inventoryItem = await Plastic.findById(item.itemId);
+              break;
+            case 'tape':
+              inventoryItem = await Tape.findById(item.itemId);
+              break;
+            default:
+              inventoryErrors.push(`Unknown item type: ${item.itemType}`);
+              continue;
+          }
+
+          if (!inventoryItem) {
+            inventoryErrors.push(
+              `${
+                item.itemType.charAt(0).toUpperCase() + item.itemType.slice(1)
+              } item not found`,
+            );
+          } else if (inventoryItem.quantity < item.quantity) {
+            inventoryErrors.push(
+              `Insufficient ${item.itemType} stock: ${
+                inventoryItem.name
+              } (available: ${inventoryItem.quantity}${
+                inventoryItem.unit || 'pcs'
+              }, required: ${item.quantity}${item.unit || 'pcs'})`,
+            );
+          } else {
+            otherItemsToDeduct.push({
+              itemType: item.itemType,
+              itemId: inventoryItem._id,
+              currentQuantity: inventoryItem.quantity,
+              requiredQuantity: item.quantity,
+            });
+          }
+        }
+      }
+
       // Prepare stones used data for this design order
-      const stonesUsed = design.defaultStones ? design.defaultStones.map((designStone: { stoneId: { _id: string }; quantity: number }) => ({
-        stoneId: designStone.stoneId._id,
-        quantity: designStone.quantity * paperUsed.quantityInPcs,
-      })) : [];
+      const stonesUsed = design.defaultStones
+        ? design.defaultStones.map(
+            (designStone: { stoneId: { _id: string }; quantity: number }) => ({
+              stoneId: designStone.stoneId._id,
+              quantity: designStone.quantity * paperUsed.quantityInPcs,
+            }),
+          )
+        : [];
 
       // Calculate pricing for this design order
       let unitPrice = 0;
@@ -312,6 +488,7 @@ export async function POST(request: NextRequest) {
         designId: design._id,
         quantity: paperUsed.quantityInPcs,
         stonesUsed,
+        otherItemsUsed: designOrder.otherItemsUsed || [],
         paperUsed: {
           ...paperUsed,
           paperWeightPerPc: paper.weightPerPiece,
@@ -326,6 +503,11 @@ export async function POST(request: NextRequest) {
         paper,
         requiredPieces: paperUsed.quantityInPcs,
       });
+
+      // Store other items for inventory deduction
+      if (otherItemsToDeduct.length > 0) {
+        inventoryOtherItems.push(...otherItemsToDeduct);
+      }
     }
 
     if (inventoryErrors.length > 0) {
@@ -357,7 +539,7 @@ export async function POST(request: NextRequest) {
       type,
       customerName,
       phone,
-      customerId,
+      customerId: finalCustomerId,
       gstNumber: gstNumber,
       designOrders: processedDesignOrders,
       modeOfPayment,
@@ -385,10 +567,30 @@ export async function POST(request: NextRequest) {
 
       // Deduct stone inventory
       for (const stoneDeduction of stonesToDeduct) {
-        const newStoneQuantity = stoneDeduction.currentQuantity - stoneDeduction.requiredQuantity;
+        const newStoneQuantity =
+          stoneDeduction.currentQuantity - stoneDeduction.requiredQuantity;
         await Stone.findByIdAndUpdate(stoneDeduction.stoneId, {
           quantity: newStoneQuantity,
         });
+      }
+
+      // Deduct other inventory items
+      for (const itemDeduction of inventoryOtherItems) {
+        const newItemQuantity =
+          itemDeduction.currentQuantity - itemDeduction.requiredQuantity;
+
+        switch (itemDeduction.itemType) {
+          case 'plastic':
+            await Plastic.findByIdAndUpdate(itemDeduction.itemId, {
+              quantity: newItemQuantity,
+            });
+            break;
+          case 'tape':
+            await Tape.findByIdAndUpdate(itemDeduction.itemId, {
+              quantity: newItemQuantity,
+            });
+            break;
+        }
       }
 
       // Create the order
@@ -401,7 +603,9 @@ export async function POST(request: NextRequest) {
           // Restore paper inventory to original state
           for (const { paper, requiredPieces } of inventoryPapers) {
             const restoredTotalPieces = paper.totalPieces + requiredPieces;
-            const restoredQuantity = Math.floor(restoredTotalPieces / paper.piecesPerRoll);
+            const restoredQuantity = Math.floor(
+              restoredTotalPieces / paper.piecesPerRoll,
+            );
             await Paper.findByIdAndUpdate(paper._id, {
               totalPieces: restoredTotalPieces,
               quantity: restoredQuantity,
@@ -413,6 +617,22 @@ export async function POST(request: NextRequest) {
             await Stone.findByIdAndUpdate(stoneDeduction.stoneId, {
               quantity: stoneDeduction.currentQuantity,
             });
+          }
+
+          // Restore other inventory items to original state
+          for (const itemDeduction of inventoryOtherItems) {
+            switch (itemDeduction.itemType) {
+              case 'plastic':
+                await Plastic.findByIdAndUpdate(itemDeduction.itemId, {
+                  quantity: itemDeduction.currentQuantity,
+                });
+                break;
+              case 'tape':
+                await Tape.findByIdAndUpdate(itemDeduction.itemId, {
+                  quantity: itemDeduction.currentQuantity,
+                });
+                break;
+            }
           }
         } catch (rollbackError) {
           console.error('Failed to rollback inventory changes:', rollbackError);

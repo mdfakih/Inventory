@@ -36,7 +36,7 @@ const stoneSchema = new mongoose.Schema(
     },
     weightPerPiece: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
       default: 0, // Weight in grams per piece
     },

@@ -414,18 +414,16 @@ export default function StonesTable({
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center py-4">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-            onItemsPerPageChange={handleItemsPerPageChange}
-            itemsPerPage={itemsPerPage}
-            totalItems={totalItems}
-          />
-        </div>
-      )}
+      <div className="flex justify-center items-center py-4">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          onItemsPerPageChange={handleItemsPerPageChange}
+          itemsPerPage={itemsPerPage}
+          totalItems={totalItems}
+        />
+      </div>
     </div>
   );
 }

@@ -25,7 +25,7 @@ const orderSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    
+
     // Updated to support multiple design orders
     designOrders: [
       {
@@ -34,11 +34,7 @@ const orderSchema = new mongoose.Schema(
           ref: 'Design',
           required: true,
         },
-        quantity: {
-          type: Number,
-          required: true,
-          min: 1,
-        },
+
         stonesUsed: [
           {
             stoneId: {
@@ -73,6 +69,30 @@ const orderSchema = new mongoose.Schema(
             min: 0,
           },
         },
+        // Other inventory items used
+        otherItemsUsed: [
+          {
+            itemType: {
+              type: String,
+              enum: ['plastic', 'tape', 'other'],
+              required: true,
+            },
+            itemId: {
+              type: mongoose.Schema.Types.ObjectId,
+              refPath: 'otherItemsUsed.itemType',
+              required: true,
+            },
+            quantity: {
+              type: Number,
+              required: true,
+              min: 0,
+            },
+            unit: {
+              type: String,
+              default: 'pcs',
+            },
+          },
+        ],
         calculatedWeight: {
           type: Number,
           min: 0,
@@ -126,6 +146,27 @@ const orderSchema = new mongoose.Schema(
         min: 0,
       },
     },
+    // Legacy fields for other inventory items
+    otherItemsUsed: [
+      {
+        itemType: {
+          type: String,
+          enum: ['plastic', 'tape', 'other'],
+        },
+        itemId: {
+          type: mongoose.Schema.Types.ObjectId,
+          refPath: 'otherItemsUsed.itemType',
+        },
+        quantity: {
+          type: Number,
+          min: 0,
+        },
+        unit: {
+          type: String,
+          default: 'pcs',
+        },
+      },
+    ],
 
     // Payment and pricing fields
     modeOfPayment: {
@@ -228,7 +269,7 @@ const orderSchema = new mongoose.Schema(
 );
 
 // Pre-save middleware to calculate totals and maintain backward compatibility
-orderSchema.pre('save', function(next) {
+orderSchema.pre('save', function (next) {
   if (this.designOrders && this.designOrders.length > 0) {
     // Calculate total cost from all design orders
     this.totalCost = this.designOrders.reduce((sum, designOrder) => {
@@ -241,7 +282,7 @@ orderSchema.pre('save', function(next) {
     }, 0);
 
     // Calculate total final weight from all design orders
-    if (this.designOrders.some(designOrder => designOrder.finalWeight)) {
+    if (this.designOrders.some((designOrder) => designOrder.finalWeight)) {
       this.finalTotalWeight = this.designOrders.reduce((sum, designOrder) => {
         return sum + (designOrder.finalWeight || 0);
       }, 0);
@@ -258,7 +299,8 @@ orderSchema.pre('save', function(next) {
     // Calculate weight discrepancy if final weight is set
     if (this.finalTotalWeight && this.calculatedWeight) {
       this.weightDiscrepancy = this.finalTotalWeight - this.calculatedWeight;
-      this.discrepancyPercentage = (this.weightDiscrepancy / this.calculatedWeight) * 100;
+      this.discrepancyPercentage =
+        (this.weightDiscrepancy / this.calculatedWeight) * 100;
     }
   }
 

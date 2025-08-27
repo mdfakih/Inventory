@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       return false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Remove router dependency to prevent infinite loops
 
   const login = (userData: User) => {

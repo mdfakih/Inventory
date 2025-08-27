@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/safe-image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -128,13 +128,13 @@ export default function DesignsPage() {
     prices: [],
     defaultStones: [],
   });
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  
+
   const [sortBy] = useState('createdAt');
   const [sortOrder] = useState<'asc' | 'desc'>('desc');
   const { showSuccess, showError } = useSnackbarHelpers();
@@ -152,32 +152,35 @@ export default function DesignsPage() {
     }
   }, []);
 
-  const fetchDesigns = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+  const fetchDesigns = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+        const response = await authenticatedFetch(
+          `/api/designs?page=${currentPage}&limit=${itemsPerPage}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
+        );
+        const data = await response.json();
+        if (data.success) {
+          setDesigns(data.data);
+          setTotalPages(data.pagination.pages);
+          setTotalItems(data.pagination.total);
+        }
+      } catch (error) {
+        console.error('Error fetching designs:', error);
+        showError('Data Loading Error', 'Failed to load designs data.');
+      } finally {
+        setLoading(false);
+        if (isRefresh) {
+          setRefreshing(false);
+        }
       }
-      const response = await authenticatedFetch(
-        `/api/designs?page=${currentPage}&limit=${itemsPerPage}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
-      );
-      const data = await response.json();
-      if (data.success) {
-        setDesigns(data.data);
-        setTotalPages(data.pagination.pages);
-        setTotalItems(data.pagination.total);
-      }
-    } catch (error) {
-      console.error('Error fetching designs:', error);
-      showError('Data Loading Error', 'Failed to load designs data.');
-    } finally {
-      setLoading(false);
-      if (isRefresh) {
-        setRefreshing(false);
-      }
-    }
-  }, [currentPage, itemsPerPage, sortBy, sortOrder, showError]);
+    },
+    [currentPage, itemsPerPage, sortBy, sortOrder, showError],
+  );
 
   const fetchStones = useCallback(async () => {
     try {
@@ -189,9 +192,16 @@ export default function DesignsPage() {
       const internalStonesData = await internalStonesRes.json();
       const outStonesData = await outStonesRes.json();
 
-      if (internalStonesData.success)
-        setStones(internalStonesData.data);
-      if (outStonesData.success) setStones(outStonesData.data);
+      // Combine both internal and out stones
+      const allStones = [];
+      if (internalStonesData.success) {
+        allStones.push(...internalStonesData.data);
+      }
+      if (outStonesData.success) {
+        allStones.push(...outStonesData.data);
+      }
+
+      setStones(allStones);
     } catch (error) {
       console.error('Error fetching stones:', error);
       showError('Data Loading Error', 'Failed to load stones data.');
@@ -206,7 +216,14 @@ export default function DesignsPage() {
       fetchUser();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated, currentPage, itemsPerPage, sortBy, sortOrder]);
+  }, [
+    authLoading,
+    isAuthenticated,
+    currentPage,
+    itemsPerPage,
+    sortBy,
+    sortOrder,
+  ]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -593,12 +610,13 @@ export default function DesignsPage() {
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                     {formData.imageUrl ? (
                       <div className="space-y-2">
-                        <Image
+                        <SafeImage
                           src={formData.imageUrl}
                           alt="Design preview"
                           width={128}
                           height={128}
                           className="mx-auto max-h-32 object-contain"
+                          fallbackText="Design preview"
                         />
                         <Button
                           type="button"
@@ -784,21 +802,14 @@ export default function DesignsPage() {
                 {designs.map((design) => (
                   <TableRow key={design._id}>
                     <TableCell>
-                      {design.imageUrl ? (
-                        <Image
-                          src={design.imageUrl}
-                          alt={design.name}
-                          width={48}
-                          height={48}
-                          className="h-12 w-12 object-cover rounded"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center">
-                          <span className="text-gray-500 text-xs">
-                            No Image
-                          </span>
-                        </div>
-                      )}
+                      <SafeImage
+                        src={design.imageUrl}
+                        alt={design.name}
+                        width={48}
+                        height={48}
+                        className="h-12 w-12 object-cover rounded"
+                        fallbackText="No Image"
+                      />
                     </TableCell>
                     <TableCell className="font-medium">{design.name}</TableCell>
                     <TableCell>{design.number}</TableCell>
@@ -880,18 +891,16 @@ export default function DesignsPage() {
               </TableBody>
             </Table>
           )}
-          
+
           {/* Pagination */}
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              onPageChange={handlePageChange}
-              onItemsPerPageChange={handleItemsPerPageChange}
-            />
-          )}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+            onItemsPerPageChange={handleItemsPerPageChange}
+          />
         </CardContent>
       </Card>
 
@@ -1052,12 +1061,13 @@ export default function DesignsPage() {
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                 {editFormData.imageUrl ? (
                   <div className="space-y-2">
-                    <Image
+                    <SafeImage
                       src={editFormData.imageUrl}
                       alt="Design preview"
                       width={128}
                       height={128}
                       className="mx-auto max-h-32 object-contain"
+                      fallbackText="Design preview"
                     />
                     <Button
                       type="button"
@@ -1264,17 +1274,14 @@ export default function DesignsPage() {
               </div>
               <div>
                 <Label className="font-semibold">Design Image</Label>
-                {selectedDesign.imageUrl ? (
-                  <Image
-                    src={selectedDesign.imageUrl}
-                    alt={selectedDesign.name}
-                    width={192}
-                    height={192}
-                    className="mt-2 max-h-48 object-contain rounded"
-                  />
-                ) : (
-                  <p className="text-gray-500 mt-2">No image</p>
-                )}
+                <SafeImage
+                  src={selectedDesign.imageUrl}
+                  alt={selectedDesign.name}
+                  width={192}
+                  height={192}
+                  className="mt-2 max-h-48 object-contain rounded"
+                  fallbackText="No image available"
+                />
               </div>
               <div>
                 <Label className="font-semibold">Default Stones</Label>

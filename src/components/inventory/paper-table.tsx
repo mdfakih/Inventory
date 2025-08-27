@@ -394,16 +394,14 @@ export default function PaperTable({
         </div>
       )}
 
-      {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          onItemsPerPageChange={handleItemsPerPageChange}
-          itemsPerPage={itemsPerPage}
-          totalItems={totalItems}
-        />
-      )}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+        onItemsPerPageChange={handleItemsPerPageChange}
+        itemsPerPage={itemsPerPage}
+        totalItems={totalItems}
+      />
     </div>
   );
 }

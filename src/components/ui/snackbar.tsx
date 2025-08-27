@@ -86,7 +86,7 @@ export function SnackbarProvider({ children }: SnackbarProviderProps) {
       {children}
 
       {/* Snackbar Container */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+      <div className="fixed top-4 right-4 z-90 space-y-2 max-w-sm">
         {snackbars.map((snackbar) => (
           <div
             key={snackbar.id}

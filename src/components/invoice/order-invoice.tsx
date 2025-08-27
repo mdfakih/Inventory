@@ -8,7 +8,7 @@ import { authenticatedFetch } from '@/lib/utils';
 import { Download, Printer, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/safe-image';
 
 interface User {
   id: string;
@@ -37,7 +37,6 @@ interface Stone {
 
 interface DesignOrder {
   designId: Design;
-  quantity: number;
   stonesUsed: Array<{
     stoneId: Stone;
     quantity: number;
@@ -97,7 +96,11 @@ interface OrderInvoiceProps {
   onClose: () => void;
 }
 
-export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceProps) {
+export default function OrderInvoice({
+  orderId,
+  isOpen,
+  onClose,
+}: OrderInvoiceProps) {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
@@ -106,7 +109,9 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
   const fetchOrderData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await authenticatedFetch(`/api/orders/${orderId}/invoice`);
+      const response = await authenticatedFetch(
+        `/api/orders/${orderId}/invoice`,
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -155,7 +160,7 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
 
   const generatePDF = async () => {
     if (!order) return;
-    
+
     setGeneratingPDF(true);
     try {
       const element = document.getElementById('invoice-content');
@@ -238,7 +243,12 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
         <div className="bg-white rounded-lg p-8 flex flex-col items-center">
           <Spinner size="lg" />
           <p className="mt-4 text-gray-600">Loading invoice...</p>
-          <Button onClick={onClose} className="mt-4">Close</Button>
+          <Button
+            onClick={onClose}
+            className="mt-4"
+          >
+            Close
+          </Button>
         </div>
       </div>
     );
@@ -249,18 +259,23 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-8 flex flex-col items-center">
           <p className="text-red-600">Failed to load order data</p>
-          <Button onClick={onClose} className="mt-4">Close</Button>
+          <Button
+            onClick={onClose}
+            className="mt-4"
+          >
+            Close
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
     >
-      <div 
+      <div
         ref={modalRef}
         className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto relative"
         onClick={(e) => e.stopPropagation()}
@@ -287,7 +302,11 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
               <Download className="h-4 w-4 mr-2" />
               {generatingPDF ? 'Generating...' : 'Download PDF'}
             </Button>
-            <Button onClick={printInvoice} variant="outline" size="sm">
+            <Button
+              onClick={printInvoice}
+              variant="outline"
+              size="sm"
+            >
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
@@ -295,17 +314,26 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
         </div>
 
         {/* Invoice Content */}
-        <div id="invoice-content" className="p-6">
+        <div
+          id="invoice-content"
+          className="p-6"
+        >
           {/* Company Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">INVENTORY MANAGEMENT</h1>
-            <p className="text-gray-600">Professional Design & Manufacturing Services</p>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              INVENTORY MANAGEMENT
+            </h1>
+            <p className="text-gray-600">
+              Professional Design & Manufacturing Services
+            </p>
           </div>
 
           {/* Invoice Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             <div>
-              <h3 className="text-lg font-semibold mb-3 text-gray-800">Bill To:</h3>
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">
+                Bill To:
+              </h3>
               <div className="space-y-1">
                 <p className="font-medium">{order.customerName}</p>
                 <p className="text-gray-600">{order.phone}</p>
@@ -321,27 +349,39 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
               </div>
             </div>
             <div className="text-right">
-              <h3 className="text-lg font-semibold mb-3 text-gray-800">Invoice Details:</h3>
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">
+                Invoice Details:
+              </h3>
               <div className="space-y-1">
                 <p className="text-gray-600">
-                  <span className="font-medium">Invoice #:</span> {order._id.slice(-8).toUpperCase()}
+                  <span className="font-medium">Invoice #:</span>{' '}
+                  {order._id.slice(-8).toUpperCase()}
                 </p>
                 <p className="text-gray-600">
-                  <span className="font-medium">Date:</span> {new Date(order.createdAt).toLocaleDateString()}
+                  <span className="font-medium">Date:</span>{' '}
+                  {new Date(order.createdAt).toLocaleDateString()}
                 </p>
                 <p className="text-gray-600">
                   <span className="font-medium">Order Type:</span>{' '}
-                  <Badge variant={order.type === 'internal' ? 'default' : 'secondary'}>
+                  <Badge
+                    variant={
+                      order.type === 'internal' ? 'default' : 'secondary'
+                    }
+                  >
                     {order.type}
                   </Badge>
                 </p>
                 <p className="text-gray-600">
                   <span className="font-medium">Status:</span>{' '}
-                  <Badge className={
-                    order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }>
+                  <Badge
+                    className={
+                      order.status === 'completed'
+                        ? 'bg-green-100 text-green-800'
+                        : order.status === 'cancelled'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }
+                  >
                     {order.status}
                   </Badge>
                 </p>
@@ -351,42 +391,65 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
 
           {/* Designs Table */}
           <div className="mb-8">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800">Order Details</h3>
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">
+              Order Details
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="border border-gray-300 p-3 text-left">Design</th>
-                    <th className="border border-gray-300 p-3 text-left">Image</th>
-                    <th className="border border-gray-300 p-3 text-center">Quantity</th>
-                    <th className="border border-gray-300 p-3 text-center">Paper Size</th>
-                    <th className="border border-gray-300 p-3 text-center">Unit Price</th>
-                    <th className="border border-gray-300 p-3 text-center">Total Price</th>
+                    <th className="border border-gray-300 p-3 text-left">
+                      Design
+                    </th>
+                    <th className="border border-gray-300 p-3 text-left">
+                      Image
+                    </th>
+                    <th className="border border-gray-300 p-3 text-center">
+                      Quantity
+                    </th>
+                    <th className="border border-gray-300 p-3 text-center">
+                      Paper Size
+                    </th>
+                    <th className="border border-gray-300 p-3 text-center">
+                      Unit Price
+                    </th>
+                    <th className="border border-gray-300 p-3 text-center">
+                      Total Price
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {order.designOrders.map((designOrder, index) => (
-                    <tr key={index} className="border-b border-gray-300">
+                    <tr
+                      key={index}
+                      className="border-b border-gray-300"
+                    >
                       <td className="border border-gray-300 p-3">
                         <div>
-                          <p className="font-medium">{designOrder.designId.name}</p>
-                          <p className="text-sm text-gray-600">#{designOrder.designId.number}</p>
+                          <p className="font-medium">
+                            {designOrder.designId.name}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            #{designOrder.designId.number}
+                          </p>
                         </div>
                       </td>
                       <td className="border border-gray-300 p-3">
-                        <Image
+                        <SafeImage
                           src={designOrder.designId.imageUrl}
                           alt={designOrder.designId.name}
                           width={64}
                           height={64}
                           className="object-cover rounded border"
+                          fallbackText="Design"
                         />
                       </td>
                       <td className="border border-gray-300 p-3 text-center">
-                        {designOrder.quantity} pcs
+                        {designOrder.paperUsed.quantityInPcs} pcs
                       </td>
                       <td className="border border-gray-300 p-3 text-center">
-                        {designOrder.paperUsed.sizeInInch}&quot; × {designOrder.paperUsed.quantityInPcs} pcs
+                        {designOrder.paperUsed.sizeInInch}&quot; ×{' '}
+                        {designOrder.paperUsed.quantityInPcs} pcs
                       </td>
                       <td className="border border-gray-300 p-3 text-center">
                         ₹{designOrder.unitPrice?.toFixed(2) || '0.00'}
@@ -402,29 +465,53 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
           </div>
 
           {/* Stones Used */}
-          {order.designOrders.some(designOrder => designOrder.stonesUsed && designOrder.stonesUsed.length > 0) && (
+          {order.designOrders.some(
+            (designOrder) =>
+              designOrder.stonesUsed && designOrder.stonesUsed.length > 0,
+          ) && (
             <div className="mb-8">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">Stones Used</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-800">
+                Stones Used
+              </h3>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-300 p-3 text-left">Stone</th>
-                      <th className="border border-gray-300 p-3 text-center">Color</th>
-                      <th className="border border-gray-300 p-3 text-center">Size</th>
-                      <th className="border border-gray-300 p-3 text-center">Quantity</th>
+                      <th className="border border-gray-300 p-3 text-left">
+                        Stone
+                      </th>
+                      <th className="border border-gray-300 p-3 text-center">
+                        Color
+                      </th>
+                      <th className="border border-gray-300 p-3 text-center">
+                        Size
+                      </th>
+                      <th className="border border-gray-300 p-3 text-center">
+                        Quantity
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {order.designOrders.map(designOrder => 
+                    {order.designOrders.map((designOrder) =>
                       designOrder.stonesUsed?.map((stone, stoneIndex) => (
-                        <tr key={`${designOrder.designId._id}-${stoneIndex}`} className="border-b border-gray-300">
-                          <td className="border border-gray-300 p-3">{stone.stoneId.name}</td>
-                          <td className="border border-gray-300 p-3 text-center">{stone.stoneId.color}</td>
-                          <td className="border border-gray-300 p-3 text-center">{stone.stoneId.size}</td>
-                          <td className="border border-gray-300 p-3 text-center">{stone.quantity}g</td>
+                        <tr
+                          key={`${designOrder.designId._id}-${stoneIndex}`}
+                          className="border-b border-gray-300"
+                        >
+                          <td className="border border-gray-300 p-3">
+                            {stone.stoneId.name}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            {stone.stoneId.color}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            {stone.stoneId.size}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            {stone.quantity}g
+                          </td>
                         </tr>
-                      ))
+                      )),
                     )}
                   </tbody>
                 </table>
@@ -436,22 +523,31 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Calculated Weight</p>
-              <p className="text-lg font-semibold">{order.calculatedWeight?.toFixed(2)}g</p>
+              <p className="text-lg font-semibold">
+                {order.calculatedWeight?.toFixed(2)}g
+              </p>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Final Weight</p>
               <p className="text-lg font-semibold">
-                {order.finalTotalWeight ? `${order.finalTotalWeight.toFixed(2)}g` : 'Not set'}
+                {order.finalTotalWeight
+                  ? `${order.finalTotalWeight.toFixed(2)}g`
+                  : 'Not set'}
               </p>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Payment Status</p>
-              <Badge className={
-                order.paymentStatus === 'completed' ? 'bg-green-100 text-green-800' :
-                order.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' :
-                order.paymentStatus === 'partial' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-gray-100 text-gray-800'
-              }>
+              <Badge
+                className={
+                  order.paymentStatus === 'completed'
+                    ? 'bg-green-100 text-green-800'
+                    : order.paymentStatus === 'overdue'
+                    ? 'bg-red-100 text-red-800'
+                    : order.paymentStatus === 'partial'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-800'
+                }
+              >
                 {order.paymentStatus}
               </Badge>
             </div>
@@ -459,12 +555,17 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
 
           {/* Payment Details */}
           <div className="mb-8">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800">Payment Details</h3>
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">
+              Payment Details
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <p className="text-gray-600 mb-2">
                   <span className="font-medium">Mode of Payment:</span>{' '}
-                  <Badge variant="outline" className="capitalize">
+                  <Badge
+                    variant="outline"
+                    className="capitalize"
+                  >
                     {order.modeOfPayment}
                   </Badge>
                 </p>
@@ -481,12 +582,18 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">₹{order.totalCost?.toFixed(2) || '0.00'}</span>
+                    <span className="font-medium">
+                      ₹{order.totalCost?.toFixed(2) || '0.00'}
+                    </span>
                   </div>
                   {order.discountValue > 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">
-                        Discount ({order.discountType === 'percentage' ? `${order.discountValue}%` : 'Flat'}):
+                        Discount (
+                        {order.discountType === 'percentage'
+                          ? `${order.discountValue}%`
+                          : 'Flat'}
+                        ):
                       </span>
                       <span className="text-green-600 font-medium">
                         -₹{order.discountedAmount?.toFixed(2) || '0.00'}
@@ -495,7 +602,9 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
                   )}
                   <div className="border-t pt-2">
                     <div className="flex justify-between">
-                      <span className="text-lg font-semibold">Total Amount:</span>
+                      <span className="text-lg font-semibold">
+                        Total Amount:
+                      </span>
                       <span className="text-xl font-bold text-blue-600">
                         ₹{order.finalAmount?.toFixed(2) || '0.00'}
                       </span>
@@ -510,8 +619,8 @@ export default function OrderInvoice({ orderId, isOpen, onClose }: OrderInvoiceP
           <div className="text-center text-gray-600 text-sm border-t pt-6">
             <p>Thank you for your business!</p>
             <p className="mt-2">
-              Created by: {order.createdBy?.name} | 
-              Date: {new Date(order.createdAt).toLocaleDateString()}
+              Created by: {order.createdBy?.name} | Date:{' '}
+              {new Date(order.createdAt).toLocaleDateString()}
             </p>
           </div>
         </div>
