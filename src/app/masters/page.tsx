@@ -197,6 +197,7 @@ export default function MastersPage() {
           stonesRes,
           stonesOutRes,
           papersRes,
+          papersOutRes,
           plasticsRes,
           tapesRes,
         ] = await Promise.all([
@@ -211,7 +212,10 @@ export default function MastersPage() {
             `/api/inventory/stones?page=${stonesPagination.currentPage}&limit=${stonesPagination.itemsPerPage}&type=out`,
           ),
           fetch(
-            `/api/inventory/paper?page=${papersPagination.currentPage}&limit=${papersPagination.itemsPerPage}`,
+            `/api/inventory/paper?page=${papersPagination.currentPage}&limit=${papersPagination.itemsPerPage}&type=internal`,
+          ),
+          fetch(
+            `/api/inventory/paper?page=${papersPagination.currentPage}&limit=${papersPagination.itemsPerPage}&type=out`,
           ),
           fetch(
             `/api/inventory/plastic?page=${plasticsPagination.currentPage}&limit=${plasticsPagination.itemsPerPage}`,
@@ -262,17 +266,27 @@ export default function MastersPage() {
           }));
         }
 
-        if (papersRes.ok) {
+        if (papersRes.ok && papersOutRes.ok) {
           const papersData = await papersRes.json();
-          setPapers(papersData.data || []);
-          if (papersData.pagination) {
-            setPapersPagination({
-              currentPage: papersData.pagination.page,
-              itemsPerPage: papersData.pagination.limit,
-              totalPages: papersData.pagination.pages,
-              totalItems: papersData.pagination.total,
-            });
-          }
+          const papersOutData = await papersOutRes.json();
+          const allPapers = [
+            ...(papersData.data || []),
+            ...(papersOutData.data || []),
+          ];
+          setPapers(allPapers);
+          // Calculate combined pagination for papers
+          const totalInternal = papersData.pagination?.total || 0;
+          const totalOut = papersOutData.pagination?.total || 0;
+          const totalPapers = totalInternal + totalOut;
+          const totalPages = Math.ceil(
+            totalPapers / papersPagination.itemsPerPage,
+          );
+
+          setPapersPagination((prev) => ({
+            ...prev,
+            totalPages,
+            totalItems: totalPapers,
+          }));
         }
 
         if (plasticsRes.ok) {
