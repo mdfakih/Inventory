@@ -5,6 +5,7 @@ import Navigation from '@/components/navigation';
 import { ThemeProvider } from '@/components/theme-provider';
 import { SnackbarProvider } from '@/components/ui/snackbar';
 import { AuthProvider } from '@/lib/auth-context';
+import ErrorBoundary from '@/components/error-boundary';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -24,19 +25,21 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className={`${inter.className} min-h-screen bg-background`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <SnackbarProvider>
-            <AuthProvider>
-              <Navigation />
-              <main className="min-h-[calc(100vh-4rem)]">{children}</main>
-            </AuthProvider>
-          </SnackbarProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <SnackbarProvider>
+              <AuthProvider>
+                <Navigation />
+                <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+              </AuthProvider>
+            </SnackbarProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

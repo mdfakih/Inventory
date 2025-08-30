@@ -9,19 +9,17 @@ import React, {
   ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import type { User } from '@/types';
 
-interface User {
+interface AuthUser extends Pick<User, 'name' | 'email' | 'role'> {
   id: string;
-  email: string;
-  name: string;
-  role: 'admin' | 'manager' | 'employee';
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (userData: User) => void;
+  login: (userData: AuthUser) => void;
   logout: () => void;
   checkAuth: () => Promise<boolean>;
 }
@@ -29,7 +27,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -54,10 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       return false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Remove router dependency to prevent infinite loops
+  }, [router]);
 
-  const login = (userData: User) => {
+  const login = (userData: AuthUser) => {
     setUser(userData);
   };
 

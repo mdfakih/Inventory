@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,25 +27,13 @@ import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
 import { Package } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
-
-interface Stone {
-  _id: string;
-  name: string;
-  number: string;
-  color: string;
-  size: string;
-  quantity: number;
-  unit: 'g' | 'kg';
-  inventoryType: 'internal' | 'out';
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Stone } from '@/types';
 
 interface StonesTableProps {
   inventoryType?: 'internal' | 'out';
 }
 
-export default function StonesTable({
+function StonesTable({
   inventoryType = 'internal',
 }: StonesTableProps) {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -115,8 +103,7 @@ export default function StonesTable({
     if (!authLoading && isAuthenticated) {
       fetchStones();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated, currentPage, itemsPerPage]);
+  }, [authLoading, isAuthenticated, currentPage, itemsPerPage, fetchStones]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -427,3 +414,5 @@ export default function StonesTable({
     </div>
   );
 }
+
+export default memo(StonesTable);

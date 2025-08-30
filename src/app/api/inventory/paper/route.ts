@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Paper from '@/models/Paper';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,6 +63,127 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
       { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    await dbConnect();
+
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
+      );
+    }
+
+    // Only admin can create master data
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Only administrators can create master data',
+        },
+        { status: 403 },
+      );
+    }
+
+    // Parse request body
+    const body = await request.json();
+    const { name, width, quantity, piecesPerRoll, weightPerPiece, inventoryType } = body;
+
+    // Validate required fields
+    if (!name || !width || !piecesPerRoll || !weightPerPiece) {
+      return NextResponse.json(
+        { success: false, message: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Validate field types and values
+    if (typeof name !== 'string' || name.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, message: 'Name must be a non-empty string' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof width !== 'number' || width <= 0) {
+      return NextResponse.json(
+        { success: false, message: 'Width must be a positive number' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof piecesPerRoll !== 'number' || piecesPerRoll <= 0) {
+      return NextResponse.json(
+        { success: false, message: 'Pieces per roll must be a positive number' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof weightPerPiece !== 'number' || weightPerPiece < 0) {
+      return NextResponse.json(
+        { success: false, message: 'Weight per piece must be a non-negative number' },
+        { status: 400 }
+      );
+    }
+
+    if (inventoryType && !['internal', 'out'].includes(inventoryType)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid inventory type' },
+        { status: 400 }
+      );
+    }
+
+    // Calculate total pieces based on quantity and pieces per roll
+    const totalPieces = (quantity || 0) * piecesPerRoll;
+
+    // Create new paper
+    const paper = new Paper({
+      name: name.trim(),
+      width: Number(width),
+      quantity: Number(quantity) || 0,
+      totalPieces,
+      piecesPerRoll: Number(piecesPerRoll),
+      weightPerPiece: Number(weightPerPiece),
+      inventoryType: inventoryType || 'internal',
+      updatedBy: user.id,
+    });
+
+    await paper.save();
+
+    return NextResponse.json({
+      success: true,
+      message: 'Paper type created successfully',
+      data: paper,
+    });
+
+  } catch (error: unknown) {
+    console.error('Create paper error:', error);
+    
+    // Handle duplicate key error
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
+      return NextResponse.json(
+        { success: false, message: 'A paper type with this name already exists for this inventory type' },
+        { status: 400 }
+      );
+    }
+
+    // Handle validation errors
+    if (error && typeof error === 'object' && 'name' in error && error.name === 'ValidationError' && 'errors' in error) {
+      const messages = Object.values(error.errors as Record<string, { message: string }>).map(err => err.message);
+      return NextResponse.json(
+        { success: false, message: messages.join(', ') },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: false, message: 'Internal server error' },
+      { status: 500 }
     );
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { SpinnerPage } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/utils';
+import type { Stone as StoneType, Paper as PaperType, Order as OrderType } from '@/types';
 import {
   BarChart,
   Bar,
@@ -26,48 +27,16 @@ import {
   Cell,
 } from 'recharts';
 
-interface Stone {
-  _id: string;
-  name: string;
-  color: string;
-  quantity: number;
-}
-
-interface Paper {
-  _id: string;
-  width: number;
-  quantity: number;
-}
-
-interface Order {
-  _id: string;
-  type: 'internal' | 'out';
-  customerName: string;
-  phone: string;
-  designId: {
-    name: string;
-    number: string;
-    price?: number;
-    currency?: '₹' | '$';
-  };
-  calculatedWeight?: number;
-  finalTotalWeight?: number;
-  weightDiscrepancy?: number;
-  discrepancyPercentage?: number;
-  status: string;
-  paymentStatus: 'pending' | 'partial' | 'completed' | 'overdue';
-  isFinalized: boolean;
-  createdAt: string;
-}
+// Remove duplicate interfaces - using types from @/types
 
 interface DashboardData {
-  stones: Stone[];
-  papers: Paper[];
-  orders: Order[];
-  recentOrders: Order[];
+  stones: StoneType[];
+  papers: PaperType[];
+  orders: OrderType[];
+  recentOrders: OrderType[];
 }
 
-export default function AdminDashboard() {
+function AdminDashboard() {
   const [data, setData] = useState<DashboardData>({
     stones: [],
     papers: [],
@@ -112,34 +81,52 @@ export default function AdminDashboard() {
     }
   };
 
-  const getOrderTypeData = () => {
+  const orderTypeData = useMemo(() => {
     const internalCount = data.orders.filter(
-      (order: Order) => order.type === 'internal',
+      (order) => order.type === 'internal',
     ).length;
     const outCount = data.orders.filter(
-      (order: Order) => order.type === 'out',
+      (order) => order.type === 'out',
     ).length;
 
     return [
       { name: 'Internal', value: internalCount, fill: '#0088FE' },
       { name: 'Out', value: outCount, fill: '#00C49F' },
     ];
-  };
+  }, [data.orders]);
 
-  const getStoneStockData = () => {
-    return data.stones.map((stone: Stone) => ({
+  const stoneStockData = useMemo(() => {
+    return data.stones.map((stone) => ({
       name: stone.name,
       stock: stone.quantity,
       color: stone.color,
     }));
-  };
+  }, [data.stones]);
 
-  const getPaperStockData = () => {
-    return data.papers.map((paper: Paper) => ({
+  const paperStockData = useMemo(() => {
+    return data.papers.map((paper) => ({
       name: `${paper.width}"`,
       pcs: paper.quantity,
     }));
-  };
+  }, [data.papers]);
+
+  const recentOrdersCount = useMemo(() => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    return data.orders.filter((order) => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= weekAgo;
+    }).length;
+  }, [data.orders]);
+
+  const paymentStatusCounts = useMemo(() => {
+    return {
+      pending: data.orders.filter((order) => order.paymentStatus === 'pending').length,
+      partial: data.orders.filter((order) => order.paymentStatus === 'partial').length,
+      completed: data.orders.filter((order) => order.paymentStatus === 'completed').length,
+      overdue: data.orders.filter((order) => order.paymentStatus === 'overdue').length,
+    };
+  }, [data.orders]);
 
   if (loading) {
     return <SpinnerPage />;
@@ -224,7 +211,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {data.stones.reduce(
-                (sum: number, stone: Stone) => sum + stone.quantity,
+                (sum, stone) => sum + stone.quantity,
                 0,
               )}
             </div>
@@ -244,7 +231,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">
               {data.papers.reduce(
-                (sum: number, paper: Paper) => sum + paper.quantity,
+                (sum, paper) => sum + paper.quantity,
                 0,
               )}
             </div>
@@ -272,14 +259,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {
-                data.orders.filter((order: Order) => {
-                  const orderDate = new Date(order.createdAt);
-                  const weekAgo = new Date();
-                  weekAgo.setDate(weekAgo.getDate() - 7);
-                  return orderDate >= weekAgo;
-                }).length
-              }
+              {recentOrdersCount}
             </div>
             <p className="text-xs text-muted-foreground">Orders this week</p>
           </CardContent>
@@ -295,7 +275,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
-              {data.orders.filter((order: Order) => order.paymentStatus === 'pending').length}
+              {paymentStatusCounts.pending}
             </div>
             <p className="text-xs text-muted-foreground">Orders awaiting payment</p>
           </CardContent>
@@ -308,7 +288,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {data.orders.filter((order: Order) => order.paymentStatus === 'partial').length}
+              {paymentStatusCounts.partial}
             </div>
             <p className="text-xs text-muted-foreground">Orders with partial payment</p>
           </CardContent>
@@ -321,7 +301,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {data.orders.filter((order: Order) => order.paymentStatus === 'completed').length}
+              {paymentStatusCounts.completed}
             </div>
             <p className="text-xs text-muted-foreground">Fully paid orders</p>
           </CardContent>
@@ -334,7 +314,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {data.orders.filter((order: Order) => order.paymentStatus === 'overdue').length}
+              {paymentStatusCounts.overdue}
             </div>
             <p className="text-xs text-muted-foreground">Overdue payments</p>
           </CardContent>
@@ -354,7 +334,7 @@ export default function AdminDashboard() {
             >
               <PieChart>
                 <Pie
-                  data={getOrderTypeData()}
+                  data={orderTypeData}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -365,7 +345,7 @@ export default function AdminDashboard() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {getOrderTypeData().map((entry, index) => (
+                  {orderTypeData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={entry.fill}
@@ -388,7 +368,7 @@ export default function AdminDashboard() {
               width="100%"
               height={300}
             >
-              <BarChart data={getStoneStockData()}>
+              <BarChart data={stoneStockData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
@@ -414,7 +394,7 @@ export default function AdminDashboard() {
             width="100%"
             height={300}
           >
-            <BarChart data={getPaperStockData()}>
+            <BarChart data={paperStockData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
@@ -430,114 +410,116 @@ export default function AdminDashboard() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle>Recent Orders</CardTitle>
-          <CardDescription>Latest 5 orders with weight details</CardDescription>
+          <CardDescription>Latest orders overview</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {data.recentOrders.map((order: Order) => (
-              <div
-                key={order._id}
-                className="p-3 border rounded-md hover:bg-gray-50 transition-colors"
-              >
-                <div className="space-y-2">
-                  {/* Customer Info */}
-                  <div>
-                    <p className="font-medium text-sm">{order.customerName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {order.phone}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Design: {order.designId?.name || 'N/A'}
-                    </p>
-                  </div>
-
-                  {/* Weight Info */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <p className="text-muted-foreground">
-                        Calc: {order.calculatedWeight?.toFixed(2) || 'N/A'}g
-                      </p>
-                      <p className="text-muted-foreground">
-                        Final: {order.finalTotalWeight?.toFixed(2) || 'Not set'}
-                        g
-                      </p>
-                    </div>
-                    <div>
-                      <p
-                        className={`font-medium ${
-                          order.weightDiscrepancy !== undefined &&
-                          order.weightDiscrepancy !== null
-                            ? order.weightDiscrepancy !== 0
-                              ? order.weightDiscrepancy > 0
-                                ? 'text-red-600'
-                                : 'text-green-600'
-                              : 'text-gray-600'
-                            : 'text-gray-500'
-                        }`}
-                      >
-                        {order.weightDiscrepancy !== undefined &&
-                        order.weightDiscrepancy !== null
-                          ? `${order.weightDiscrepancy.toFixed(
-                              2,
-                            )}g (${order.discrepancyPercentage?.toFixed(1)}%)`
-                          : 'Not calculated'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Status & Date */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-1">
-                      <Badge
-                        variant={
-                          order.type === 'internal' ? 'default' : 'secondary'
-                        }
-                        className="text-xs"
-                      >
-                        {order.type}
-                      </Badge>
-                      <Badge
-                        className={`text-xs ${
-                          order.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
+        <CardContent className="space-y-2">
+          {data.recentOrders.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground text-sm">
+              <p>No recent orders found</p>
+            </div>
+          ) : (
+            <>
+              {data.recentOrders.map((order) => (
+                <div
+                  key={order._id}
+                  className="p-3 border rounded-md hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Left: Customer & Design Info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium text-sm truncate">
+                          {order.customerName}
+                        </h4>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs px-1.5 py-0.5 ${
+                            !order.isFinalized
+                              ? 'border-amber-300 bg-amber-50 text-amber-700'
+                              : order.status === 'completed'
+                              ? 'border-green-300 bg-green-50 text-green-700'
+                              : order.status === 'cancelled'
+                              ? 'border-red-300 bg-red-50 text-red-700'
+                              : 'border-blue-300 bg-blue-50 text-blue-700'
+                          }`}
+                        >
+                          {!order.isFinalized 
+                            ? 'Draft' 
+                            : order.status === 'completed'
+                            ? 'Done'
                             : order.status === 'cancelled'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {order.status}
-                      </Badge>
-                      <Badge
-                        className={`text-xs ${
-                          order.paymentStatus === 'completed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : order.paymentStatus === 'overdue' 
-                            ? 'bg-red-100 text-red-800'
-                            : order.paymentStatus === 'partial'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {order.paymentStatus || 'pending'}
-                      </Badge>
-                      {!order.isFinalized && (
-                        <Badge className="text-xs bg-gray-100 text-gray-800">
-                          Pending
+                            ? 'Cancel'
+                            : 'Active'
+                          }
                         </Badge>
-                      )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {typeof order.designId === 'object' 
+                          ? order.designId?.name 
+                          : order.designId || 'N/A'
+                        } • {order.type === 'internal' ? 'Internal' : 'Out Job'}
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleDateString()}
-                    </p>
+
+                    {/* Right: Weight & Payment */}
+                    <div className="text-right text-xs space-y-0.5">
+                      <div className="font-medium">
+                        {order.calculatedWeight?.toFixed(1) || '--'}g
+                        {order.finalTotalWeight && order.calculatedWeight && (
+                          <span
+                            className={`ml-1 ${
+                              order.weightDiscrepancy && order.weightDiscrepancy > 0
+                                ? 'text-red-600'
+                                : order.weightDiscrepancy && order.weightDiscrepancy < 0
+                                ? 'text-green-600'
+                                : 'text-muted-foreground'
+                            }`}
+                          >
+                            →{order.finalTotalWeight.toFixed(1)}g
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          variant="outline"
+                          className={`text-xs px-1.5 py-0 ${
+                            order.paymentStatus === 'completed'
+                              ? 'border-green-300 bg-green-50 text-green-700'
+                              : order.paymentStatus === 'overdue'
+                              ? 'border-red-300 bg-red-50 text-red-700'
+                              : order.paymentStatus === 'partial'
+                              ? 'border-amber-300 bg-amber-50 text-amber-700'
+                              : 'border-gray-300 bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          {order.paymentStatus === 'completed' 
+                            ? '✓ Paid' 
+                            : order.paymentStatus === 'partial'
+                            ? '◐ Partial'
+                            : order.paymentStatus === 'overdue'
+                            ? '⚠ Overdue'
+                            : '○ Pending'
+                          }
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {new Date(order.createdAt).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
+
+export default memo(AdminDashboard);

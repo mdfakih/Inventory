@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,23 +27,13 @@ import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
 import { Package, Edit, Trash2 } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
-
-interface Paper {
-  _id: string;
-  name: string;
-  width: number;
-  quantity: number;
-  totalPieces: number;
-  piecesPerRoll: number;
-  weightPerPiece: number;
-  inventoryType: 'internal' | 'out';
-}
+import type { Paper } from '@/types';
 
 interface PaperTableProps {
   inventoryType?: 'internal' | 'out';
 }
 
-export default function PaperTable({
+function PaperTable({
   inventoryType = 'internal',
 }: PaperTableProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -295,7 +285,7 @@ export default function PaperTable({
           <div className="space-y-4">
             <p>
               Are you sure you want to reset the quantity of{' '}
-              <strong>{selectedPaper?.name}</strong> to 0? This action cannot be
+              <strong>{selectedPaper?.width}&quot; paper</strong> to 0? This action cannot be
               undone.
             </p>
             <div className="flex justify-end space-x-2">
@@ -350,7 +340,7 @@ export default function PaperTable({
             <TableBody>
               {papers.map((paper) => (
                 <TableRow key={paper._id}>
-                  <TableCell className="font-medium">{paper.name}</TableCell>
+                  <TableCell className="font-medium">{paper.width}&quot; Paper</TableCell>
                   <TableCell>{paper.width}&quot;</TableCell>
                   <TableCell>{paper.quantity}</TableCell>
                   <TableCell>{paper.piecesPerRoll}</TableCell>
@@ -405,3 +395,5 @@ export default function PaperTable({
     </div>
   );
 }
+
+export default memo(PaperTable);

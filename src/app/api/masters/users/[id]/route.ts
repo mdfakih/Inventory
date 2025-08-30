@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import User from '@/models/User';
+import { hashPassword } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -66,7 +67,7 @@ export async function PATCH(
         );
       }
 
-      user.password = newPassword;
+      user.password = await hashPassword(newPassword);
       await user.save();
 
       return NextResponse.json({

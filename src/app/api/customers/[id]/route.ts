@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Customer from '@/models/Customer';
 import { getCurrentUser } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 export async function GET(
   request: NextRequest,
@@ -11,6 +12,14 @@ export async function GET(
     await dbConnect();
     
     const { id } = await params;
+    
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid customer ID format' },
+        { status: 400 },
+      );
+    }
     
     const customer = await Customer.findById(id)
       .populate('createdBy', 'name')
@@ -44,6 +53,14 @@ export async function PUT(
     await dbConnect();
     
     const { id } = await params;
+    
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid customer ID format' },
+        { status: 400 },
+      );
+    }
     
     const user = await getCurrentUser(request);
     if (!user?._id) {

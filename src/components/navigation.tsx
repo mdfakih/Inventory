@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
 import { Menu, X } from 'lucide-react';
 
-export default function Navigation() {
+function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
@@ -35,14 +35,26 @@ export default function Navigation() {
     }
   };
 
-  const getInitials = (name: string) => {
-    return name
+  const userInitials = useMemo(() => {
+    if (!user?.name) return 'U';
+    return user.name
       .split(' ')
       .map((n) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
+  }, [user?.name]);
+
+  const navigationItems = useMemo(() => [
+    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/inventory', label: 'Inventory' },
+    { href: '/designs', label: 'Designs' },
+    { href: '/orders', label: 'Orders' },
+    { href: '/customers', label: 'Customers' },
+    { href: '/forms', label: 'Forms' },
+    ...(user?.role === 'admin' ? [{ href: '/masters', label: 'Masters' }] : []),
+    { href: '/reports', label: 'Reports' },
+  ], [user?.role]);
 
   // Don't show navigation on login page
   if (pathname === '/login') {
@@ -76,17 +88,6 @@ export default function Navigation() {
       </nav>
     );
   }
-
-  const navigationItems = [
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/inventory', label: 'Inventory' },
-    { href: '/designs', label: 'Designs' },
-    { href: '/orders', label: 'Orders' },
-    { href: '/customers', label: 'Customers' },
-    { href: '/forms', label: 'Forms' },
-    ...(user.role === 'admin' ? [{ href: '/masters', label: 'Masters' }] : []),
-    { href: '/reports', label: 'Reports' },
-  ];
 
   const isActive = (href: string) => {
     if (href === '/inventory') {
@@ -137,7 +138,7 @@ export default function Navigation() {
                   className="relative h-8 w-8 rounded-full"
                 >
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                    <AvatarFallback>{userInitials}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -204,3 +205,5 @@ export default function Navigation() {
     </nav>
   );
 }
+
+export default memo(Navigation);

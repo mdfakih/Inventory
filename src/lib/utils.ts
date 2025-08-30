@@ -18,17 +18,22 @@ export async function authenticatedFetch(
     ...options,
   };
 
-  const response = await fetch(url, defaultOptions);
+  try {
+    const response = await fetch(url, defaultOptions);
 
-  // Handle 401 responses globally
-  if (response.status === 401) {
-    // Only redirect if we're in a browser environment
-    if (typeof window !== 'undefined') {
-      window.location.href = '/unauthorized';
+    // Handle 401 responses globally
+    if (response.status === 401) {
+      // Only redirect if we're in a browser environment
+      if (typeof window !== 'undefined') {
+        window.location.href = '/unauthorized';
+      }
     }
-  }
 
-  return response;
+    return response;
+  } catch (error) {
+    console.error('Authenticated fetch failed:', error);
+    throw error;
+  }
 }
 
 export function generateJobOrderNumber(): string {
