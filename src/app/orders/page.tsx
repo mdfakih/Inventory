@@ -71,6 +71,7 @@ interface Design {
 
 interface Paper {
   _id: string;
+  name: string;
   width: number;
   quantity: number;
   totalPieces: number;
@@ -1303,8 +1304,7 @@ export default function OrdersPage() {
                                           key={paper._id}
                                           value={paper.width.toString()}
                                         >
-                                          {paper.width}&quot; (
-                                          {paper.weightPerPiece}g per piece)
+                                          {paper.name} ({paper.width}&quot;, {paper.weightPerPiece}g per piece)
                                         </SelectItem>
                                       ))}
                                   </SelectContent>
@@ -2435,8 +2435,7 @@ export default function OrdersPage() {
                                 key={paper._id}
                                 value={paper.width.toString()}
                               >
-                                {paper.width}&quot; ({paper.weightPerPiece}g per
-                                piece)
+                                {paper.name} ({paper.width}&quot;, {paper.weightPerPiece}g per piece)
                               </SelectItem>
                             ))}
                         </SelectContent>

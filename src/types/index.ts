@@ -23,12 +23,14 @@ export interface Stone {
 
 export interface Paper {
   _id: string;
-  width: 9 | 13 | 16 | 19 | 20 | 24;
+  name: string;
+  width: number;
   quantity: number;
   totalPieces: number;
   unit: 'pcs';
   piecesPerRoll: number;
   weightPerPiece: number;
+  inventoryType: 'internal' | 'out';
   updatedBy?: string;
   updateHistory: Array<{
     field: string;

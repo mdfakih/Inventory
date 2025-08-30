@@ -53,6 +53,7 @@ interface Stone {
 
 interface Paper {
   _id: string;
+  name: string;
   width: number;
   quantity: number;
   totalPieces: number;
@@ -64,6 +65,7 @@ interface Paper {
 export default function OutInventoryPage() {
   const [stones, setStones] = useState<Stone[]>([]);
   const [papers, setPapers] = useState<Paper[]>([]);
+  const [availablePaperTypes, setAvailablePaperTypes] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'stones' | 'paper'>('stones');
 
@@ -85,26 +87,27 @@ export default function OutInventoryPage() {
   const [isCreatingPaper, setIsCreatingPaper] = useState(false);
   const [isUpdatingPaper, setIsUpdatingPaper] = useState<string | null>(null);
   const [paperFormData, setPaperFormData] = useState({
-    width: '',
+    selectedPaperType: '',
     quantity: '',
-    piecesPerRoll: '',
-    weightPerPiece: '',
   });
 
   const { showSuccess, showError } = useSnackbarHelpers();
 
   const fetchData = useCallback(async () => {
     try {
-      const [stonesRes, papersRes] = await Promise.all([
+      const [stonesRes, papersRes, availablePapersRes] = await Promise.all([
         fetch('/api/inventory/stones?type=out'),
         fetch('/api/inventory/paper?type=out'),
+        fetch('/api/inventory/paper?type=internal'), // Fetch all internal paper types for selection
       ]);
 
       const stonesData = await stonesRes.json();
       const papersData = await papersRes.json();
+      const availablePapersData = await availablePapersRes.json();
 
       if (stonesData.success) setStones(stonesData.data);
       if (papersData.success) setPapers(papersData.data);
+      if (availablePapersData.success) setAvailablePaperTypes(availablePapersData.data);
     } catch (error) {
       console.error('Error fetching data:', error);
       showError('Data Loading Error', 'Failed to load out inventory data.');
@@ -115,7 +118,8 @@ export default function OutInventoryPage() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Stone management functions
   const handleCreateStone = async (e: React.FormEvent) => {
@@ -202,19 +206,30 @@ export default function OutInventoryPage() {
   // Paper management functions
   const handleCreatePaper = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!paperFormData.selectedPaperType) {
+      showError('Selection Required', 'Please select a paper type.');
+      return;
+    }
+
     setIsCreatingPaper(true);
     try {
+      const selectedPaper = availablePaperTypes.find(p => p._id === paperFormData.selectedPaperType);
+      if (!selectedPaper) {
+        showError('Invalid Selection', 'Selected paper type not found.');
+        return;
+      }
+
       const response = await fetch('/api/inventory/paper', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...paperFormData,
-          width: parseInt(paperFormData.width),
+          name: selectedPaper.name,
+          width: selectedPaper.width,
           quantity: parseInt(paperFormData.quantity),
-          piecesPerRoll: parseInt(paperFormData.piecesPerRoll),
-          weightPerPiece: parseFloat(paperFormData.weightPerPiece),
+          piecesPerRoll: selectedPaper.piecesPerRoll,
+          weightPerPiece: selectedPaper.weightPerPiece,
           inventoryType: 'out',
         }),
       });
@@ -227,10 +242,8 @@ export default function OutInventoryPage() {
         );
         setIsPaperDialogOpen(false);
         setPaperFormData({
-          width: '',
+          selectedPaperType: '',
           quantity: '',
-          piecesPerRoll: '',
-          weightPerPiece: '',
         });
         fetchData();
       } else {
@@ -573,78 +586,41 @@ export default function OutInventoryPage() {
                     onSubmit={handleCreatePaper}
                     className="space-y-4"
                   >
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="width">Width (inches)</Label>
-                        <Select
-                          value={paperFormData.width}
-                          onValueChange={(value) =>
-                            setPaperFormData({ ...paperFormData, width: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select width" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="9">9 inches</SelectItem>
-                            <SelectItem value="13">13 inches</SelectItem>
-                            <SelectItem value="16">16 inches</SelectItem>
-                            <SelectItem value="19">19 inches</SelectItem>
-                            <SelectItem value="20">20 inches</SelectItem>
-                            <SelectItem value="24">24 inches</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity">Quantity (pcs)</Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          value={paperFormData.quantity}
-                          onChange={(e) =>
-                            setPaperFormData({
-                              ...paperFormData,
-                              quantity: e.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="paperType">Paper Type</Label>
+                      <Select
+                        value={paperFormData.selectedPaperType}
+                        onValueChange={(value) =>
+                          setPaperFormData({ ...paperFormData, selectedPaperType: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select paper type from masters" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePaperTypes.map((paper) => (
+                            <SelectItem key={paper._id} value={paper._id}>
+                              {paper.name} - {paper.width}&quot; ({paper.piecesPerRoll} pcs/roll, {paper.weightPerPiece}g/pc)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="piecesPerRoll">Pieces per Roll</Label>
-                        <Input
-                          id="piecesPerRoll"
-                          type="number"
-                          value={paperFormData.piecesPerRoll}
-                          onChange={(e) =>
-                            setPaperFormData({
-                              ...paperFormData,
-                              piecesPerRoll: e.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="weightPerPiece">
-                          Weight per Piece (g)
-                        </Label>
-                        <Input
-                          id="weightPerPiece"
-                          type="number"
-                          step="0.01"
-                          value={paperFormData.weightPerPiece}
-                          onChange={(e) =>
-                            setPaperFormData({
-                              ...paperFormData,
-                              weightPerPiece: e.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quantity">Quantity (rolls)</Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        value={paperFormData.quantity}
+                        onChange={(e) =>
+                          setPaperFormData({
+                            ...paperFormData,
+                            quantity: e.target.value,
+                          })
+                        }
+                        placeholder="Number of rolls received"
+                        required
+                      />
                     </div>
                     <div className="flex justify-end space-x-2">
                       <Button
@@ -685,8 +661,9 @@ export default function OutInventoryPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Name</TableHead>
                     <TableHead>Width</TableHead>
-                    <TableHead>Quantity (pcs)</TableHead>
+                    <TableHead>Quantity (rolls)</TableHead>
                     <TableHead>Pieces per Roll</TableHead>
                     <TableHead>Weight per Piece</TableHead>
                     <TableHead>Total Pieces</TableHead>
@@ -698,8 +675,9 @@ export default function OutInventoryPage() {
                   {papers.map((paper) => (
                     <TableRow key={paper._id}>
                       <TableCell className="font-medium">
-                        {paper.width}&quot;
+                        {paper.name || `${paper.width}" Paper`}
                       </TableCell>
+                      <TableCell>{paper.width}&quot;</TableCell>
                       <TableCell>{paper.quantity}</TableCell>
                       <TableCell>{paper.piecesPerRoll}</TableCell>
                       <TableCell>{paper.weightPerPiece}g</TableCell>

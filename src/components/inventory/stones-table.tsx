@@ -103,7 +103,8 @@ function StonesTable({
     if (!authLoading && isAuthenticated) {
       fetchStones();
     }
-  }, [authLoading, isAuthenticated, currentPage, itemsPerPage, fetchStones]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, inventoryType, currentPage, itemsPerPage]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

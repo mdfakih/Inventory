@@ -285,7 +285,7 @@ function PaperTable({
           <div className="space-y-4">
             <p>
               Are you sure you want to reset the quantity of{' '}
-              <strong>{selectedPaper?.width}&quot; paper</strong> to 0? This action cannot be
+              <strong>{selectedPaper?.name}</strong> to 0? This action cannot be
               undone.
             </p>
             <div className="flex justify-end space-x-2">
@@ -340,7 +340,7 @@ function PaperTable({
             <TableBody>
               {papers.map((paper) => (
                 <TableRow key={paper._id}>
-                  <TableCell className="font-medium">{paper.width}&quot; Paper</TableCell>
+                  <TableCell className="font-medium">{paper.name}</TableCell>
                   <TableCell>{paper.width}&quot;</TableCell>
                   <TableCell>{paper.quantity}</TableCell>
                   <TableCell>{paper.piecesPerRoll}</TableCell>

@@ -105,7 +105,7 @@ function AdminDashboard() {
 
   const paperStockData = useMemo(() => {
     return data.papers.map((paper) => ({
-      name: `${paper.width}"`,
+      name: paper.name,
       pcs: paper.quantity,
     }));
   }, [data.papers]);

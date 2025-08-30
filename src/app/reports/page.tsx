@@ -999,7 +999,7 @@ export default function ReportsPage() {
                               <p className="font-medium">
                                 {'name' in item
                                   ? item.name
-                                  : `${item.width}" Paper`}
+                                  : `${(item as any).width}" Paper`}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {'number' in item
