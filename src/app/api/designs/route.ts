@@ -68,9 +68,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, number, imageUrl, prices, defaultStones } = body;
 
-    if (!name || !number || !imageUrl) {
+    if (!name || !number) {
       return NextResponse.json(
-        { success: false, message: 'Name, number, and image URL are required' },
+        { success: false, message: 'Name and number are required' },
         { status: 400 },
       );
     }
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     const design = new Design({
       name,
       number,
-      imageUrl,
+      imageUrl: imageUrl || '',
       prices: prices || [],
       defaultStones: defaultStones || [],
       createdBy: user.id,

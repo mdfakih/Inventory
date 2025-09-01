@@ -60,7 +60,7 @@ interface Design {
   _id: string;
   name: string;
   number: string;
-  imageUrl: string;
+  imageUrl?: string;
   prices: Array<{
     currency: '₹' | '$';
     price: number;
@@ -265,6 +265,7 @@ export default function DesignsPage() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('data', formData);
     setIsCreating(true);
     try {
       const response = await authenticatedFetch('/api/designs', {
@@ -370,7 +371,7 @@ export default function DesignsPage() {
     setEditFormData({
       name: design.name,
       number: design.number,
-      imageUrl: design.imageUrl,
+      imageUrl: design.imageUrl || '',
       prices:
         design.prices?.map((price) => ({
           currency: price.currency,
@@ -606,7 +607,10 @@ export default function DesignsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Design Image</Label>
+                  <Label>
+                    Design Image{' '}
+                    <span className="text-sm text-gray-500">(Optional)</span>
+                  </Label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                     {formData.imageUrl ? (
                       <div className="space-y-2">
@@ -657,7 +661,7 @@ export default function DesignsPage() {
                           </Button>
                         </div>
                         <p className="text-sm text-gray-500">
-                          PNG, JPG, GIF up to 10MB
+                          PNG, JPG, GIF up to 10MB (Optional)
                         </p>
                       </div>
                     )}
@@ -730,7 +734,7 @@ export default function DesignsPage() {
                             updateDefaultStone(
                               index,
                               'quantity',
-                              parseInt(e.target.value),
+                              parseInt(e.target.value) || 0,
                             )
                           }
                           min="0"
@@ -802,14 +806,20 @@ export default function DesignsPage() {
                 {designs.map((design) => (
                   <TableRow key={design._id}>
                     <TableCell>
-                      <SafeImage
-                        src={design.imageUrl}
-                        alt={design.name}
-                        width={48}
-                        height={48}
-                        className="h-12 w-12 object-cover rounded"
-                        fallbackText="No Image"
-                      />
+                      {design.imageUrl ? (
+                        <SafeImage
+                          src={design.imageUrl}
+                          alt={design.name}
+                          width={48}
+                          height={48}
+                          className="h-12 w-12 object-cover rounded"
+                          fallbackText="No Image"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500">
+                          No Image
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="font-medium">{design.name}</TableCell>
                     <TableCell>{design.number}</TableCell>
@@ -1057,7 +1067,10 @@ export default function DesignsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Design Image</Label>
+              <Label>
+                Design Image{' '}
+                <span className="text-sm text-gray-500">(Optional)</span>
+              </Label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                 {editFormData.imageUrl ? (
                   <div className="space-y-2">
@@ -1108,7 +1121,7 @@ export default function DesignsPage() {
                       </Button>
                     </div>
                     <p className="text-sm text-gray-500">
-                      PNG, JPG, GIF up to 10MB
+                      PNG, JPG, GIF up to 10MB (Optional)
                     </p>
                   </div>
                 )}
@@ -1181,7 +1194,10 @@ export default function DesignsPage() {
                           ...prev,
                           defaultStones: prev.defaultStones.map((s, i) =>
                             i === index
-                              ? { ...s, quantity: parseInt(e.target.value) }
+                              ? {
+                                  ...s,
+                                  quantity: parseInt(e.target.value) || 0,
+                                }
                               : s,
                           ),
                         }))
@@ -1274,14 +1290,20 @@ export default function DesignsPage() {
               </div>
               <div>
                 <Label className="font-semibold">Design Image</Label>
-                <SafeImage
-                  src={selectedDesign.imageUrl}
-                  alt={selectedDesign.name}
-                  width={192}
-                  height={192}
-                  className="mt-2 max-h-48 object-contain rounded"
-                  fallbackText="No image available"
-                />
+                {selectedDesign.imageUrl ? (
+                  <SafeImage
+                    src={selectedDesign.imageUrl}
+                    alt={selectedDesign.name}
+                    width={192}
+                    height={192}
+                    className="mt-2 max-h-48 object-contain rounded"
+                    fallbackText="No image available"
+                  />
+                ) : (
+                  <div className="mt-2 w-48 h-48 bg-gray-100 rounded flex items-center justify-center text-gray-500">
+                    No image available
+                  </div>
+                )}
               </div>
               <div>
                 <Label className="font-semibold">Default Stones</Label>
