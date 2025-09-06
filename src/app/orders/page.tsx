@@ -393,7 +393,7 @@ export default function OrdersPage() {
         authenticatedFetch(
           `/api/orders?page=${currentPage}&limit=${itemsPerPage}`,
         ),
-        authenticatedFetch('/api/designs'),
+        authenticatedFetch('/api/designs?all=true'),
         authenticatedFetch('/api/inventory/paper?type=internal'),
         authenticatedFetch('/api/inventory/paper?type=out'),
         authenticatedFetch('/api/inventory/stones?type=internal'),
@@ -1304,7 +1304,8 @@ export default function OrdersPage() {
                                           key={paper._id}
                                           value={paper.width.toString()}
                                         >
-                                          {paper.name} ({paper.width}&quot;, {paper.weightPerPiece}g per piece)
+                                          {paper.name} ({paper.width}&quot;,{' '}
+                                          {paper.weightPerPiece}g per piece)
                                         </SelectItem>
                                       ))}
                                   </SelectContent>
@@ -2435,7 +2436,8 @@ export default function OrdersPage() {
                                 key={paper._id}
                                 value={paper.width.toString()}
                               >
-                                {paper.name} ({paper.width}&quot;, {paper.weightPerPiece}g per piece)
+                                {paper.name} ({paper.width}&quot;,{' '}
+                                {paper.weightPerPiece}g per piece)
                               </SelectItem>
                             ))}
                         </SelectContent>

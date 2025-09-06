@@ -6,10 +6,25 @@ import { getCurrentUser } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   try {
     await dbConnect();
-    
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
+    const all = searchParams.get('all') === 'true';
+
+    // If all=true, return all designs without pagination (for dropdowns)
+    if (all) {
+      const designs = await Design.find()
+        .populate('defaultStones.stoneId')
+        .populate('createdBy', 'name email')
+        .populate('updatedBy', 'name email')
+        .sort({ name: 1 }); // Sort by name for dropdowns
+
+      return NextResponse.json({
+        success: true,
+        data: designs,
+      });
+    }
 
     // Validate pagination parameters
     if (page < 1 || limit < 1 || limit > 100) {
