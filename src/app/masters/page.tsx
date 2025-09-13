@@ -61,6 +61,7 @@ import {
   Key,
   Info,
   Edit,
+  Trash2,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Pagination } from '@/components/ui/pagination';
@@ -413,6 +414,105 @@ export default function MastersPage() {
   const [isEditTapeDialogOpen, setIsEditTapeDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
+  // Bulk selection state for each master type
+  const [selectedStoneIds, setSelectedStoneIds] = useState<string[]>([]);
+  const [selectedPaperIds, setSelectedPaperIds] = useState<string[]>([]);
+  const [selectedPlasticIds, setSelectedPlasticIds] = useState<string[]>([]);
+  const [selectedTapeIds, setSelectedTapeIds] = useState<string[]>([]);
+
+  // Bulk delete dialog states
+  const [isBulkStoneDialogOpen, setIsBulkStoneDialogOpen] = useState(false);
+  const [isBulkPaperDialogOpen, setIsBulkPaperDialogOpen] = useState(false);
+  const [isBulkPlasticDialogOpen, setIsBulkPlasticDialogOpen] = useState(false);
+  const [isBulkTapeDialogOpen, setIsBulkTapeDialogOpen] = useState(false);
+
+  // Bulk delete loading states
+  const [isBulkDeletingStones, setIsBulkDeletingStones] = useState(false);
+  const [isBulkDeletingPapers, setIsBulkDeletingPapers] = useState(false);
+  const [isBulkDeletingPlastics, setIsBulkDeletingPlastics] = useState(false);
+  const [isBulkDeletingTapes, setIsBulkDeletingTapes] = useState(false);
+
+  // Checkbox selection helper functions
+  const toggleStoneSelection = (id: string) => {
+    setSelectedStoneIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const togglePaperSelection = (id: string) => {
+    setSelectedPaperIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const togglePlasticSelection = (id: string) => {
+    setSelectedPlasticIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleTapeSelection = (id: string) => {
+    setSelectedTapeIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAllStones = () => {
+    const visibleIds = stones.map((s) => s._id);
+    const areAllSelected = visibleIds.every((id) =>
+      selectedStoneIds.includes(id),
+    );
+    if (areAllSelected) {
+      setSelectedStoneIds((prev) =>
+        prev.filter((id) => !visibleIds.includes(id)),
+      );
+    } else {
+      setSelectedStoneIds((prev) => [...new Set([...prev, ...visibleIds])]);
+    }
+  };
+
+  const toggleSelectAllPapers = () => {
+    const visibleIds = papers.map((p) => p._id);
+    const areAllSelected = visibleIds.every((id) =>
+      selectedPaperIds.includes(id),
+    );
+    if (areAllSelected) {
+      setSelectedPaperIds((prev) =>
+        prev.filter((id) => !visibleIds.includes(id)),
+      );
+    } else {
+      setSelectedPaperIds((prev) => [...new Set([...prev, ...visibleIds])]);
+    }
+  };
+
+  const toggleSelectAllPlastics = () => {
+    const visibleIds = plastics.map((p) => p._id);
+    const areAllSelected = visibleIds.every((id) =>
+      selectedPlasticIds.includes(id),
+    );
+    if (areAllSelected) {
+      setSelectedPlasticIds((prev) =>
+        prev.filter((id) => !visibleIds.includes(id)),
+      );
+    } else {
+      setSelectedPlasticIds((prev) => [...new Set([...prev, ...visibleIds])]);
+    }
+  };
+
+  const toggleSelectAllTapes = () => {
+    const visibleIds = tapes.map((t) => t._id);
+    const areAllSelected = visibleIds.every((id) =>
+      selectedTapeIds.includes(id),
+    );
+    if (areAllSelected) {
+      setSelectedTapeIds((prev) =>
+        prev.filter((id) => !visibleIds.includes(id)),
+      );
+    } else {
+      setSelectedTapeIds((prev) => [...new Set([...prev, ...visibleIds])]);
+    }
+  };
+
   const handleEditUser = (user: User) => {
     setSelectedUserForEdit(user);
     setIsEditDialogOpen(true);
@@ -636,6 +736,171 @@ export default function MastersPage() {
       );
     } finally {
       setIsDeleting(null);
+    }
+  };
+
+  // Bulk delete handlers
+  const handleBulkDeleteStones = async () => {
+    const idsToDelete = selectedStoneIds;
+    if (idsToDelete.length < 1) return;
+    setIsBulkDeletingStones(true);
+    try {
+      const response = await authenticatedFetch(
+        '/api/masters/stones/bulk-delete',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: idsToDelete }),
+        },
+      );
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(
+          'Stones Deleted',
+          `${
+            data.deletedCount || idsToDelete.length
+          } stone types deleted successfully.`,
+        );
+        setSelectedStoneIds([]);
+        await loadAllData(true);
+        setIsBulkStoneDialogOpen(false);
+      } else {
+        showError(
+          'Bulk Delete Failed',
+          data.message || 'Failed to delete selected stone types.',
+        );
+      }
+    } catch (error) {
+      console.error('Error bulk deleting stones:', error);
+      showError(
+        'Network Error',
+        'Failed to delete stone types. Please try again.',
+      );
+    } finally {
+      setIsBulkDeletingStones(false);
+    }
+  };
+
+  const handleBulkDeletePapers = async () => {
+    const idsToDelete = selectedPaperIds;
+    if (idsToDelete.length < 1) return;
+    setIsBulkDeletingPapers(true);
+    try {
+      const response = await authenticatedFetch(
+        '/api/masters/paper/bulk-delete',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: idsToDelete }),
+        },
+      );
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(
+          'Papers Deleted',
+          `${
+            data.deletedCount || idsToDelete.length
+          } paper types deleted successfully.`,
+        );
+        setSelectedPaperIds([]);
+        await loadAllData(true);
+        setIsBulkPaperDialogOpen(false);
+      } else {
+        showError(
+          'Bulk Delete Failed',
+          data.message || 'Failed to delete selected paper types.',
+        );
+      }
+    } catch (error) {
+      console.error('Error bulk deleting papers:', error);
+      showError(
+        'Network Error',
+        'Failed to delete paper types. Please try again.',
+      );
+    } finally {
+      setIsBulkDeletingPapers(false);
+    }
+  };
+
+  const handleBulkDeletePlastics = async () => {
+    const idsToDelete = selectedPlasticIds;
+    if (idsToDelete.length < 1) return;
+    setIsBulkDeletingPlastics(true);
+    try {
+      const response = await authenticatedFetch(
+        '/api/masters/plastic/bulk-delete',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: idsToDelete }),
+        },
+      );
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(
+          'Plastics Deleted',
+          `${
+            data.deletedCount || idsToDelete.length
+          } plastic types deleted successfully.`,
+        );
+        setSelectedPlasticIds([]);
+        await loadAllData(true);
+        setIsBulkPlasticDialogOpen(false);
+      } else {
+        showError(
+          'Bulk Delete Failed',
+          data.message || 'Failed to delete selected plastic types.',
+        );
+      }
+    } catch (error) {
+      console.error('Error bulk deleting plastics:', error);
+      showError(
+        'Network Error',
+        'Failed to delete plastic types. Please try again.',
+      );
+    } finally {
+      setIsBulkDeletingPlastics(false);
+    }
+  };
+
+  const handleBulkDeleteTapes = async () => {
+    const idsToDelete = selectedTapeIds;
+    if (idsToDelete.length < 1) return;
+    setIsBulkDeletingTapes(true);
+    try {
+      const response = await authenticatedFetch(
+        '/api/masters/tape/bulk-delete',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: idsToDelete }),
+        },
+      );
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(
+          'Tapes Deleted',
+          `${
+            data.deletedCount || idsToDelete.length
+          } tape types deleted successfully.`,
+        );
+        setSelectedTapeIds([]);
+        await loadAllData(true);
+        setIsBulkTapeDialogOpen(false);
+      } else {
+        showError(
+          'Bulk Delete Failed',
+          data.message || 'Failed to delete selected tape types.',
+        );
+      }
+    } catch (error) {
+      console.error('Error bulk deleting tapes:', error);
+      showError(
+        'Network Error',
+        'Failed to delete tape types. Please try again.',
+      );
+    } finally {
+      setIsBulkDeletingTapes(false);
     }
   };
 
@@ -1043,20 +1308,31 @@ export default function MastersPage() {
                     Manage stone types and specifications
                   </CardDescription>
                 </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Stone Type
+                <div className="flex items-center gap-4">
+                  {user?.role === 'admin' && selectedStoneIds.length > 0 && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => setIsBulkStoneDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected ({selectedStoneIds.length})
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add New Stone Type</DialogTitle>
-                    </DialogHeader>
-                    <StoneForm onSuccess={loadAllData} />
-                  </DialogContent>
-                </Dialog>
+                  )}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Stone Type
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Stone Type</DialogTitle>
+                      </DialogHeader>
+                      <StoneForm onSuccess={loadAllData} />
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -1065,6 +1341,32 @@ export default function MastersPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>
+                          <input
+                            type="checkbox"
+                            aria-label="Select all stones"
+                            checked={
+                              stones.length > 0 &&
+                              stones.every((s) =>
+                                selectedStoneIds.includes(s._id),
+                              )
+                            }
+                            ref={(el) => {
+                              if (el) {
+                                const someSelected = stones.some((s) =>
+                                  selectedStoneIds.includes(s._id),
+                                );
+                                const allSelected =
+                                  stones.length > 0 &&
+                                  stones.every((s) =>
+                                    selectedStoneIds.includes(s._id),
+                                  );
+                                el.indeterminate = someSelected && !allSelected;
+                              }
+                            }}
+                            onChange={toggleSelectAllStones}
+                          />
+                        </TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Number</TableHead>
                         <TableHead>Color</TableHead>
@@ -1076,7 +1378,22 @@ export default function MastersPage() {
                     </TableHeader>
                     <TableBody>
                       {stones.map((stone) => (
-                        <TableRow key={stone._id}>
+                        <TableRow
+                          key={stone._id}
+                          data-state={
+                            selectedStoneIds.includes(stone._id)
+                              ? 'selected'
+                              : undefined
+                          }
+                        >
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${stone.name}`}
+                              checked={selectedStoneIds.includes(stone._id)}
+                              onChange={() => toggleStoneSelection(stone._id)}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">
                             {stone.name}
                           </TableCell>
@@ -1155,20 +1472,31 @@ export default function MastersPage() {
                     pieces per roll
                   </CardDescription>
                 </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Paper Type
+                <div className="flex items-center gap-4">
+                  {user?.role === 'admin' && selectedPaperIds.length > 0 && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => setIsBulkPaperDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected ({selectedPaperIds.length})
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Add New Paper Type</DialogTitle>
-                    </DialogHeader>
-                    <PaperForm onSuccess={loadAllData} />
-                  </DialogContent>
-                </Dialog>
+                  )}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Paper Type
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add New Paper Type</DialogTitle>
+                      </DialogHeader>
+                      <PaperForm onSuccess={loadAllData} />
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -1190,6 +1518,33 @@ export default function MastersPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead>
+                            <input
+                              type="checkbox"
+                              aria-label="Select all papers"
+                              checked={
+                                papers.length > 0 &&
+                                papers.every((p) =>
+                                  selectedPaperIds.includes(p._id),
+                                )
+                              }
+                              ref={(el) => {
+                                if (el) {
+                                  const someSelected = papers.some((p) =>
+                                    selectedPaperIds.includes(p._id),
+                                  );
+                                  const allSelected =
+                                    papers.length > 0 &&
+                                    papers.every((p) =>
+                                      selectedPaperIds.includes(p._id),
+                                    );
+                                  el.indeterminate =
+                                    someSelected && !allSelected;
+                                }
+                              }}
+                              onChange={toggleSelectAllPapers}
+                            />
+                          </TableHead>
                           <TableHead>Name</TableHead>
                           <TableHead>Width (inches)</TableHead>
                           <TableHead>Pieces per Roll</TableHead>
@@ -1200,7 +1555,22 @@ export default function MastersPage() {
                       </TableHeader>
                       <TableBody>
                         {papers.map((paper) => (
-                          <TableRow key={paper._id}>
+                          <TableRow
+                            key={paper._id}
+                            data-state={
+                              selectedPaperIds.includes(paper._id)
+                                ? 'selected'
+                                : undefined
+                            }
+                          >
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${paper.name}`}
+                                checked={selectedPaperIds.includes(paper._id)}
+                                onChange={() => togglePaperSelection(paper._id)}
+                              />
+                            </TableCell>
                             <TableCell className="font-medium">
                               {paper.name}
                             </TableCell>
@@ -1269,20 +1639,31 @@ export default function MastersPage() {
                     values
                   </CardDescription>
                 </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Plastic Type
+                <div className="flex items-center gap-4">
+                  {user?.role === 'admin' && selectedPlasticIds.length > 0 && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => setIsBulkPlasticDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected ({selectedPlasticIds.length})
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Add New Plastic Type</DialogTitle>
-                    </DialogHeader>
-                    <PlasticForm onSuccess={loadAllData} />
-                  </DialogContent>
-                </Dialog>
+                  )}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Plastic Type
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add New Plastic Type</DialogTitle>
+                      </DialogHeader>
+                      <PlasticForm onSuccess={loadAllData} />
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -1304,6 +1685,33 @@ export default function MastersPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead>
+                            <input
+                              type="checkbox"
+                              aria-label="Select all plastics"
+                              checked={
+                                plastics.length > 0 &&
+                                plastics.every((p) =>
+                                  selectedPlasticIds.includes(p._id),
+                                )
+                              }
+                              ref={(el) => {
+                                if (el) {
+                                  const someSelected = plastics.some((p) =>
+                                    selectedPlasticIds.includes(p._id),
+                                  );
+                                  const allSelected =
+                                    plastics.length > 0 &&
+                                    plastics.every((p) =>
+                                      selectedPlasticIds.includes(p._id),
+                                    );
+                                  el.indeterminate =
+                                    someSelected && !allSelected;
+                                }
+                              }}
+                              onChange={toggleSelectAllPlastics}
+                            />
+                          </TableHead>
                           <TableHead>Name</TableHead>
                           <TableHead>Width (inches)</TableHead>
                           <TableHead>Actions</TableHead>
@@ -1311,7 +1719,26 @@ export default function MastersPage() {
                       </TableHeader>
                       <TableBody>
                         {plastics.map((plastic) => (
-                          <TableRow key={plastic._id}>
+                          <TableRow
+                            key={plastic._id}
+                            data-state={
+                              selectedPlasticIds.includes(plastic._id)
+                                ? 'selected'
+                                : undefined
+                            }
+                          >
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${plastic.name}`}
+                                checked={selectedPlasticIds.includes(
+                                  plastic._id,
+                                )}
+                                onChange={() =>
+                                  togglePlasticSelection(plastic._id)
+                                }
+                              />
+                            </TableCell>
                             <TableCell className="font-medium">
                               {plastic.name}
                             </TableCell>
@@ -1372,20 +1799,31 @@ export default function MastersPage() {
                   <CardTitle>Tape Master Data</CardTitle>
                   <CardDescription>Manage tape specifications</CardDescription>
                 </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Tape Type
+                <div className="flex items-center gap-4">
+                  {user?.role === 'admin' && selectedTapeIds.length > 0 && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => setIsBulkTapeDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Selected ({selectedTapeIds.length})
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Add New Tape Type</DialogTitle>
-                    </DialogHeader>
-                    <TapeForm onSuccess={loadAllData} />
-                  </DialogContent>
-                </Dialog>
+                  )}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Tape Type
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add New Tape Type</DialogTitle>
+                      </DialogHeader>
+                      <TapeForm onSuccess={loadAllData} />
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -1407,13 +1845,55 @@ export default function MastersPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead>
+                            <input
+                              type="checkbox"
+                              aria-label="Select all tapes"
+                              checked={
+                                tapes.length > 0 &&
+                                tapes.every((t) =>
+                                  selectedTapeIds.includes(t._id),
+                                )
+                              }
+                              ref={(el) => {
+                                if (el) {
+                                  const someSelected = tapes.some((t) =>
+                                    selectedTapeIds.includes(t._id),
+                                  );
+                                  const allSelected =
+                                    tapes.length > 0 &&
+                                    tapes.every((t) =>
+                                      selectedTapeIds.includes(t._id),
+                                    );
+                                  el.indeterminate =
+                                    someSelected && !allSelected;
+                                }
+                              }}
+                              onChange={toggleSelectAllTapes}
+                            />
+                          </TableHead>
                           <TableHead>Name</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {tapes.map((tape) => (
-                          <TableRow key={tape._id}>
+                          <TableRow
+                            key={tape._id}
+                            data-state={
+                              selectedTapeIds.includes(tape._id)
+                                ? 'selected'
+                                : undefined
+                            }
+                          >
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${tape.name}`}
+                                checked={selectedTapeIds.includes(tape._id)}
+                                onChange={() => toggleTapeSelection(tape._id)}
+                              />
+                            </TableCell>
                             <TableCell className="font-medium">
                               {tape.name}
                             </TableCell>
@@ -1588,6 +2068,165 @@ export default function MastersPage() {
               }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialogs */}
+      <Dialog
+        open={isBulkStoneDialogOpen}
+        onOpenChange={setIsBulkStoneDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedStoneIds.length === 1
+                ? 'Delete Stone Type'
+                : 'Delete Selected Stone Types'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to delete {selectedStoneIds.length}{' '}
+              {selectedStoneIds.length === 1 ? 'stone type' : 'stone types'}?
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkStoneDialogOpen(false)}
+                disabled={isBulkDeletingStones}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                onClick={handleBulkDeleteStones}
+                loading={isBulkDeletingStones}
+                loadingText="Deleting..."
+                variant="destructive"
+              >
+                Delete
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isBulkPaperDialogOpen}
+        onOpenChange={setIsBulkPaperDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedPaperIds.length === 1
+                ? 'Delete Paper Type'
+                : 'Delete Selected Paper Types'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to delete {selectedPaperIds.length}{' '}
+              {selectedPaperIds.length === 1 ? 'paper type' : 'paper types'}?
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkPaperDialogOpen(false)}
+                disabled={isBulkDeletingPapers}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                onClick={handleBulkDeletePapers}
+                loading={isBulkDeletingPapers}
+                loadingText="Deleting..."
+                variant="destructive"
+              >
+                Delete
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isBulkPlasticDialogOpen}
+        onOpenChange={setIsBulkPlasticDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedPlasticIds.length === 1
+                ? 'Delete Plastic Type'
+                : 'Delete Selected Plastic Types'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to delete {selectedPlasticIds.length}{' '}
+              {selectedPlasticIds.length === 1
+                ? 'plastic type'
+                : 'plastic types'}
+              ? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkPlasticDialogOpen(false)}
+                disabled={isBulkDeletingPlastics}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                onClick={handleBulkDeletePlastics}
+                loading={isBulkDeletingPlastics}
+                loadingText="Deleting..."
+                variant="destructive"
+              >
+                Delete
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isBulkTapeDialogOpen}
+        onOpenChange={setIsBulkTapeDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedTapeIds.length === 1
+                ? 'Delete Tape Type'
+                : 'Delete Selected Tape Types'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to delete {selectedTapeIds.length}{' '}
+              {selectedTapeIds.length === 1 ? 'tape type' : 'tape types'}? This
+              action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkTapeDialogOpen(false)}
+                disabled={isBulkDeletingTapes}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                onClick={handleBulkDeleteTapes}
+                loading={isBulkDeletingTapes}
+                loadingText="Deleting..."
+                variant="destructive"
+              >
+                Delete
+              </LoadingButton>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
