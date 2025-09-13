@@ -161,13 +161,13 @@ export async function DELETE(
       id,
       {
         quantity: 0,
-        updatedBy: user.id,
+        updatedBy: user._id,
         $push: {
           updateHistory: {
             field: 'quantity',
             oldValue: tape.quantity,
             newValue: 0,
-            updatedBy: user.id,
+            updatedBy: user._id,
             updatedAt: new Date(),
           },
         },

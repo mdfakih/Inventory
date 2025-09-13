@@ -110,10 +110,15 @@ export default function DesignsPage() {
   const [selectedDesign, setSelectedDesign] = useState<Design | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
     number: '',
@@ -145,7 +150,18 @@ export default function DesignsPage() {
       const response = await authenticatedFetch('/api/auth/me');
       if (response.ok) {
         const data = await response.json();
-        setUser(data.user);
+        if (data.success) {
+          setUser(data.user);
+        }
+      } else if (response.status === 401) {
+        // Don't log error for 401 - let auth context handle it
+        console.log('User authentication failed');
+      } else {
+        console.error(
+          'Error fetching user:',
+          response.status,
+          response.statusText,
+        );
       }
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -163,11 +179,27 @@ export default function DesignsPage() {
         const response = await authenticatedFetch(
           `/api/designs?page=${currentPage}&limit=${itemsPerPage}&sortBy=${sortBy}&sortOrder=${sortOrder}`,
         );
-        const data = await response.json();
-        if (data.success) {
-          setDesigns(data.data);
-          setTotalPages(data.pagination.pages);
-          setTotalItems(data.pagination.total);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setDesigns(data.data);
+            setTotalPages(data.pagination.pages);
+            setTotalItems(data.pagination.total);
+          } else {
+            showError(
+              'Data Loading Error',
+              data.message || 'Failed to load designs data.',
+            );
+          }
+        } else if (response.status === 401) {
+          // Don't show error for 401 - let auth context handle it
+          console.log('Authentication failed while fetching designs');
+        } else {
+          showError(
+            'Data Loading Error',
+            `Failed to load designs data. Status: ${response.status}`,
+          );
         }
       } catch (error) {
         console.error('Error fetching designs:', error);
@@ -189,16 +221,25 @@ export default function DesignsPage() {
         authenticatedFetch('/api/inventory/stones?type=out'),
       ]);
 
-      const internalStonesData = await internalStonesRes.json();
-      const outStonesData = await outStonesRes.json();
-
       // Combine both internal and out stones
       const allStones = [];
-      if (internalStonesData.success) {
-        allStones.push(...internalStonesData.data);
+
+      if (internalStonesRes.ok) {
+        const internalStonesData = await internalStonesRes.json();
+        if (internalStonesData.success) {
+          allStones.push(...internalStonesData.data);
+        }
+      } else if (internalStonesRes.status === 401) {
+        console.log('Authentication failed while fetching internal stones');
       }
-      if (outStonesData.success) {
-        allStones.push(...outStonesData.data);
+
+      if (outStonesRes.ok) {
+        const outStonesData = await outStonesRes.json();
+        if (outStonesData.success) {
+          allStones.push(...outStonesData.data);
+        }
+      } else if (outStonesRes.status === 401) {
+        console.log('Authentication failed while fetching out stones');
       }
 
       setStones(allStones);
@@ -208,12 +249,78 @@ export default function DesignsPage() {
     }
   }, [showError]);
 
+  const visibleIds = designs.map((d) => d._id);
+  const areAllVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const someVisibleSelected =
+    visibleIds.some((id) => selectedIds.includes(id)) && !areAllVisibleSelected;
+
+  const toggleRowSelection = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedIds((prev) => {
+      const visibleSet = new Set(visibleIds);
+      const others = prev.filter((id) => !visibleSet.has(id));
+      if (areAllVisibleSelected) {
+        return others; // unselect all visible, keep others
+      }
+      return [...others, ...visibleIds];
+    });
+  };
+
+  const openBulkDeleteDialog = () => setIsBulkDialogOpen(true);
+  const closeBulkDeleteDialog = () => setIsBulkDialogOpen(false);
+
+  const handleBulkDelete = async () => {
+    const idsToDelete = selectedIds;
+    if (idsToDelete.length < 1) return;
+    setIsBulkDeleting(true);
+    try {
+      const response = await authenticatedFetch('/api/designs/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: idsToDelete }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        showSuccess(
+          'Designs Deleted',
+          `${
+            data.deletedCount || idsToDelete.length
+          } designs deleted successfully.`,
+        );
+        setSelectedIds([]);
+        await fetchDesigns(true);
+        setIsBulkDialogOpen(false);
+      } else {
+        showError(
+          'Bulk Delete Failed',
+          data.message || 'Failed to delete selected designs.',
+        );
+      }
+    } catch (error) {
+      console.error('Error bulk deleting designs:', error);
+      showError('Network Error', 'Failed to delete designs. Please try again.');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated
     if (!authLoading && isAuthenticated) {
       fetchDesigns();
       fetchStones();
       fetchUser();
+    } else if (!authLoading && !isAuthenticated) {
+      // If not authenticated, clear any existing data
+      setDesigns([]);
+      setStones([]);
+      setUser(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -234,9 +341,42 @@ export default function DesignsPage() {
     setCurrentPage(1); // Reset to first page when changing items per page
   };
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageUpload = async (
+    file: File,
+    retryCount = 0,
+    isEdit = false,
+  ) => {
     setUploading(true);
+    setUploadProgress(0);
+
     try {
+      // Validate file before upload
+      if (!file.type.startsWith('image/')) {
+        showError(
+          'Invalid File Type',
+          'Please select an image file (PNG, JPG, GIF).',
+        );
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        showError('File Too Large', 'File size must be less than 5MB.');
+        return;
+      }
+
+      if (file.size === 0) {
+        showError('Empty File', 'The selected file is empty.');
+        return;
+      }
+
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) return prev;
+          return prev + Math.random() * 10;
+        });
+      }, 200);
+
       const formData = new FormData();
       formData.append('file', file);
 
@@ -245,26 +385,81 @@ export default function DesignsPage() {
         body: formData,
       });
 
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
       const data = await response.json();
       if (data.success) {
         showSuccess(
           'Image Uploaded',
           'Design image has been uploaded successfully.',
         );
-        setFormData((prev) => ({ ...prev, imageUrl: data.data.url }));
+
+        if (isEdit) {
+          setEditFormData((prev) => ({ ...prev, imageUrl: data.data.url }));
+          // Reset edit file input after successful upload
+          if (editFileInputRef.current) {
+            editFileInputRef.current.value = '';
+          }
+        } else {
+          setFormData((prev) => ({ ...prev, imageUrl: data.data.url }));
+          // Reset file input after successful upload
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }
       } else {
+        // Retry logic for network errors
+        if (
+          retryCount < 2 &&
+          (response.status >= 500 || response.status === 408)
+        ) {
+          console.log(`Upload failed, retrying... (attempt ${retryCount + 1})`);
+          setTimeout(() => {
+            handleImageUpload(file, retryCount + 1, isEdit);
+          }, 1000 * (retryCount + 1)); // Exponential backoff
+          return;
+        }
+
         showError('Upload Failed', data.message || 'Failed to upload image.');
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      showError('Network Error', 'Failed to upload image. Please try again.');
+
+      // Retry logic for network errors
+      if (retryCount < 2) {
+        console.log(`Network error, retrying... (attempt ${retryCount + 1})`);
+        setTimeout(() => {
+          handleImageUpload(file, retryCount + 1, isEdit);
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+        return;
+      }
+
+      showError(
+        'Network Error',
+        'Failed to upload image. Please check your connection and try again.',
+      );
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate that at least one stone is selected
+    const validStones = formData.defaultStones.filter(
+      (stone) => stone.stoneId && stone.stoneId.trim() !== '',
+    );
+    if (validStones.length === 0) {
+      showError(
+        'Validation Error',
+        'At least one stone must be selected for the design. Please add a stone before creating the design.',
+      );
+      return;
+    }
+
     console.log('data', formData);
     setIsCreating(true);
     try {
@@ -308,6 +503,18 @@ export default function DesignsPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDesign) return;
+
+    // Validate that at least one stone is selected
+    const validStones = editFormData.defaultStones.filter(
+      (stone) => stone.stoneId && stone.stoneId.trim() !== '',
+    );
+    if (validStones.length === 0) {
+      showError(
+        'Validation Error',
+        'At least one stone must be selected for the design. Please add a stone before updating the design.',
+      );
+      return;
+    }
 
     setIsUpdating(true);
     try {
@@ -428,21 +635,23 @@ export default function DesignsPage() {
 
   return (
     <div className="container mx-auto space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-3xl font-bold">Designs Management</h1>
-        <p className="text-gray-600">
-          Manage design templates and configurations
-        </p>
-      </div>
-
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold">Designs ({designs.length})</h2>
-          <p className="text-sm text-muted-foreground">
-            Manage design templates and their default stone configurations
+          <h1 className="text-3xl font-bold">Designs Management</h1>
+          <p className="text-gray-600">
+            Manage design templates and configurations
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {user?.role === 'admin' && selectedIds.length > 0 && (
+            <Button
+              variant="destructive"
+              onClick={openBulkDeleteDialog}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected ({selectedIds.length})
+            </Button>
+          )}
           {refreshing && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner size="sm" />
@@ -637,7 +846,7 @@ export default function DesignsPage() {
                     ) : (
                       <div className="space-y-2">
                         <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                        <div>
+                        <div className="space-y-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -650,7 +859,7 @@ export default function DesignsPage() {
                                   size="sm"
                                   className="mr-2"
                                 />
-                                Uploading...
+                                Uploading... {Math.round(uploadProgress)}%
                               </>
                             ) : (
                               <>
@@ -659,9 +868,17 @@ export default function DesignsPage() {
                               </>
                             )}
                           </Button>
+                          {uploading && (
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                                style={{ width: `${uploadProgress}%` }}
+                              ></div>
+                            </div>
+                          )}
                         </div>
                         <p className="text-sm text-gray-500">
-                          PNG, JPG, GIF up to 10MB (Optional)
+                          PNG, JPG, GIF up to 5MB (Optional)
                         </p>
                       </div>
                     )}
@@ -674,6 +891,8 @@ export default function DesignsPage() {
                         if (file) {
                           handleImageUpload(file);
                         }
+                        // Reset the input value to allow selecting the same file again
+                        e.target.value = '';
                       }}
                       className="hidden"
                     />
@@ -729,15 +948,14 @@ export default function DesignsPage() {
                         <Label>Quantity (g)</Label>
                         <Input
                           type="number"
+                          step="0.01"
                           value={stone.quantity}
-                          onChange={(e) =>
-                            updateDefaultStone(
-                              index,
-                              'quantity',
-                              parseInt(e.target.value) || 0,
-                            )
-                          }
-                          min="0"
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            const roundedValue = Math.round(value * 100) / 100; // Round to 2 decimal places
+                            updateDefaultStone(index, 'quantity', roundedValue);
+                          }}
+                          min="0.1"
                         />
                       </div>
                       <Button
@@ -793,6 +1011,17 @@ export default function DesignsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={areAllVisibleSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someVisibleSelected;
+                      }}
+                      onChange={toggleSelectAllVisible}
+                    />
+                  </TableHead>
                   <TableHead>Image</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Number</TableHead>
@@ -804,7 +1033,20 @@ export default function DesignsPage() {
               </TableHeader>
               <TableBody>
                 {designs.map((design) => (
-                  <TableRow key={design._id}>
+                  <TableRow
+                    key={design._id}
+                    data-state={
+                      selectedIds.includes(design._id) ? 'selected' : undefined
+                    }
+                  >
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${design.name}`}
+                        checked={selectedIds.includes(design._id)}
+                        onChange={() => toggleRowSelection(design._id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       {design.imageUrl ? (
                         <SafeImage
@@ -913,6 +1155,46 @@ export default function DesignsPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog
+        open={isBulkDialogOpen}
+        onOpenChange={setIsBulkDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedIds.length === 1
+                ? 'Delete Design'
+                : 'Delete Selected Designs'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to delete {selectedIds.length}{' '}
+              {selectedIds.length === 1 ? 'design' : 'designs'}? This action
+              cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={closeBulkDeleteDialog}
+                disabled={isBulkDeleting}
+              >
+                Cancel
+              </Button>
+              <LoadingButton
+                onClick={handleBulkDelete}
+                loading={isBulkDeleting}
+                loadingText="Deleting..."
+                variant="destructive"
+              >
+                Delete
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog
@@ -1097,11 +1379,11 @@ export default function DesignsPage() {
                 ) : (
                   <div className="space-y-2">
                     <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <div>
+                    <div className="space-y-2">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => editFileInputRef.current?.click()}
                         disabled={uploading}
                       >
                         {uploading ? (
@@ -1110,7 +1392,7 @@ export default function DesignsPage() {
                               size="sm"
                               className="mr-2"
                             />
-                            Uploading...
+                            Uploading... {Math.round(uploadProgress)}%
                           </>
                         ) : (
                           <>
@@ -1119,12 +1401,34 @@ export default function DesignsPage() {
                           </>
                         )}
                       </Button>
+                      {uploading && (
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${uploadProgress}%` }}
+                          ></div>
+                        </div>
+                      )}
                     </div>
                     <p className="text-sm text-gray-500">
-                      PNG, JPG, GIF up to 10MB (Optional)
+                      PNG, JPG, GIF up to 5MB (Optional)
                     </p>
                   </div>
                 )}
+                <input
+                  ref={editFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleImageUpload(file, 0, true);
+                    }
+                    // Reset the input value to allow selecting the same file again
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
               </div>
             </div>
 
@@ -1188,21 +1492,24 @@ export default function DesignsPage() {
                     <Label>Quantity (g)</Label>
                     <Input
                       type="number"
+                      step="0.01"
                       value={stone.quantity}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) || 0;
+                        const roundedValue = Math.round(value * 100) / 100; // Round to 2 decimal places
                         setEditFormData((prev) => ({
                           ...prev,
                           defaultStones: prev.defaultStones.map((s, i) =>
                             i === index
                               ? {
                                   ...s,
-                                  quantity: parseInt(e.target.value) || 0,
+                                  quantity: roundedValue,
                                 }
                               : s,
                           ),
-                        }))
-                      }
-                      min="0"
+                        }));
+                      }}
+                      min="0.1"
                     />
                   </div>
                   <Button

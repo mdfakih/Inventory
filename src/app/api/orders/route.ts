@@ -386,6 +386,15 @@ export async function POST(request: NextRequest) {
       if (design.defaultStones && design.defaultStones.length > 0) {
         for (const designStone of design.defaultStones) {
           const stone = designStone.stoneId;
+          
+          // Validate design stone quantity meets minimum requirement
+          if (designStone.quantity < 0.1) {
+            inventoryErrors.push(
+              `Invalid stone quantity in design: ${stone.name} (${designStone.quantity}g) - must be at least 0.1g`,
+            );
+            continue;
+          }
+          
           const requiredQuantity =
             designStone.quantity * paperUsed.quantityInPcs; // Total stones needed for all pieces
 
@@ -549,7 +558,7 @@ export async function POST(request: NextRequest) {
       discountedAmount,
       finalAmount,
       notes,
-      createdBy: user.id,
+      createdBy: user._id,
     };
 
     // Deduct materials from inventory

@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 import {
   Table,
@@ -25,8 +23,10 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
-import { Package, Edit, Trash2 } from 'lucide-react';
+import { safeJsonParse } from '@/lib/utils';
+import { Package, Trash2, Plus } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
+import AddInventoryModal from './add-inventory-modal';
 
 interface Tape {
   _id: string;
@@ -41,49 +41,57 @@ export default function TapeTable() {
   const [tapes, setTapes] = useState<Tape[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedTape, setSelectedTape] = useState<Tape | null>(null);
-  const [updateQuantity, setUpdateQuantity] = useState('');
-  
+  const [isAddInventoryModalOpen, setIsAddInventoryModalOpen] = useState(false);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  
+
   const { showSuccess, showError } = useSnackbarHelpers();
   const { loading: authLoading, isAuthenticated } = useAuth();
 
-  const fetchTapes = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
+  const fetchTapes = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        }
+        const response = await fetch(
+          `/api/inventory/tape?page=${currentPage}&limit=${itemsPerPage}`,
+        );
+        const data = await safeJsonParse<{
+          success: boolean;
+          data: Tape[];
+          pagination: { pages: number; total: number };
+          message?: string;
+        }>(response);
+        if (data.success) {
+          setTapes(data.data);
+          setTotalPages(data.pagination.pages);
+          setTotalItems(data.pagination.total);
+        } else {
+          showError('Data Loading Error', 'Failed to load tape data.');
+        }
+      } catch (error) {
+        console.error('Error fetching tapes:', error);
+        showError(
+          'Network Error',
+          'Failed to load tape data. Please try again.',
+        );
+      } finally {
+        setLoading(false);
+        if (isRefresh) {
+          setRefreshing(false);
+        }
       }
-      const response = await fetch(`/api/inventory/tape?page=${currentPage}&limit=${itemsPerPage}`);
-      const data = await response.json();
-      if (data.success) {
-        setTapes(data.data);
-        setTotalPages(data.pagination.pages);
-        setTotalItems(data.pagination.total);
-      } else {
-        showError('Data Loading Error', 'Failed to load tape data.');
-      }
-    } catch (error) {
-      console.error('Error fetching tapes:', error);
-      showError(
-        'Network Error',
-        'Failed to load tape data. Please try again.',
-      );
-    } finally {
-      setLoading(false);
-      if (isRefresh) {
-        setRefreshing(false);
-      }
-    }
-  }, [currentPage, itemsPerPage, showError]);
+    },
+    [currentPage, itemsPerPage, showError],
+  );
 
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated
@@ -92,44 +100,6 @@ export default function TapeTable() {
     }
   }, [authLoading, isAuthenticated, currentPage, itemsPerPage, fetchTapes]);
 
-  const handleUpdateQuantity = async (tapeId: string, newQuantity: number) => {
-    setIsUpdating(tapeId);
-    try {
-      const response = await fetch(`/api/inventory/tape/${tapeId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ quantity: newQuantity }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        showSuccess(
-          'Quantity Updated',
-          'Tape quantity has been updated successfully.',
-        );
-        await fetchTapes(true);
-        setIsUpdateDialogOpen(false);
-        setSelectedTape(null);
-        setUpdateQuantity('');
-      } else {
-        showError(
-          'Update Failed',
-          data.message || 'Failed to update quantity.',
-        );
-      }
-    } catch (error) {
-      console.error('Error updating quantity:', error);
-      showError(
-        'Network Error',
-        'Failed to update quantity. Please try again.',
-      );
-    } finally {
-      setIsUpdating(null);
-    }
-  };
-
   const handleResetTape = async (tapeId: string) => {
     setIsDeleting(tapeId);
     try {
@@ -137,7 +107,9 @@ export default function TapeTable() {
         method: 'DELETE',
       });
 
-      const data = await response.json();
+      const data = await safeJsonParse<{ success: boolean; message?: string }>(
+        response,
+      );
       if (data.success) {
         showSuccess(
           'Tape Reset',
@@ -161,12 +133,6 @@ export default function TapeTable() {
     } finally {
       setIsDeleting(null);
     }
-  };
-
-  const openUpdateDialog = (tape: Tape) => {
-    setSelectedTape(tape);
-    setUpdateQuantity(tape.quantity.toString());
-    setIsUpdateDialogOpen(true);
   };
 
   const openDeleteDialog = (tape: Tape) => {
@@ -198,74 +164,32 @@ export default function TapeTable() {
           <h1 className="text-3xl font-bold">Tape Inventory</h1>
           <p className="text-gray-600">Manage cello tape inventory</p>
         </div>
-        {refreshing && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner size="sm" />
-            <span>Refreshing...</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {refreshing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              <span>Refreshing...</span>
+            </div>
+          )}
+          <Button
+            onClick={() => setIsAddInventoryModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Inventory
+          </Button>
+        </div>
       </div>
 
-      {/* Update Quantity Modal */}
-      <Dialog
-        open={isUpdateDialogOpen}
-        onOpenChange={setIsUpdateDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Quantity</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (selectedTape) {
-                const quantity = parseInt(updateQuantity);
-                if (!isNaN(quantity) && quantity >= 0) {
-                  handleUpdateQuantity(selectedTape._id, quantity);
-                } else {
-                  showError(
-                    'Invalid Input',
-                    'Please enter a valid positive number.',
-                  );
-                }
-              }
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="updateQuantity">New Quantity (pcs)</Label>
-              <Input
-                id="updateQuantity"
-                type="number"
-                value={updateQuantity}
-                onChange={(e) => setUpdateQuantity(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsUpdateDialogOpen(false);
-                  setSelectedTape(null);
-                  setUpdateQuantity('');
-                }}
-                disabled={isUpdating === selectedTape?._id}
-              >
-                Cancel
-              </Button>
-              <LoadingButton
-                type="submit"
-                loading={isUpdating === selectedTape?._id}
-                loadingText="Updating..."
-              >
-                Update Quantity
-              </LoadingButton>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Add Inventory Modal */}
+      <AddInventoryModal
+        isOpen={isAddInventoryModalOpen}
+        onClose={() => setIsAddInventoryModalOpen(false)}
+        onSuccess={() => {
+          fetchTapes(true);
+          setIsAddInventoryModalOpen(false);
+        }}
+      />
 
       {/* Delete Confirmation Modal */}
       <Dialog
@@ -340,28 +264,16 @@ export default function TapeTable() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <LoadingButton
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openUpdateDialog(tape)}
-                        loading={isUpdating === tape._id}
-                        loadingText="Updating..."
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Update
-                      </LoadingButton>
-                      <LoadingButton
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => openDeleteDialog(tape)}
-                        loading={isDeleting === tape._id}
-                        loadingText="Resetting..."
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Reset
-                      </LoadingButton>
-                    </div>
+                    <LoadingButton
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => openDeleteDialog(tape)}
+                      loading={isDeleting === tape._id}
+                      loadingText="Resetting..."
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Reset
+                    </LoadingButton>
                   </TableCell>
                 </TableRow>
               ))}

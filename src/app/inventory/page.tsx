@@ -8,7 +8,7 @@ export default function InventoryPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/inventory/stones');
+    router.replace('/inventory/stones?type=internal');
   }, [router]);
 
   return (

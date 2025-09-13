@@ -9,11 +9,17 @@ export async function authenticatedFetch(
   url: string,
   options: RequestInit = {},
 ): Promise<Response> {
+  // Don't set Content-Type for FormData (file uploads)
+  // Let the browser set it automatically with the proper boundary
+  const isFormData = options.body instanceof FormData;
+
   const defaultOptions: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers: isFormData
+      ? { ...options.headers } // Don't set Content-Type for FormData
+      : {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
     credentials: 'include', // Include cookies for authentication
     ...options,
   };
@@ -21,12 +27,12 @@ export async function authenticatedFetch(
   try {
     const response = await fetch(url, defaultOptions);
 
-    // Handle 401 responses globally
+    // Handle 401 errors by dispatching custom event for auth context to handle
     if (response.status === 401) {
-      // Only redirect if we're in a browser environment
-      if (typeof window !== 'undefined') {
-        window.location.href = '/unauthorized';
-      }
+      const event = new CustomEvent('api-error', {
+        detail: { status: 401, url },
+      });
+      window.dispatchEvent(event);
     }
 
     return response;
@@ -34,6 +40,23 @@ export async function authenticatedFetch(
     console.error('Authenticated fetch failed:', error);
     throw error;
   }
+}
+
+export async function safeJsonParse<T = unknown>(
+  response: Response,
+): Promise<T> {
+  const contentType = response.headers.get('content-type');
+
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    throw new Error(
+      `Expected JSON response but got ${
+        contentType || 'unknown content type'
+      }. Response: ${text.substring(0, 200)}...`,
+    );
+  }
+
+  return response.json();
 }
 
 export function generateJobOrderNumber(): string {

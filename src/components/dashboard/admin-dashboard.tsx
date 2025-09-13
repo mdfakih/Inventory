@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, memo } from 'react';
+import Link from 'next/link';
 import {
   Card,
   CardContent,
@@ -12,7 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { SpinnerPage } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/utils';
-import type { Stone as StoneType, Paper as PaperType, Order as OrderType } from '@/types';
+import type {
+  Stone as StoneType,
+  Paper as PaperType,
+  Order as OrderType,
+} from '@/types';
 import {
   BarChart,
   Bar,
@@ -85,9 +90,7 @@ function AdminDashboard() {
     const internalCount = data.orders.filter(
       (order) => order.type === 'internal',
     ).length;
-    const outCount = data.orders.filter(
-      (order) => order.type === 'out',
-    ).length;
+    const outCount = data.orders.filter((order) => order.type === 'out').length;
 
     return [
       { name: 'Internal', value: internalCount, fill: '#0088FE' },
@@ -121,10 +124,15 @@ function AdminDashboard() {
 
   const paymentStatusCounts = useMemo(() => {
     return {
-      pending: data.orders.filter((order) => order.paymentStatus === 'pending').length,
-      partial: data.orders.filter((order) => order.paymentStatus === 'partial').length,
-      completed: data.orders.filter((order) => order.paymentStatus === 'completed').length,
-      overdue: data.orders.filter((order) => order.paymentStatus === 'overdue').length,
+      pending: data.orders.filter((order) => order.paymentStatus === 'pending')
+        .length,
+      partial: data.orders.filter((order) => order.paymentStatus === 'partial')
+        .length,
+      completed: data.orders.filter(
+        (order) => order.paymentStatus === 'completed',
+      ).length,
+      overdue: data.orders.filter((order) => order.paymentStatus === 'overdue')
+        .length,
     };
   }, [data.orders]);
 
@@ -142,7 +150,7 @@ function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <a
+            <Link
               href="/masters"
               className="block"
             >
@@ -155,8 +163,8 @@ function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </a>
-            <a
+            </Link>
+            <Link
               href="/reports"
               className="block"
             >
@@ -169,9 +177,9 @@ function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </a>
-            <a
-              href="/inventory"
+            </Link>
+            <Link
+              href="/inventory/stones?type=internal"
               className="block"
             >
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -183,8 +191,8 @@ function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </a>
-            <a
+            </Link>
+            <Link
               href="/orders"
               className="block"
             >
@@ -197,7 +205,7 @@ function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </a>
+            </Link>
           </div>
         </CardContent>
       </Card>
@@ -210,10 +218,7 @@ function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {data.stones.reduce(
-                (sum, stone) => sum + stone.quantity,
-                0,
-              )}
+              {data.stones.reduce((sum, stone) => sum + stone.quantity, 0)}
             </div>
             <p className="text-xs text-muted-foreground">
               Total quantity in stock
@@ -230,10 +235,7 @@ function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {data.papers.reduce(
-                (sum, paper) => sum + paper.quantity,
-                0,
-              )}
+              {data.papers.reduce((sum, paper) => sum + paper.quantity, 0)}
             </div>
             <p className="text-xs text-muted-foreground">
               Total pieces in stock
@@ -258,9 +260,7 @@ function AdminDashboard() {
             <Badge variant="secondary">Last 7 days</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {recentOrdersCount}
-            </div>
+            <div className="text-2xl font-bold">{recentOrdersCount}</div>
             <p className="text-xs text-muted-foreground">Orders this week</p>
           </CardContent>
         </Card>
@@ -270,34 +270,59 @@ function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
-            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Attention</Badge>
+            <CardTitle className="text-sm font-medium">
+              Pending Payments
+            </CardTitle>
+            <Badge
+              variant="secondary"
+              className="bg-yellow-100 text-yellow-800"
+            >
+              Attention
+            </Badge>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
               {paymentStatusCounts.pending}
             </div>
-            <p className="text-xs text-muted-foreground">Orders awaiting payment</p>
+            <p className="text-xs text-muted-foreground">
+              Orders awaiting payment
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Partial Payments</CardTitle>
-            <Badge variant="secondary" className="bg-orange-100 text-orange-800">Partial</Badge>
+            <CardTitle className="text-sm font-medium">
+              Partial Payments
+            </CardTitle>
+            <Badge
+              variant="secondary"
+              className="bg-orange-100 text-orange-800"
+            >
+              Partial
+            </Badge>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
               {paymentStatusCounts.partial}
             </div>
-            <p className="text-xs text-muted-foreground">Orders with partial payment</p>
+            <p className="text-xs text-muted-foreground">
+              Orders with partial payment
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed Payments</CardTitle>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">Paid</Badge>
+            <CardTitle className="text-sm font-medium">
+              Completed Payments
+            </CardTitle>
+            <Badge
+              variant="secondary"
+              className="bg-green-100 text-green-800"
+            >
+              Paid
+            </Badge>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
@@ -309,8 +334,15 @@ function AdminDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Payments</CardTitle>
-            <Badge variant="secondary" className="bg-red-100 text-red-800">Urgent</Badge>
+            <CardTitle className="text-sm font-medium">
+              Overdue Payments
+            </CardTitle>
+            <Badge
+              variant="secondary"
+              className="bg-red-100 text-red-800"
+            >
+              Urgent
+            </Badge>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
@@ -338,9 +370,13 @@ function AdminDashboard() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) =>
-                    `${name} ${((percent || 0) * 100).toFixed(0)}%`
-                  }
+                  label={({
+                    name,
+                    percent,
+                  }: {
+                    name?: string;
+                    percent?: number;
+                  }) => `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
@@ -414,9 +450,9 @@ function AdminDashboard() {
           <CardTitle>Recent Orders</CardTitle>
           <CardDescription>Latest orders overview</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.recentOrders.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground text-sm">
+            <div className="col-span-full text-center py-4 text-muted-foreground text-sm">
               <p>No recent orders found</p>
             </div>
           ) : (
@@ -445,21 +481,21 @@ function AdminDashboard() {
                               : 'border-blue-300 bg-blue-50 text-blue-700'
                           }`}
                         >
-                          {!order.isFinalized 
-                            ? 'Draft' 
+                          {!order.isFinalized
+                            ? 'In progress'
                             : order.status === 'completed'
                             ? 'Done'
                             : order.status === 'cancelled'
                             ? 'Cancel'
-                            : 'Active'
-                          }
+                            : 'Active'}
                         </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {typeof order.designId === 'object' 
-                          ? order.designId?.name 
-                          : order.designId || 'N/A'
-                        } • {order.type === 'internal' ? 'Internal' : 'Out Job'}
+                        Design:{' '}
+                        {typeof order.designId === 'object'
+                          ? order.designId?.name
+                          : order.designId || 'N/A'}{' '}
+                        • {order.type === 'internal' ? 'Internal' : 'Out Job'}
                       </div>
                     </div>
 
@@ -470,9 +506,11 @@ function AdminDashboard() {
                         {order.finalTotalWeight && order.calculatedWeight && (
                           <span
                             className={`ml-1 ${
-                              order.weightDiscrepancy && order.weightDiscrepancy > 0
+                              order.weightDiscrepancy &&
+                              order.weightDiscrepancy > 0
                                 ? 'text-red-600'
-                                : order.weightDiscrepancy && order.weightDiscrepancy < 0
+                                : order.weightDiscrepancy &&
+                                  order.weightDiscrepancy < 0
                                 ? 'text-green-600'
                                 : 'text-muted-foreground'
                             }`}
@@ -481,33 +519,39 @@ function AdminDashboard() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Badge
-                          variant="outline"
-                          className={`text-xs px-1.5 py-0 ${
-                            order.paymentStatus === 'completed'
-                              ? 'border-green-300 bg-green-50 text-green-700'
-                              : order.paymentStatus === 'overdue'
-                              ? 'border-red-300 bg-red-50 text-red-700'
+                      <div className="flex flex-col items-end-safe gap-1.5">
+                        <span>
+                          Payment:{' '}
+                          <Badge
+                            variant="outline"
+                            className={`text-xs px-1.5 py-0 ${
+                              order.paymentStatus === 'completed'
+                                ? 'border-green-300 bg-green-50 text-green-700'
+                                : order.paymentStatus === 'overdue'
+                                ? 'border-red-300 bg-red-50 text-red-700'
+                                : order.paymentStatus === 'partial'
+                                ? 'border-amber-300 bg-amber-50 text-amber-700'
+                                : 'border-gray-300 bg-gray-50 text-gray-700'
+                            }`}
+                          >
+                            {order.paymentStatus === 'completed'
+                              ? '✓ Paid'
                               : order.paymentStatus === 'partial'
-                              ? 'border-amber-300 bg-amber-50 text-amber-700'
-                              : 'border-gray-300 bg-gray-50 text-gray-700'
-                          }`}
-                        >
-                          {order.paymentStatus === 'completed' 
-                            ? '✓ Paid' 
-                            : order.paymentStatus === 'partial'
-                            ? '◐ Partial'
-                            : order.paymentStatus === 'overdue'
-                            ? '⚠ Overdue'
-                            : '○ Pending'
-                          }
-                        </Badge>
+                              ? '◐ Partial'
+                              : order.paymentStatus === 'overdue'
+                              ? '⚠ Overdue'
+                              : '○ Pending'}
+                          </Badge>
+                        </span>
                         <span className="text-muted-foreground">
-                          {new Date(order.createdAt).toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric' 
-                          })}
+                          Order Date:
+                          {new Date(order.createdAt).toLocaleDateString(
+                            'en-US',
+                            {
+                              month: 'short',
+                              day: 'numeric',
+                            },
+                          )}
                         </span>
                       </div>
                     </div>

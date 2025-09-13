@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -66,7 +66,14 @@ const outJobInventoryItems = [
 function InventoryLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isClient, setIsClient] = useState(false);
+
+  // Ensure we're on the client side to avoid hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Determine current tab based on URL or default to internal
   const currentTab = searchParams.get('type') === 'out' ? 'out' : 'internal';
@@ -74,16 +81,14 @@ function InventoryLayoutContent({ children }: { children: React.ReactNode }) {
     currentTab === 'out' ? outJobInventoryItems : internalInventoryItems;
 
   const handleTabChange = (value: string) => {
-    // Update the URL to reflect the selected tab
-    const url = new URL(window.location.href);
+    // Navigate to the first item in the selected category
     if (value === 'out') {
-      url.searchParams.set('type', 'out');
+      // Navigate to the first out job item (stones)
+      router.push('/inventory/stones?type=out');
     } else {
-      url.searchParams.delete('type');
+      // Navigate to the first internal item (stones)
+      router.push('/inventory/stones?type=internal');
     }
-    window.history.pushState({}, '', url.toString());
-    // Force a page reload to update the content
-    window.location.reload();
   };
 
   return (
@@ -146,11 +151,29 @@ function InventoryLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="space-y-1">
             {currentItems.map((item) => {
               const Icon = item.icon;
-              const isActive =
-                pathname.includes(item.href.split('?')[0]) &&
-                (item.href.includes('type=')
-                  ? searchParams.get('type') === item.href.split('type=')[1]
-                  : !searchParams.get('type'));
+
+              // Only calculate active state on client side to avoid hydration mismatch
+              let isActive = false;
+              if (isClient) {
+                // Extract the base path from the href
+                const basePath = item.href.split('?')[0];
+
+                // Check if current pathname matches the base path
+                const pathMatches = pathname === basePath;
+
+                // For items with type parameter, check if the type matches or if no type is specified (defaults to internal)
+                let typeMatches = true;
+                if (item.href.includes('type=')) {
+                  const expectedType = item.href.split('type=')[1];
+                  const currentType = searchParams.get('type') || 'internal'; // Default to internal if no type specified
+                  typeMatches = currentType === expectedType;
+                } else {
+                  // For items without type parameter, ensure no type is specified
+                  typeMatches = !searchParams.get('type');
+                }
+
+                isActive = pathMatches && typeMatches;
+              }
 
               return (
                 <Link

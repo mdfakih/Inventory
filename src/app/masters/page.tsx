@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { authenticatedFetch } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -201,26 +202,26 @@ export default function MastersPage() {
           plasticsRes,
           tapesRes,
         ] = await Promise.all([
-          fetch(
+          authenticatedFetch(
             `/api/masters/users?page=${usersPagination.currentPage}&limit=${usersPagination.itemsPerPage}`,
           ),
-          fetch('/api/auth/password-reset-requests'),
-          fetch(
+          authenticatedFetch('/api/auth/password-reset-requests'),
+          authenticatedFetch(
             `/api/inventory/stones?page=${stonesPagination.currentPage}&limit=${stonesPagination.itemsPerPage}&type=internal`,
           ),
-          fetch(
+          authenticatedFetch(
             `/api/inventory/stones?page=${stonesPagination.currentPage}&limit=${stonesPagination.itemsPerPage}&type=out`,
           ),
-          fetch(
+          authenticatedFetch(
             `/api/inventory/paper?page=${papersPagination.currentPage}&limit=${papersPagination.itemsPerPage}&type=internal`,
           ),
-          fetch(
+          authenticatedFetch(
             `/api/inventory/paper?page=${papersPagination.currentPage}&limit=${papersPagination.itemsPerPage}&type=out`,
           ),
-          fetch(
+          authenticatedFetch(
             `/api/inventory/plastic?page=${plasticsPagination.currentPage}&limit=${plasticsPagination.itemsPerPage}`,
           ),
-          fetch(
+          authenticatedFetch(
             `/api/inventory/tape?page=${tapesPagination.currentPage}&limit=${tapesPagination.itemsPerPage}`,
           ),
         ]);
@@ -341,11 +342,7 @@ export default function MastersPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!isAuthenticated) {
-        router.push('/login');
-        return;
-      }
-
+      // Authentication redirect is handled by AuthContext and middleware
       if (user?.role !== 'admin') {
         showError('Access Denied', 'Only administrators can access this page.');
         router.push('/dashboard');
@@ -365,11 +362,14 @@ export default function MastersPage() {
   ) => {
     setIsTogglingStatus(userId);
     try {
-      const response = await fetch(`/api/masters/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'toggle-status' }),
-      });
+      const response = await authenticatedFetch(
+        `/api/masters/users/${userId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'toggle-status' }),
+        },
+      );
 
       if (response.ok) {
         await response.json();
@@ -506,9 +506,12 @@ export default function MastersPage() {
 
     setIsDeleting(stoneId);
     try {
-      const response = await fetch(`/api/masters/stones/${stoneId}`, {
-        method: 'DELETE',
-      });
+      const response = await authenticatedFetch(
+        `/api/masters/stones/${stoneId}`,
+        {
+          method: 'DELETE',
+        },
+      );
 
       if (response.ok) {
         showSuccess(
@@ -539,9 +542,12 @@ export default function MastersPage() {
 
     setIsDeleting(paperId);
     try {
-      const response = await fetch(`/api/masters/paper/${paperId}`, {
-        method: 'DELETE',
-      });
+      const response = await authenticatedFetch(
+        `/api/masters/paper/${paperId}`,
+        {
+          method: 'DELETE',
+        },
+      );
 
       if (response.ok) {
         showSuccess(
@@ -572,9 +578,12 @@ export default function MastersPage() {
 
     setIsDeleting(plasticId);
     try {
-      const response = await fetch(`/api/masters/plastic/${plasticId}`, {
-        method: 'DELETE',
-      });
+      const response = await authenticatedFetch(
+        `/api/masters/plastic/${plasticId}`,
+        {
+          method: 'DELETE',
+        },
+      );
 
       if (response.ok) {
         showSuccess(
@@ -605,7 +614,7 @@ export default function MastersPage() {
 
     setIsDeleting(tapeId);
     try {
-      const response = await fetch(`/api/masters/tape/${tapeId}`, {
+      const response = await authenticatedFetch(`/api/masters/tape/${tapeId}`, {
         method: 'DELETE',
       });
 
@@ -636,11 +645,14 @@ export default function MastersPage() {
   ) => {
     setIsProcessingRequest(userId);
     try {
-      const response = await fetch('/api/auth/password-reset-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, action }),
-      });
+      const response = await authenticatedFetch(
+        '/api/auth/password-reset-requests',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action }),
+        },
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -1597,7 +1609,7 @@ function UserForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('/api/masters/users', {
+      const response = await authenticatedFetch('/api/masters/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -1739,11 +1751,14 @@ function ChangePasswordForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`/api/masters/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'change-password', newPassword }),
-      });
+      const response = await authenticatedFetch(
+        `/api/masters/users/${userId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'change-password', newPassword }),
+        },
+      );
 
       if (response.ok) {
         showSuccess(
@@ -1816,7 +1831,7 @@ function StoneForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('/api/inventory/stones', {
+      const response = await authenticatedFetch('/api/inventory/stones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, quantity: 0 }),
@@ -1980,7 +1995,7 @@ function PaperForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('/api/inventory/paper', {
+      const response = await authenticatedFetch('/api/inventory/paper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2140,7 +2155,7 @@ function PlasticForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('/api/inventory/plastic', {
+      const response = await authenticatedFetch('/api/inventory/plastic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2234,7 +2249,7 @@ function TapeForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('/api/inventory/tape', {
+      const response = await authenticatedFetch('/api/inventory/tape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2322,11 +2337,14 @@ function EditStoneForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`/api/inventory/stones/${stone._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const response = await authenticatedFetch(
+        `/api/inventory/stones/${stone._id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        },
+      );
 
       if (response.ok) {
         showSuccess(
@@ -2498,16 +2516,19 @@ function EditPaperForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`/api/inventory/paper/${paper._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          width: parseFloat(formData.width),
-          piecesPerRoll: parseInt(formData.piecesPerRoll),
-          weightPerPiece: parseFloat(formData.weightPerPiece),
-        }),
-      });
+      const response = await authenticatedFetch(
+        `/api/inventory/paper/${paper._id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name,
+            width: parseFloat(formData.width),
+            piecesPerRoll: parseInt(formData.piecesPerRoll),
+            weightPerPiece: parseFloat(formData.weightPerPiece),
+          }),
+        },
+      );
 
       if (response.ok) {
         showSuccess(
@@ -2646,14 +2667,17 @@ function EditPlasticForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`/api/inventory/plastic/${plastic._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          width: parseFloat(formData.width),
-        }),
-      });
+      const response = await authenticatedFetch(
+        `/api/inventory/plastic/${plastic._id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name,
+            width: parseFloat(formData.width),
+          }),
+        },
+      );
 
       if (response.ok) {
         showSuccess(
@@ -2753,13 +2777,16 @@ function EditTapeForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`/api/inventory/tape/${tape._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-        }),
-      });
+      const response = await authenticatedFetch(
+        `/api/inventory/tape/${tape._id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name,
+          }),
+        },
+      );
 
       if (response.ok) {
         showSuccess(

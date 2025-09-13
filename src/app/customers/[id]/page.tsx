@@ -121,8 +121,8 @@ export default function CustomerDetailsPage() {
     return (
       <div className="container mx-auto p-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Customer not found</h1>
-          <p className="text-gray-600 mt-2">The customer you&apos;re looking for doesn&apos;t exist.</p>
+          <h1 className="text-2xl font-bold">Customer not found</h1>
+          <p className="text-muted-foreground mt-2">The customer you&apos;re looking for doesn&apos;t exist.</p>
           <Button onClick={() => router.push('/customers')} className="mt-4">
             Back to Customers
           </Button>
@@ -146,7 +146,7 @@ export default function CustomerDetailsPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold">{customer.name}</h1>
-            <p className="text-gray-600">Customer Details</p>
+            <p className="text-muted-foreground">Customer Details</p>
           </div>
         </div>
         
@@ -166,9 +166,9 @@ export default function CustomerDetailsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-blue-600" />
+                <Package className="h-5 w-5 text-blue-500 dark:text-blue-400" />
                 <div>
-                  <p className="text-sm text-gray-600">Total Orders</p>
+                  <p className="text-sm text-muted-foreground">Total Orders</p>
                   <p className="text-2xl font-bold">{analytics.totalOrders as number}</p>
                 </div>
               </div>
@@ -178,9 +178,9 @@ export default function CustomerDetailsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-green-600" />
+                <DollarSign className="h-5 w-5 text-green-500 dark:text-green-400" />
                 <div>
-                  <p className="text-sm text-gray-600">Total Spent</p>
+                  <p className="text-sm text-muted-foreground">Total Spent</p>
                   <p className="text-2xl font-bold">{formatCurrency(analytics.totalAmount as number)}</p>
                 </div>
               </div>
@@ -190,9 +190,9 @@ export default function CustomerDetailsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-purple-600" />
+                <TrendingUp className="h-5 w-5 text-purple-500 dark:text-purple-400" />
                 <div>
-                  <p className="text-sm text-gray-600">Avg Order Value</p>
+                  <p className="text-sm text-muted-foreground">Avg Order Value</p>
                   <p className="text-2xl font-bold">{formatCurrency(analytics.averageOrderValue as number)}</p>
                 </div>
               </div>
@@ -202,9 +202,9 @@ export default function CustomerDetailsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-orange-600" />
+                <CheckCircle className="h-5 w-5 text-orange-500 dark:text-orange-400" />
                 <div>
-                  <p className="text-sm text-gray-600">Completion Rate</p>
+                  <p className="text-sm text-muted-foreground">Completion Rate</p>
                   <p className="text-2xl font-bold">{(analytics.completionRate as number).toFixed(1)}%</p>
                 </div>
               </div>
@@ -225,64 +225,64 @@ export default function CustomerDetailsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label className="text-sm font-medium text-gray-600">Name</Label>
+                <Label className="text-sm font-medium text-muted-foreground">Name</Label>
                 <p className="text-lg font-semibold">{customer.name}</p>
               </div>
               
               <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-500" />
+                <Phone className="h-4 w-4 text-muted-foreground" />
                 <span>{customer.phone}</span>
               </div>
               
               {customer.email && (
                 <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-gray-500" />
+                  <Mail className="h-4 w-4 text-muted-foreground" />
                   <span>{customer.email}</span>
                 </div>
               )}
               
               {customer.company && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Company</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Company</Label>
                   <p>{customer.company}</p>
                 </div>
               )}
               
               {customer.gstNumber && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">GST Number</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">GST Number</Label>
                   <p>{customer.gstNumber}</p>
                 </div>
               )}
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Customer Type</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Customer Type</Label>
                   <Badge className={getCustomerTypeColor(customer.customerType)}>
                     {customer.customerType}
                   </Badge>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Credit Limit</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Credit Limit</Label>
                   <p>{formatCurrency(customer.creditLimit)}</p>
                 </div>
               </div>
               
               <div>
-                <Label className="text-sm font-medium text-gray-600">Payment Terms</Label>
+                <Label className="text-sm font-medium text-muted-foreground">Payment Terms</Label>
                 <p>{customer.paymentTerms}</p>
               </div>
               
               {customer.notes && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Notes</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
                   <p className="text-sm">{customer.notes}</p>
                 </div>
               )}
               
               {customer.tags && customer.tags.length > 0 && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-600">Tags</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Tags</Label>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {customer.tags.map((tag, index) => (
                       <Badge key={index} variant="secondary">{tag}</Badge>
@@ -355,8 +355,8 @@ export default function CustomerDetailsPage() {
             </CardHeader>
             <CardContent>
               {orders.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/40" />
                   <p>No orders found for this customer.</p>
                 </div>
               ) : (
@@ -364,7 +364,7 @@ export default function CustomerDetailsPage() {
                   {orders.map((order) => (
                     <div
                       key={order._id}
-                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      className="border border-border rounded-lg p-4 hover:bg-muted transition-colors"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -375,36 +375,36 @@ export default function CustomerDetailsPage() {
                             {order.paymentStatus || 'pending'}
                           </Badge>
                         </div>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-muted-foreground">
                           {new Date(order.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                       
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
-                          <Label className="text-xs font-medium text-gray-600">Order ID</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">Order ID</Label>
                           <p className="font-mono">{order._id.slice(-8)}</p>
                         </div>
                         
                         <div>
-                          <Label className="text-xs font-medium text-gray-600">Type</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">Type</Label>
                           <p className="capitalize">{order.type}</p>
                         </div>
                         
                         <div>
-                          <Label className="text-xs font-medium text-gray-600">Amount</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">Amount</Label>
                           <p className="font-semibold">{formatCurrency(order.finalAmount || 0)}</p>
                         </div>
                         
                         <div>
-                          <Label className="text-xs font-medium text-gray-600">Weight</Label>
+                          <Label className="text-xs font-medium text-muted-foreground">Weight</Label>
                           <p>{order.finalTotalWeight ? `${order.finalTotalWeight}g` : 'N/A'}</p>
                         </div>
                       </div>
                       
                       {order.notes && (
-                        <div className="mt-2 pt-2 border-t border-gray-100">
-                          <Label className="text-xs font-medium text-gray-600">Notes</Label>
+                        <div className="mt-2 pt-2 border-t border-border/50">
+                          <Label className="text-xs font-medium text-muted-foreground">Notes</Label>
                           <p className="text-sm">{order.notes}</p>
                         </div>
                       )}

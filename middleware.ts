@@ -5,15 +5,23 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/forgot-password', '/unauthorized', '/test-unauthorized', '/api/auth/login', '/api/auth/forgot-password'];
+  const publicRoutes = [
+    '/login',
+    '/forgot-password',
+    '/unauthorized',
+    '/test-unauthorized',
+    '/api/auth/login',
+    '/api/auth/forgot-password',
+  ];
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next();
   }
 
   // Check for authentication token
   const token = request.cookies.get('auth-token')?.value;
-  
+
   if (!token) {
+    console.log('No auth token found for path:', pathname);
     // Redirect to login if no token
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -24,8 +32,11 @@ export function middleware(request: NextRequest) {
   // Verify token
   const payload = verifyToken(token);
   if (!payload) {
-    // Clear invalid token and redirect to login
-    const response = NextResponse.redirect(new URL('/login', request.url));
+    console.log('Token verification failed for path:', pathname);
+    // Clear invalid cookie
+    const response = pathname.startsWith('/api/')
+      ? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      : NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('auth-token');
     return response;
   }
@@ -41,9 +52,11 @@ export function middleware(request: NextRequest) {
     }
 
     // Manager and Admin routes
-    if (pathname.startsWith('/api/inventory/') || 
-        pathname.startsWith('/api/designs/') || 
-        pathname.startsWith('/api/orders/')) {
+    if (
+      pathname.startsWith('/api/inventory/') ||
+      pathname.startsWith('/api/designs/') ||
+      pathname.startsWith('/api/orders/')
+    ) {
       if (role === 'employee') {
         // Employees can only read
         if (request.method !== 'GET') {
@@ -59,9 +72,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith('/inventory') || 
-      pathname.startsWith('/designs') || 
-      pathname.startsWith('/orders')) {
+  if (
+    pathname.startsWith('/inventory') ||
+    pathname.startsWith('/designs') ||
+    pathname.startsWith('/orders')
+  ) {
     // All authenticated users can access these pages
     return NextResponse.next();
   }

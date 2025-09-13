@@ -1,21 +1,14 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import AdminDashboard from '@/components/dashboard/admin-dashboard';
 import ManagerDashboard from '@/components/dashboard/manager-dashboard';
 import EmployeeDashboard from '@/components/dashboard/employee-dashboard';
 
 export default function DashboardPage() {
-  const { user, loading, isAuthenticated } = useAuth();
-  const router = useRouter();
+  const { user, loading } = useAuth();
 
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push('/login');
-    }
-  }, [loading, isAuthenticated, router]);
+  // Authentication is now handled by AuthContext and middleware
 
   if (loading) {
     return (

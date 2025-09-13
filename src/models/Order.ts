@@ -45,7 +45,7 @@ const orderSchema = new mongoose.Schema(
             quantity: {
               type: Number,
               required: true,
-              min: 0,
+              min: 0.1,
             },
           },
         ],
@@ -85,7 +85,7 @@ const orderSchema = new mongoose.Schema(
             quantity: {
               type: Number,
               required: true,
-              min: 0,
+              min: 0.1,
             },
             unit: {
               type: String,

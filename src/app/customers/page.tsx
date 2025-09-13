@@ -41,6 +41,7 @@ import {
   Plus,
   Search,
   Filter,
+  Power,
   Users,
   TrendingUp,
   Calendar,
@@ -226,7 +227,12 @@ export default function CustomersPage() {
   };
 
   const handleDeleteCustomer = async (customerId: string) => {
-    if (!confirm('Are you sure you want to deactivate this customer?')) return;
+    if (
+      !confirm(
+        'Are you sure you want to permanently delete this customer? This cannot be undone.',
+      )
+    )
+      return;
 
     try {
       const response = await authenticatedFetch(
@@ -238,14 +244,41 @@ export default function CustomersPage() {
       const result = await response.json();
 
       if (result.success) {
-        showSuccess('Customer deactivated successfully');
+        showSuccess('Customer deleted successfully');
         fetchCustomers();
         fetchAnalytics();
       } else {
-        showError(result.message || 'Failed to deactivate customer');
+        showError(result.message || 'Failed to delete customer');
       }
     } catch {
-      showError('Failed to deactivate customer');
+      showError('Failed to delete customer');
+    }
+  };
+
+  const handleToggleCustomerStatus = async (customer: Customer) => {
+    try {
+      const response = await authenticatedFetch(
+        `/api/customers/${customer._id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ isActive: !customer.isActive }),
+        },
+      );
+      const result = await response.json();
+
+      if (result.success) {
+        showSuccess(
+          `Customer ${
+            customer.isActive ? 'deactivated' : 'activated'
+          } successfully`,
+        );
+        fetchCustomers();
+        fetchAnalytics();
+      } else {
+        showError(result.message || 'Failed to update customer status');
+      }
+    } catch {
+      showError('Failed to update customer status');
     }
   };
 
@@ -558,6 +591,21 @@ export default function CustomersPage() {
                             onClick={() => openEditDialog(customer)}
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleCustomerStatus(customer)}
+                            className={
+                              customer.isActive
+                                ? 'text-yellow-700 hover:text-yellow-800'
+                                : 'text-green-700 hover:text-green-800'
+                            }
+                            title={
+                              customer.isActive ? 'Deactivate' : 'Activate'
+                            }
+                          >
+                            <Power className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"

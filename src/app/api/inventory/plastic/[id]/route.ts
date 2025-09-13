@@ -92,59 +92,6 @@ export async function PUT(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    await dbConnect();
-
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 },
-      );
-    }
-
-    const { id } = await params;
-    const body = await request.json();
-    const { quantity } = body;
-
-    if (quantity === undefined || quantity < 0) {
-      return NextResponse.json(
-        { success: false, message: 'Valid quantity is required' },
-        { status: 400 },
-      );
-    }
-
-    const plastic = await Plastic.findByIdAndUpdate(
-      id,
-      { quantity },
-      { new: true },
-    );
-
-    if (!plastic) {
-      return NextResponse.json(
-        { success: false, message: 'Plastic not found' },
-        { status: 404 },
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Plastic quantity updated successfully',
-      data: plastic,
-    });
-  } catch (error) {
-    console.error('Error updating plastic quantity:', error);
-    return NextResponse.json(
-      { success: false, message: 'Internal server error' },
-      { status: 500 },
-    );
-  }
-}
-
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -174,13 +121,13 @@ export async function DELETE(
       id,
       {
         quantity: 0,
-        updatedBy: user.id,
+        updatedBy: user._id,
         $push: {
           updateHistory: {
             field: 'quantity',
             oldValue: plastic.quantity,
             newValue: 0,
-            updatedBy: user.id,
+            updatedBy: user._id,
             updatedAt: new Date(),
           },
         },

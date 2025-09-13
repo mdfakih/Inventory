@@ -32,6 +32,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { authenticatedFetch } from '@/lib/utils';
 import {
   BarChart3,
   Package,
@@ -42,6 +43,11 @@ import {
   Calendar,
   TrendingUp,
 } from 'lucide-react';
+import InventoryEntriesReport from '@/components/reports/inventory-entries-report';
+import OrderTrendsChart from '@/components/charts/order-trends-chart';
+import OrderDistributionChart from '@/components/charts/order-distribution-chart';
+import InventoryAnalyticsChart from '@/components/charts/inventory-analytics-chart';
+import UserDistributionChart from '@/components/charts/user-distribution-chart';
 
 interface Stone {
   _id: string;
@@ -82,7 +88,12 @@ interface Order {
   type: 'internal' | 'out';
   customerName: string;
   phone: string;
-  designId: { name: string; number: string; price?: number; currency?: '₹' | '$' };
+  designId: {
+    name: string;
+    number: string;
+    price?: number;
+    currency?: '₹' | '$';
+  };
   finalTotalWeight: number;
   calculatedWeight: number;
   weightDiscrepancy: number;
@@ -157,7 +168,9 @@ export default function ReportsPage() {
         setLoading(true);
       }
       // Use the reports generate API to get all data at once
-      const response = await fetch('/api/reports/generate?type=all');
+      const response = await authenticatedFetch(
+        '/api/reports/generate?type=all',
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -192,11 +205,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     if (!authLoading) {
-      if (!isAuthenticated) {
-        router.push('/login');
-        return;
-      }
-
+      // Authentication redirect is handled by AuthContext and middleware
       if (user?.role !== 'admin') {
         showError('Access Denied', 'Only administrators can access reports.');
         router.push('/dashboard');
@@ -217,9 +226,12 @@ export default function ReportsPage() {
         ...(dateRange.endDate && { endDate: dateRange.endDate }),
       });
 
-      const response = await fetch(`/api/reports/generate?${params}`, {
-        method: 'GET',
-      });
+      const response = await authenticatedFetch(
+        `/api/reports/generate?${params}`,
+        {
+          method: 'GET',
+        },
+      );
 
       const data = await response.json();
       if (data.success) {
@@ -263,9 +275,12 @@ export default function ReportsPage() {
         ...(dateRange.endDate && { endDate: dateRange.endDate }),
       });
 
-      const response = await fetch(`/api/reports/export?${params}`, {
-        method: 'GET',
-      });
+      const response = await authenticatedFetch(
+        `/api/reports/export?${params}`,
+        {
+          method: 'GET',
+        },
+      );
 
       if (response.ok) {
         const blob = await response.blob();
@@ -488,9 +503,10 @@ export default function ReportsPage() {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="inventory-entries">Inventory Entries</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
@@ -599,7 +615,7 @@ export default function ReportsPage() {
                   </span>
                 </div>
                 {lowStockItems > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
                       <span className="text-sm">
@@ -682,6 +698,13 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent
+          value="inventory-entries"
+          className="space-y-6"
+        >
+          <InventoryEntriesReport />
         </TabsContent>
 
         <TabsContent
@@ -775,11 +798,11 @@ export default function ReportsPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge 
+                            <Badge
                               className={`${
-                                order.paymentStatus === 'completed' 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : order.paymentStatus === 'overdue' 
+                                order.paymentStatus === 'completed'
+                                  ? 'bg-green-100 text-green-800'
+                                  : order.paymentStatus === 'overdue'
                                   ? 'bg-red-100 text-red-800'
                                   : order.paymentStatus === 'partial'
                                   ? 'bg-yellow-100 text-yellow-800'
@@ -891,11 +914,11 @@ export default function ReportsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge 
+                            <Badge
                               className={`${
-                                order.paymentStatus === 'completed' 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : order.paymentStatus === 'overdue' 
+                                order.paymentStatus === 'completed'
+                                  ? 'bg-green-100 text-green-800'
+                                  : order.paymentStatus === 'overdue'
                                   ? 'bg-red-100 text-red-800'
                                   : order.paymentStatus === 'partial'
                                   ? 'bg-yellow-100 text-yellow-800'
@@ -1058,31 +1081,45 @@ export default function ReportsPage() {
 
                 {/* Payment Status Analytics */}
                 <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-3">Payment Status Distribution</h3>
+                  <h3 className="text-lg font-semibold mb-3">
+                    Payment Status Distribution
+                  </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-4 bg-blue-50 rounded-lg">
                       <div className="text-2xl font-bold text-blue-600">
-                        {reportData.analytics?.orders?.paymentStatus?.pending || 0}
+                        {reportData.analytics?.orders?.paymentStatus?.pending ||
+                          0}
                       </div>
-                      <p className="text-sm text-muted-foreground">Pending Payment</p>
+                      <p className="text-sm text-muted-foreground">
+                        Pending Payment
+                      </p>
                     </div>
                     <div className="text-center p-4 bg-yellow-50 rounded-lg">
                       <div className="text-2xl font-bold text-yellow-600">
-                        {reportData.analytics?.orders?.paymentStatus?.partial || 0}
+                        {reportData.analytics?.orders?.paymentStatus?.partial ||
+                          0}
                       </div>
-                      <p className="text-sm text-muted-foreground">Partial Payment</p>
+                      <p className="text-sm text-muted-foreground">
+                        Partial Payment
+                      </p>
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <div className="text-2xl font-bold text-green-600">
-                        {reportData.analytics?.orders?.paymentStatus?.completed || 0}
+                        {reportData.analytics?.orders?.paymentStatus
+                          ?.completed || 0}
                       </div>
-                      <p className="text-sm text-muted-foreground">Payment Completed</p>
+                      <p className="text-sm text-muted-foreground">
+                        Payment Completed
+                      </p>
                     </div>
                     <div className="text-center p-4 bg-red-50 rounded-lg">
                       <div className="text-2xl font-bold text-red-600">
-                        {reportData.analytics?.orders?.paymentStatus?.overdue || 0}
+                        {reportData.analytics?.orders?.paymentStatus?.overdue ||
+                          0}
                       </div>
-                      <p className="text-sm text-muted-foreground">Payment Overdue</p>
+                      <p className="text-sm text-muted-foreground">
+                        Payment Overdue
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1090,88 +1127,107 @@ export default function ReportsPage() {
             </Card>
           )}
 
+          {/* Analytics Charts with Tabs */}
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Order Trends</CardTitle>
+              <CardTitle>Analytics Charts</CardTitle>
               <CardDescription>
-                Visualization of order patterns and trends
+                Interactive charts and visualizations for comprehensive analysis
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <BarChart3 className="h-12 w-12 mx-auto mb-4" />
-                  <p>Chart visualization will be implemented here</p>
-                  <p className="text-sm">Order analytics and trend analysis</p>
-                </div>
-              </div>
+              <Tabs
+                defaultValue="order-trends"
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="order-trends">Order Trends</TabsTrigger>
+                  <TabsTrigger value="order-distribution">
+                    Order Distribution
+                  </TabsTrigger>
+                  <TabsTrigger value="inventory-analytics">
+                    Inventory Analytics
+                  </TabsTrigger>
+                  <TabsTrigger value="user-distribution">
+                    User Distribution
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent
+                  value="order-trends"
+                  className="mt-6"
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">Order Trends</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Visualization of order patterns and trends over the last
+                        12 months
+                      </p>
+                    </div>
+                    <OrderTrendsChart orders={reportData.orders} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent
+                  value="order-distribution"
+                  className="mt-6"
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">
+                        Order Distribution Analysis
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Visual breakdown of order types and payment status
+                      </p>
+                    </div>
+                    <OrderDistributionChart orders={reportData.orders} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent
+                  value="inventory-analytics"
+                  className="mt-6"
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">
+                        Inventory Analytics
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Comprehensive inventory analysis and top performing
+                        items
+                      </p>
+                    </div>
+                    <InventoryAnalyticsChart
+                      stones={reportData.stones}
+                      papers={reportData.papers}
+                      plastics={reportData.plastics}
+                      tapes={reportData.tapes}
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent
+                  value="user-distribution"
+                  className="mt-6"
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">
+                        User Distribution
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Breakdown of users by role and permissions
+                      </p>
+                    </div>
+                    <UserDistributionChart users={reportData.users} />
+                  </div>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
-
-          {/* Analytics Summary */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg">Order Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Internal Orders</span>
-                    <span className="font-medium">
-                      {
-                        reportData.orders.filter((o) => o.type === 'internal')
-                          .length
-                      }
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">External Orders</span>
-                    <span className="font-medium">
-                      {reportData.orders.filter((o) => o.type === 'out').length}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg">User Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Admins</span>
-                    <span className="font-medium">
-                      {
-                        reportData.users.filter((u) => u.role === 'admin')
-                          .length
-                      }
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Managers</span>
-                    <span className="font-medium">
-                      {
-                        reportData.users.filter((u) => u.role === 'manager')
-                          .length
-                      }
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Employees</span>
-                    <span className="font-medium">
-                      {
-                        reportData.users.filter((u) => u.role === 'employee')
-                          .length
-                      }
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
       </Tabs>
     </div>

@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth';
 import dbConnect from '@/lib/db';
 import User from '@/models/User';
-import { hashPassword } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
     await dbConnect();
-    
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
@@ -63,7 +62,7 @@ export async function POST(request: NextRequest) {
     if (!name || !email || !password || !role) {
       return NextResponse.json(
         { success: false, message: 'All fields are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -71,7 +70,7 @@ export async function POST(request: NextRequest) {
     if (!['admin', 'manager', 'employee'].includes(role)) {
       return NextResponse.json(
         { success: false, message: 'Invalid role' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -82,18 +81,15 @@ export async function POST(request: NextRequest) {
     if (existingUser) {
       return NextResponse.json(
         { success: false, message: 'User with this email already exists' },
-        { status: 400 }
+        { status: 400 },
       );
     }
-
-    // Hash password
-    const hashedPassword = await hashPassword(password);
 
     // Create new user
     const newUser = new User({
       name,
       email,
-      password: hashedPassword,
+      password,
       role,
     });
 
@@ -118,7 +114,7 @@ export async function POST(request: NextRequest) {
     console.error('Error creating user:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to create user' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

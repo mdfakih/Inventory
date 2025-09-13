@@ -19,7 +19,12 @@ export function SafeImage({
 }: SafeImageProps) {
   const [hasError, setHasError] = useState(false);
 
-  if (hasError || !src) {
+  // Check if it's a placeholder URL that might fail
+  const isPlaceholderUrl =
+    typeof src === 'string' &&
+    (src.includes('via.placeholder.com') || src.includes('placeholder'));
+
+  if (hasError || !src || isPlaceholderUrl) {
     return (
       <div
         className={`flex flex-col items-center justify-center bg-gray-100 text-gray-500 ${className}`}

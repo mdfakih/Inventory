@@ -110,7 +110,7 @@ export async function PUT(
         field: 'type',
         oldValue: oldValues.type,
         newValue: type,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -120,7 +120,7 @@ export async function PUT(
         field: 'customerName',
         oldValue: oldValues.customerName,
         newValue: customerName,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -130,7 +130,7 @@ export async function PUT(
         field: 'phone',
         oldValue: oldValues.phone,
         newValue: phone,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -143,7 +143,7 @@ export async function PUT(
         field: 'customerId',
         oldValue: oldValues.customerId,
         newValue: customerId,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -153,7 +153,7 @@ export async function PUT(
         field: 'gstNumber',
         oldValue: oldValues.gstNumber,
         newValue: gstNumber,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -163,7 +163,7 @@ export async function PUT(
         field: 'status',
         oldValue: oldValues.status,
         newValue: status,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -177,7 +177,7 @@ export async function PUT(
         field: 'designOrders',
         oldValue: oldValues.designOrders,
         newValue: designOrders,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
 
@@ -307,7 +307,7 @@ export async function PUT(
           field: 'modeOfPayment',
           oldValue: oldValues.modeOfPayment,
           newValue: modeOfPayment,
-          updatedBy: user.id,
+          updatedBy: user._id,
           updatedAt: new Date(),
         });
       }
@@ -320,7 +320,7 @@ export async function PUT(
           field: 'paymentStatus',
           oldValue: oldValues.paymentStatus,
           newValue: paymentStatus,
-          updatedBy: user.id,
+          updatedBy: user._id,
           updatedAt: new Date(),
         });
       }
@@ -333,7 +333,7 @@ export async function PUT(
           field: 'discountType',
           oldValue: oldValues.discountType,
           newValue: discountType,
-          updatedBy: user.id,
+          updatedBy: user._id,
           updatedAt: new Date(),
         });
       }
@@ -346,7 +346,7 @@ export async function PUT(
           field: 'discountValue',
           oldValue: oldValues.discountValue,
           newValue: discountValue,
-          updatedBy: user.id,
+          updatedBy: user._id,
           updatedAt: new Date(),
         });
       }
@@ -384,7 +384,7 @@ export async function PUT(
         field: 'weightDiscrepancy',
         oldValue: oldValues.weightDiscrepancy,
         newValue: weightDiscrepancy,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
 
@@ -392,7 +392,7 @@ export async function PUT(
         field: 'discrepancyPercentage',
         oldValue: oldValues.discrepancyPercentage,
         newValue: discrepancyPercentage,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
 
@@ -400,7 +400,7 @@ export async function PUT(
         field: 'finalTotalWeight',
         oldValue: oldValues.finalTotalWeight,
         newValue: effectiveFinalWeight,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
 
@@ -415,7 +415,7 @@ export async function PUT(
         field: 'isFinalized',
         oldValue: false,
         newValue: true,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
 
@@ -436,7 +436,7 @@ export async function PUT(
     if (discountType !== undefined) updateData.discountType = discountType;
     if (discountValue !== undefined) updateData.discountValue = discountValue;
 
-    updateData.updatedBy = user.id;
+    updateData.updatedBy = user._id;
 
     // Add to existing history
     updateData.updateHistory = [

@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 import {
   Table,
@@ -25,8 +23,10 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
-import { Package, Edit, Trash2 } from 'lucide-react';
+import { safeJsonParse } from '@/lib/utils';
+import { Package, Trash2, Plus } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
+import AddInventoryModal from './add-inventory-modal';
 
 interface Plastic {
   _id: string;
@@ -39,49 +39,57 @@ export default function PlasticTable() {
   const [plastics, setPlastics] = useState<Plastic[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedPlastic, setSelectedPlastic] = useState<Plastic | null>(null);
-  const [updateQuantity, setUpdateQuantity] = useState('');
-  
+  const [isAddInventoryModalOpen, setIsAddInventoryModalOpen] = useState(false);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  
+
   const { showSuccess, showError } = useSnackbarHelpers();
   const { loading: authLoading, isAuthenticated } = useAuth();
 
-  const fetchPlastics = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
+  const fetchPlastics = useCallback(
+    async (isRefresh = false) => {
+      try {
+        if (isRefresh) {
+          setRefreshing(true);
+        }
+        const response = await fetch(
+          `/api/inventory/plastic?page=${currentPage}&limit=${itemsPerPage}`,
+        );
+        const data = await safeJsonParse<{
+          success: boolean;
+          data: Plastic[];
+          pagination: { pages: number; total: number };
+          message?: string;
+        }>(response);
+        if (data.success) {
+          setPlastics(data.data);
+          setTotalPages(data.pagination.pages);
+          setTotalItems(data.pagination.total);
+        } else {
+          showError('Data Loading Error', 'Failed to load plastic data.');
+        }
+      } catch (error) {
+        console.error('Error fetching plastics:', error);
+        showError(
+          'Network Error',
+          'Failed to load plastic data. Please try again.',
+        );
+      } finally {
+        setLoading(false);
+        if (isRefresh) {
+          setRefreshing(false);
+        }
       }
-      const response = await fetch(`/api/inventory/plastic?page=${currentPage}&limit=${itemsPerPage}`);
-      const data = await response.json();
-      if (data.success) {
-        setPlastics(data.data);
-        setTotalPages(data.pagination.pages);
-        setTotalItems(data.pagination.total);
-      } else {
-        showError('Data Loading Error', 'Failed to load plastic data.');
-      }
-    } catch (error) {
-      console.error('Error fetching plastics:', error);
-      showError(
-        'Network Error',
-        'Failed to load plastic data. Please try again.',
-      );
-    } finally {
-      setLoading(false);
-      if (isRefresh) {
-        setRefreshing(false);
-      }
-    }
-  }, [currentPage, itemsPerPage, showError]);
+    },
+    [currentPage, itemsPerPage, showError],
+  );
 
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated
@@ -90,47 +98,6 @@ export default function PlasticTable() {
     }
   }, [authLoading, isAuthenticated, currentPage, itemsPerPage, fetchPlastics]);
 
-  const handleUpdateQuantity = async (
-    plasticId: string,
-    newQuantity: number,
-  ) => {
-    setIsUpdating(plasticId);
-    try {
-      const response = await fetch(`/api/inventory/plastic/${plasticId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ quantity: newQuantity }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        showSuccess(
-          'Quantity Updated',
-          'Plastic quantity has been updated successfully.',
-        );
-        await fetchPlastics(true);
-        setIsUpdateDialogOpen(false);
-        setSelectedPlastic(null);
-        setUpdateQuantity('');
-      } else {
-        showError(
-          'Update Failed',
-          data.message || 'Failed to update quantity.',
-        );
-      }
-    } catch (error) {
-      console.error('Error updating quantity:', error);
-      showError(
-        'Network Error',
-        'Failed to update quantity. Please try again.',
-      );
-    } finally {
-      setIsUpdating(null);
-    }
-  };
-
   const handleResetPlastic = async (plasticId: string) => {
     setIsDeleting(plasticId);
     try {
@@ -138,7 +105,9 @@ export default function PlasticTable() {
         method: 'DELETE',
       });
 
-      const data = await response.json();
+      const data = await safeJsonParse<{ success: boolean; message?: string }>(
+        response,
+      );
       if (data.success) {
         showSuccess(
           'Plastic Reset',
@@ -162,12 +131,6 @@ export default function PlasticTable() {
     } finally {
       setIsDeleting(null);
     }
-  };
-
-  const openUpdateDialog = (plastic: Plastic) => {
-    setSelectedPlastic(plastic);
-    setUpdateQuantity(plastic.quantity.toString());
-    setIsUpdateDialogOpen(true);
   };
 
   const openDeleteDialog = (plastic: Plastic) => {
@@ -201,74 +164,32 @@ export default function PlasticTable() {
             Manage packaging plastic with different widths
           </p>
         </div>
-        {refreshing && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner size="sm" />
-            <span>Refreshing...</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {refreshing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              <span>Refreshing...</span>
+            </div>
+          )}
+          <Button
+            onClick={() => setIsAddInventoryModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Inventory
+          </Button>
+        </div>
       </div>
 
-      {/* Update Quantity Modal */}
-      <Dialog
-        open={isUpdateDialogOpen}
-        onOpenChange={setIsUpdateDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Quantity</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (selectedPlastic) {
-                const quantity = parseInt(updateQuantity);
-                if (!isNaN(quantity) && quantity >= 0) {
-                  handleUpdateQuantity(selectedPlastic._id, quantity);
-                } else {
-                  showError(
-                    'Invalid Input',
-                    'Please enter a valid positive number.',
-                  );
-                }
-              }
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="updateQuantity">New Quantity (pcs)</Label>
-              <Input
-                id="updateQuantity"
-                type="number"
-                value={updateQuantity}
-                onChange={(e) => setUpdateQuantity(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsUpdateDialogOpen(false);
-                  setSelectedPlastic(null);
-                  setUpdateQuantity('');
-                }}
-                disabled={isUpdating === selectedPlastic?._id}
-              >
-                Cancel
-              </Button>
-              <LoadingButton
-                type="submit"
-                loading={isUpdating === selectedPlastic?._id}
-                loadingText="Updating..."
-              >
-                Update Quantity
-              </LoadingButton>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Add Inventory Modal */}
+      <AddInventoryModal
+        isOpen={isAddInventoryModalOpen}
+        onClose={() => setIsAddInventoryModalOpen(false)}
+        onSuccess={() => {
+          fetchPlastics(true);
+          setIsAddInventoryModalOpen(false);
+        }}
+      />
 
       {/* Delete Confirmation Modal */}
       <Dialog
@@ -348,16 +269,6 @@ export default function PlasticTable() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <LoadingButton
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openUpdateDialog(plastic)}
-                        loading={isUpdating === plastic._id}
-                        loadingText="Updating..."
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Update
-                      </LoadingButton>
                       <LoadingButton
                         variant="destructive"
                         size="sm"

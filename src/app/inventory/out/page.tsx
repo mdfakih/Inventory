@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { authenticatedFetch } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -93,12 +94,12 @@ export default function OutInventoryPage() {
 
   const { showSuccess, showError } = useSnackbarHelpers();
 
-  const fetchData = useCallback(async () => {
+  const authenticatedFetchData = useCallback(async () => {
     try {
       const [stonesRes, papersRes, availablePapersRes] = await Promise.all([
-        fetch('/api/inventory/stones?type=out'),
-        fetch('/api/inventory/paper?type=out'),
-        fetch('/api/inventory/paper?type=internal'), // Fetch all internal paper types for selection
+        authenticatedFetch('/api/inventory/stones?type=out'),
+        authenticatedFetch('/api/inventory/paper?type=out'),
+        authenticatedFetch('/api/inventory/paper?type=internal'), // Fetch all internal paper types for selection
       ]);
 
       const stonesData = await stonesRes.json();
@@ -107,9 +108,10 @@ export default function OutInventoryPage() {
 
       if (stonesData.success) setStones(stonesData.data);
       if (papersData.success) setPapers(papersData.data);
-      if (availablePapersData.success) setAvailablePaperTypes(availablePapersData.data);
+      if (availablePapersData.success)
+        setAvailablePaperTypes(availablePapersData.data);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error authenticatedFetching data:', error);
       showError('Data Loading Error', 'Failed to load out inventory data.');
     } finally {
       setLoading(false);
@@ -117,7 +119,7 @@ export default function OutInventoryPage() {
   }, [showError]);
 
   useEffect(() => {
-    fetchData();
+    authenticatedFetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -126,7 +128,7 @@ export default function OutInventoryPage() {
     e.preventDefault();
     setIsCreatingStone(true);
     try {
-      const response = await fetch('/api/inventory/stones', {
+      const response = await authenticatedFetch('/api/inventory/stones', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,7 +155,7 @@ export default function OutInventoryPage() {
           quantity: '',
           unit: 'g',
         });
-        fetchData();
+        authenticatedFetchData();
       } else {
         showError('Creation Failed', data.message || 'Failed to add stone.');
       }
@@ -171,13 +173,16 @@ export default function OutInventoryPage() {
   ) => {
     setIsUpdatingStone(stoneId);
     try {
-      const response = await fetch(`/api/inventory/stones/${stoneId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await authenticatedFetch(
+        `/api/inventory/stones/${stoneId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ quantity: newQuantity }),
         },
-        body: JSON.stringify({ quantity: newQuantity }),
-      });
+      );
 
       const data = await response.json();
       if (data.success) {
@@ -185,7 +190,7 @@ export default function OutInventoryPage() {
           'Quantity Updated',
           'Stone quantity has been updated successfully.',
         );
-        fetchData();
+        authenticatedFetchData();
       } else {
         showError(
           'Update Failed',
@@ -213,13 +218,15 @@ export default function OutInventoryPage() {
 
     setIsCreatingPaper(true);
     try {
-      const selectedPaper = availablePaperTypes.find(p => p._id === paperFormData.selectedPaperType);
+      const selectedPaper = availablePaperTypes.find(
+        (p) => p._id === paperFormData.selectedPaperType,
+      );
       if (!selectedPaper) {
         showError('Invalid Selection', 'Selected paper type not found.');
         return;
       }
 
-      const response = await fetch('/api/inventory/paper', {
+      const response = await authenticatedFetch('/api/inventory/paper', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -245,7 +252,7 @@ export default function OutInventoryPage() {
           selectedPaperType: '',
           quantity: '',
         });
-        fetchData();
+        authenticatedFetchData();
       } else {
         showError('Creation Failed', data.message || 'Failed to add paper.');
       }
@@ -263,13 +270,16 @@ export default function OutInventoryPage() {
   ) => {
     setIsUpdatingPaper(paperId);
     try {
-      const response = await fetch(`/api/inventory/paper/${paperId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await authenticatedFetch(
+        `/api/inventory/paper/${paperId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ quantity: newQuantity }),
         },
-        body: JSON.stringify({ quantity: newQuantity }),
-      });
+      );
 
       const data = await response.json();
       if (data.success) {
@@ -277,7 +287,7 @@ export default function OutInventoryPage() {
           'Quantity Updated',
           'Paper quantity has been updated successfully.',
         );
-        fetchData();
+        authenticatedFetchData();
       } else {
         showError(
           'Update Failed',
@@ -432,13 +442,16 @@ export default function OutInventoryPage() {
                           id="quantity"
                           type="number"
                           step="0.01"
+                          min="0.1"
                           value={stoneFormData.quantity}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            const roundedValue = Math.round(value * 100) / 100; // Round to 2 decimal places
                             setStoneFormData({
                               ...stoneFormData,
-                              quantity: e.target.value,
-                            })
-                          }
+                              quantity: roundedValue.toString(),
+                            });
+                          }}
                           required
                         />
                       </div>
@@ -591,7 +604,10 @@ export default function OutInventoryPage() {
                       <Select
                         value={paperFormData.selectedPaperType}
                         onValueChange={(value) =>
-                          setPaperFormData({ ...paperFormData, selectedPaperType: value })
+                          setPaperFormData({
+                            ...paperFormData,
+                            selectedPaperType: value,
+                          })
                         }
                       >
                         <SelectTrigger>
@@ -599,8 +615,13 @@ export default function OutInventoryPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {availablePaperTypes.map((paper) => (
-                            <SelectItem key={paper._id} value={paper._id}>
-                              {paper.name} - {paper.width}&quot; ({paper.piecesPerRoll} pcs/roll, {paper.weightPerPiece}g/pc)
+                            <SelectItem
+                              key={paper._id}
+                              value={paper._id}
+                            >
+                              {paper.name} - {paper.width}&quot; (
+                              {paper.piecesPerRoll} pcs/roll,{' '}
+                              {paper.weightPerPiece}g/pc)
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -681,9 +702,7 @@ export default function OutInventoryPage() {
                       <TableCell>{paper.quantity}</TableCell>
                       <TableCell>{paper.piecesPerRoll}</TableCell>
                       <TableCell>{paper.weightPerPiece}g</TableCell>
-                      <TableCell>
-                        {paper.totalPieces}
-                      </TableCell>
+                      <TableCell>{paper.totalPieces}</TableCell>
                       <TableCell>
                         <Badge
                           variant={

@@ -6,13 +6,13 @@ import mongoose from 'mongoose';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    
+
     const { id } = await params;
-    
+
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -20,18 +20,18 @@ export async function GET(
         { status: 400 },
       );
     }
-    
+
     const customer = await Customer.findById(id)
       .populate('createdBy', 'name')
       .populate('updatedBy', 'name');
-    
+
     if (!customer) {
       return NextResponse.json(
         { success: false, message: 'Customer not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       data: customer,
@@ -40,20 +40,20 @@ export async function GET(
     console.error('Error fetching customer:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to fetch customer' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    
+
     const { id } = await params;
-    
+
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -61,17 +61,17 @@ export async function PUT(
         { status: 400 },
       );
     }
-    
+
     const user = await getCurrentUser(request);
     if (!user?._id) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { status: 401 },
       );
     }
-    
+
     const body = await request.json();
-    
+
     // Check if phone number is being changed and if it conflicts with another customer
     if (body.phone) {
       const existingCustomer = await Customer.findOne({
@@ -80,20 +80,23 @@ export async function PUT(
       });
       if (existingCustomer) {
         return NextResponse.json(
-          { success: false, message: 'Customer with this phone number already exists' },
-          { status: 400 }
+          {
+            success: false,
+            message: 'Customer with this phone number already exists',
+          },
+          { status: 400 },
         );
       }
     }
-    
+
     const customer = await Customer.findById(id);
     if (!customer) {
       return NextResponse.json(
         { success: false, message: 'Customer not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
-    
+
     // Track changes for update history
     const updateHistory = [];
     for (const [key, value] of Object.entries(body)) {
@@ -107,7 +110,7 @@ export async function PUT(
         });
       }
     }
-    
+
     const updatedCustomer = await Customer.findByIdAndUpdate(
       id,
       {
@@ -115,9 +118,11 @@ export async function PUT(
         updatedBy: user._id,
         $push: { updateHistory: { $each: updateHistory } },
       },
-      { new: true, runValidators: true }
-    ).populate('createdBy', 'name').populate('updatedBy', 'name');
-    
+      { new: true, runValidators: true },
+    )
+      .populate('createdBy', 'name')
+      .populate('updatedBy', 'name');
+
     return NextResponse.json({
       success: true,
       message: 'Customer updated successfully',
@@ -127,51 +132,48 @@ export async function PUT(
     console.error('Error updating customer:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to update customer' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await dbConnect();
-    
+
     const { id } = await params;
-    
+
     const user = await getCurrentUser(request);
     if (!user?._id) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
-        { status: 401 }
+        { status: 401 },
       );
     }
-    
+
     const customer = await Customer.findById(id);
     if (!customer) {
       return NextResponse.json(
         { success: false, message: 'Customer not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
-    
-    // Soft delete - mark as inactive instead of removing
-    await Customer.findByIdAndUpdate(id, {
-      isActive: false,
-      updatedBy: user._id,
-    });
-    
+
+    // Hard delete - remove the customer from the database
+    await Customer.findByIdAndDelete(id);
+
     return NextResponse.json({
       success: true,
-      message: 'Customer deactivated successfully',
+      message: 'Customer deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting customer:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to delete customer' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

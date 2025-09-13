@@ -180,7 +180,7 @@ export default function ManagerDashboard() {
             <CardDescription>Manage your inventory and orders</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Link href="/inventory">
+            <Link href="/inventory/stones?type=internal">
               <Button
                 className="w-full"
                 variant="outline"

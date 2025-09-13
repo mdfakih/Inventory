@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import type { User } from '@/types';
+import { authenticatedFetch } from './utils';
 
 interface AuthUser extends Pick<User, 'name' | 'email' | 'role'> {
   id: string;
@@ -21,7 +22,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (userData: AuthUser) => void;
   logout: () => void;
-  checkAuth: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,47 +31,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const checkAuth = useCallback(async (): Promise<boolean> => {
+  const logout = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me');
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        return true;
-      } else if (response.status === 401) {
-        setUser(null);
-        router.push('/unauthorized');
-        return false;
-      } else {
-        setUser(null);
-        router.push('/login');
-        return false;
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      setUser(null);
-      return false;
-    }
-  }, [router]);
-
-  const login = (userData: AuthUser) => {
-    setUser(userData);
-  };
-
-  const logout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await authenticatedFetch('/api/auth/logout', { method: 'POST' });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear localStorage
+      localStorage.removeItem('user');
       setUser(null);
       router.push('/login');
     }
-  };
+  }, [router]);
 
+  const login = useCallback((userData: AuthUser) => {
+    // Store user data in localStorage
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  }, []);
+
+  // Initialize auth from localStorage on mount
   useEffect(() => {
-    checkAuth().finally(() => setLoading(false));
-  }, [checkAuth]);
+    const initializeAuth = () => {
+      try {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error('Failed to parse stored user data:', error);
+        localStorage.removeItem('user');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Handle token expiration by checking API responses
+  useEffect(() => {
+    const handleApiError = (event: CustomEvent) => {
+      if (event.detail?.status === 401) {
+        // Only logout if we have a user in state (avoid false positives)
+        if (user) {
+          console.log('Authentication failed, logging out user');
+          localStorage.removeItem('user');
+          setUser(null);
+          router.push('/login');
+        }
+      }
+    };
+
+    window.addEventListener('api-error', handleApiError as EventListener);
+    return () => {
+      window.removeEventListener('api-error', handleApiError as EventListener);
+    };
+  }, [router, user]);
 
   const value: AuthContextType = {
     user,
@@ -79,7 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     login,
     logout,
-    checkAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

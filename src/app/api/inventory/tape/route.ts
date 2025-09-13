@@ -8,8 +8,19 @@ export async function GET(request: NextRequest) {
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
+    const all = searchParams.get('all') === 'true';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
+
+    // If all=true, return all tapes without pagination
+    if (all) {
+      const tapes = await Tape.find().sort({ createdAt: -1 });
+
+      return NextResponse.json({
+        success: true,
+        data: tapes,
+      });
+    }
 
     // Validate pagination parameters
     if (page < 1 || limit < 1 || limit > 100) {
@@ -80,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json(
         { success: false, message: 'Name is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -88,14 +99,17 @@ export async function POST(request: NextRequest) {
     if (typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
         { success: false, message: 'Name must be a non-empty string' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    if (quantity !== undefined && (typeof quantity !== 'number' || quantity < 0)) {
+    if (
+      quantity !== undefined &&
+      (typeof quantity !== 'number' || quantity < 0)
+    ) {
       return NextResponse.json(
         { success: false, message: 'Quantity must be a non-negative number' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -112,30 +126,45 @@ export async function POST(request: NextRequest) {
       message: 'Tape type created successfully',
       data: tape,
     });
-
   } catch (error: unknown) {
     console.error('Create tape error:', error);
-    
+
     // Handle duplicate key error
-    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 11000
+    ) {
       return NextResponse.json(
-        { success: false, message: 'A tape type with this name already exists' },
-        { status: 400 }
+        {
+          success: false,
+          message: 'A tape type with this name already exists',
+        },
+        { status: 400 },
       );
     }
 
     // Handle validation errors
-    if (error && typeof error === 'object' && 'name' in error && error.name === 'ValidationError' && 'errors' in error) {
-      const messages = Object.values(error.errors as Record<string, { message: string }>).map(err => err.message);
+    if (
+      error &&
+      typeof error === 'object' &&
+      'name' in error &&
+      error.name === 'ValidationError' &&
+      'errors' in error
+    ) {
+      const messages = Object.values(
+        error.errors as Record<string, { message: string }>,
+      ).map((err) => err.message);
       return NextResponse.json(
         { success: false, message: messages.join(', ') },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

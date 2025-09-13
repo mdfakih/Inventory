@@ -5,7 +5,8 @@
       "Bash(npx tsc:*)",
       "Bash(grep:*)",
       "Bash(npm run build:*)",
-      "Read(c:\\Users\\mdfak\\Pictures\\Screenshots/**)"
+      "Read(c:\\Users\\mdfak\\Pictures\\Screenshots/**)",
+      "Bash(npm install)"
     ]
   },
   "outputStyle": "default"

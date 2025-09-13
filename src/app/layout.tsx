@@ -4,6 +4,7 @@ import './globals.css';
 import Navigation from '@/components/navigation';
 import { ThemeProvider } from '@/components/theme-provider';
 import { SnackbarProvider } from '@/components/ui/snackbar';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/lib/auth-context';
 import ErrorBoundary from '@/components/error-boundary';
 
@@ -33,10 +34,12 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <SnackbarProvider>
-              <AuthProvider>
-                <Navigation />
-                <main className="min-h-[calc(100vh-4rem)]">{children}</main>
-              </AuthProvider>
+              <TooltipProvider>
+                <AuthProvider>
+                  <Navigation />
+                  <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+                </AuthProvider>
+              </TooltipProvider>
             </SnackbarProvider>
           </ThemeProvider>
         </ErrorBoundary>

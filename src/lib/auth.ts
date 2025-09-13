@@ -1,66 +1,79 @@
-import bcrypt from 'bcryptjs';
 import { NextRequest } from 'next/server';
-import { verifyToken, JWTPayload } from './jwt';
-import dbConnect from './db';
-import User from '@/models/User';
+import { getTokenFromRequest, verifyToken } from '@/lib/jwt';
+import bcrypt from 'bcryptjs';
+
+type Role = 'admin' | 'manager' | 'employee';
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
 }
 
 export async function comparePassword(
-  password: string,
-  hashedPassword: string,
+  plainText: string,
+  hashed: string,
 ): Promise<boolean> {
-  return bcrypt.compare(password, hashedPassword);
+  return bcrypt.compare(plainText, hashed);
 }
 
-export function generateRandomPassword(): string {
-  const chars =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let password = '';
-  for (let i = 0; i < 8; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
+export function generateRandomPassword(length = 12): string {
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const specials = '!@#$%^&*()_+[]{}|;:,.<>?';
+  const all = upper + lower + digits + specials;
+
+  const pick = (chars: string) =>
+    chars[Math.floor(Math.random() * chars.length)];
+
+  // Ensure at least one of each category
+  let pwd = pick(upper) + pick(lower) + pick(digits) + pick(specials);
+  for (let i = pwd.length; i < length; i += 1) {
+    pwd += pick(all);
   }
-  return password;
+  return pwd
+    .split('')
+    .sort(() => Math.random() - 0.5)
+    .join('');
 }
 
-export function getAuthUser(request: NextRequest): JWTPayload | null {
-  const token = request.cookies.get('auth-token')?.value;
-  if (!token) return null;
-
-  return verifyToken(token);
-}
-
-export async function getCurrentUser(request: NextRequest) {
-  try {
-    const authUser = getAuthUser(request);
-    if (!authUser) return null;
-
-    await dbConnect();
-    const user = await User.findById(authUser.userId).select('-password');
-    return user;
-  } catch (error) {
-    console.error('Error getting current user:', error);
-    return null;
+export function getCurrentUser(
+  request: NextRequest,
+): { _id: string; email: string; role: Role } | null {
+  // Prefer verifying the JWT from the auth cookie
+  const token = getTokenFromRequest(request);
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload) {
+      return { _id: payload.userId, email: payload.email, role: payload.role };
+    }
   }
-}
 
-export function requireAuth(request: NextRequest): JWTPayload {
-  const user = getAuthUser(request);
-  if (!user) {
-    throw new Error('Authentication required');
+  // Fallback to headers (legacy)
+  const userId = request.headers.get('x-user-id');
+  const email = request.headers.get('x-user-email');
+  const role = request.headers.get('x-user-role') as Role | null;
+  if (userId && email && role) {
+    return { _id: userId, email, role };
   }
-  return user;
+
+  return null;
 }
 
 export function requireRole(
   request: NextRequest,
-  allowedRoles: string[],
-): JWTPayload {
-  const user = requireAuth(request);
-  if (!allowedRoles.includes(user.role)) {
-    throw new Error('Insufficient permissions');
+  allowed: Role | Role[],
+): void {
+  const roles = Array.isArray(allowed) ? allowed : [allowed];
+  const role = request.headers.get('x-user-role') as Role | null;
+  if (!role) {
+    const err = new Error('Unauthorized') as Error & { status: number };
+    err.status = 401;
+    throw err;
   }
-  return user;
+  if (!roles.includes(role)) {
+    const err = new Error('Forbidden') as Error & { status: number };
+    err.status = 403;
+    throw err;
+  }
 }

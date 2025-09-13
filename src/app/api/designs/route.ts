@@ -90,6 +90,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate that at least one stone is provided
+    if (
+      !defaultStones ||
+      !Array.isArray(defaultStones) ||
+      defaultStones.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'At least one stone must be selected for the design',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate that all stones have valid stoneId and quantity
+    const validStones = defaultStones.filter(
+      (stone) => stone.stoneId && stone.stoneId.trim() !== '',
+    );
+    if (validStones.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'At least one stone must be selected for the design',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate stone quantities
+    for (const stone of validStones) {
+      if (stone.quantity < 0.1) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Stone quantity must be at least 0.1g',
+          },
+          { status: 400 },
+        );
+      }
+      // Round to 2 decimal places
+      stone.quantity = Math.round(stone.quantity * 100) / 100;
+    }
+
     // Check if design number already exists
     const existingDesign = await Design.findOne({ number });
     if (existingDesign) {
@@ -105,7 +149,7 @@ export async function POST(request: NextRequest) {
       imageUrl: imageUrl || '',
       prices: prices || [],
       defaultStones: defaultStones || [],
-      createdBy: user.id,
+      createdBy: user._id,
     });
 
     await design.save();

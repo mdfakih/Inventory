@@ -45,16 +45,21 @@ function Navigation() {
       .slice(0, 2);
   }, [user?.name]);
 
-  const navigationItems = useMemo(() => [
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/inventory', label: 'Inventory' },
-    { href: '/designs', label: 'Designs' },
-    { href: '/orders', label: 'Orders' },
-    { href: '/customers', label: 'Customers' },
-    { href: '/forms', label: 'Forms' },
-    ...(user?.role === 'admin' ? [{ href: '/masters', label: 'Masters' }] : []),
-    { href: '/reports', label: 'Reports' },
-  ], [user?.role]);
+  const navigationItems = useMemo(
+    () => [
+      { href: '/dashboard', label: 'Dashboard' },
+      { href: '/inventory', label: 'Inventory' },
+      { href: '/designs', label: 'Designs' },
+      { href: '/orders', label: 'Orders' },
+      { href: '/customers', label: 'Customers' },
+      { href: '/forms', label: 'Forms' },
+      ...(user?.role === 'admin'
+        ? [{ href: '/masters', label: 'Masters' }]
+        : []),
+      { href: '/reports', label: 'Reports' },
+    ],
+    [user?.role],
+  );
 
   // Don't show navigation on login page
   if (pathname === '/login') {

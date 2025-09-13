@@ -77,6 +77,50 @@ export async function PUT(
       );
     }
 
+    // Validate that at least one stone is provided
+    if (
+      !defaultStones ||
+      !Array.isArray(defaultStones) ||
+      defaultStones.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'At least one stone must be selected for the design',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate that all stones have valid stoneId and quantity
+    const validStones = defaultStones.filter(
+      (stone) => stone.stoneId && stone.stoneId.trim() !== '',
+    );
+    if (validStones.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'At least one stone must be selected for the design',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate stone quantities
+    for (const stone of validStones) {
+      if (stone.quantity < 0.1) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Stone quantity must be at least 0.1g',
+          },
+          { status: 400 },
+        );
+      }
+      // Round to 2 decimal places
+      stone.quantity = Math.round(stone.quantity * 100) / 100;
+    }
+
     // Check if design number already exists for other designs
     const existingDesign = await Design.findOne({ number, _id: { $ne: id } });
     if (existingDesign) {
@@ -109,7 +153,7 @@ export async function PUT(
         field: 'name',
         oldValue: oldValues.name,
         newValue: name,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -119,7 +163,7 @@ export async function PUT(
         field: 'number',
         oldValue: oldValues.number,
         newValue: number,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -129,7 +173,7 @@ export async function PUT(
         field: 'imageUrl',
         oldValue: oldValues.imageUrl,
         newValue: imageUrl,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -139,7 +183,7 @@ export async function PUT(
         field: 'prices',
         oldValue: oldValues.prices,
         newValue: prices,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -151,7 +195,7 @@ export async function PUT(
         field: 'defaultStones',
         oldValue: oldValues.defaultStones,
         newValue: defaultStones,
-        updatedBy: user.id,
+        updatedBy: user._id,
         updatedAt: new Date(),
       });
     }
@@ -163,7 +207,7 @@ export async function PUT(
       imageUrl: imageUrl || '',
       prices: prices || [],
       defaultStones: defaultStones || [],
-      updatedBy: user.id,
+      updatedBy: user._id,
       updateHistory: [...(design.updateHistory || []), ...updateHistory],
     };
 

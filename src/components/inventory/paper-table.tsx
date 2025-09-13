@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 import {
   Table,
@@ -25,33 +23,31 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSnackbarHelpers } from '@/components/ui/snackbar';
 import { useAuth } from '@/lib/auth-context';
-import { Package, Edit, Trash2 } from 'lucide-react';
+import { safeJsonParse } from '@/lib/utils';
+import { Package, Trash2, Plus } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
+import AddInventoryModal from './add-inventory-modal';
 import type { Paper } from '@/types';
 
 interface PaperTableProps {
   inventoryType?: 'internal' | 'out';
 }
 
-function PaperTable({
-  inventoryType = 'internal',
-}: PaperTableProps) {
+function PaperTable({ inventoryType = 'internal' }: PaperTableProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
-  const [updateQuantity, setUpdateQuantity] = useState('');
-  
+  const [isAddInventoryModalOpen, setIsAddInventoryModalOpen] = useState(false);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  
+
   const { showSuccess, showError } = useSnackbarHelpers();
   const { loading: authLoading, isAuthenticated } = useAuth();
 
@@ -64,7 +60,12 @@ function PaperTable({
         const response = await fetch(
           `/api/inventory/paper?type=${inventoryType}&page=${currentPage}&limit=${itemsPerPage}`,
         );
-        const data = await response.json();
+        const data = await safeJsonParse<{
+          success: boolean;
+          data: Paper[];
+          pagination: { pages: number; total: number };
+          message?: string;
+        }>(response);
         if (data.success) {
           setPapers(data.data);
           setTotalPages(data.pagination.pages);
@@ -100,44 +101,6 @@ function PaperTable({
     setCurrentPage(1); // Reset to first page when changing items per page
   };
 
-  const handleUpdateQuantity = async (paperId: string, newQuantity: number) => {
-    setIsUpdating(paperId);
-    try {
-      const response = await fetch(`/api/inventory/paper/${paperId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ quantity: newQuantity }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        showSuccess(
-          'Quantity Updated',
-          'Paper quantity has been updated successfully.',
-        );
-        await fetchPapers(true);
-        setIsUpdateDialogOpen(false);
-        setSelectedPaper(null);
-        setUpdateQuantity('');
-      } else {
-        showError(
-          'Update Failed',
-          data.message || 'Failed to update quantity.',
-        );
-      }
-    } catch (error) {
-      console.error('Error updating quantity:', error);
-      showError(
-        'Network Error',
-        'Failed to update quantity. Please try again.',
-      );
-    } finally {
-      setIsUpdating(null);
-    }
-  };
-
   const handleResetPaper = async (paperId: string) => {
     setIsDeleting(paperId);
     try {
@@ -145,7 +108,9 @@ function PaperTable({
         method: 'DELETE',
       });
 
-      const data = await response.json();
+      const data = await safeJsonParse<{ success: boolean; message?: string }>(
+        response,
+      );
       if (data.success) {
         showSuccess(
           'Paper Reset',
@@ -169,12 +134,6 @@ function PaperTable({
     } finally {
       setIsDeleting(null);
     }
-  };
-
-  const openUpdateDialog = (paper: Paper) => {
-    setSelectedPaper(paper);
-    setUpdateQuantity(paper.quantity.toString());
-    setIsUpdateDialogOpen(true);
   };
 
   const openDeleteDialog = (paper: Paper) => {
@@ -204,74 +163,32 @@ function PaperTable({
               : 'Manage paper rolls with different widths and weights'}
           </p>
         </div>
-        {refreshing && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner size="sm" />
-            <span>Refreshing...</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {refreshing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              <span>Refreshing...</span>
+            </div>
+          )}
+          <Button
+            onClick={() => setIsAddInventoryModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Inventory
+          </Button>
+        </div>
       </div>
 
-      {/* Update Quantity Modal */}
-      <Dialog
-        open={isUpdateDialogOpen}
-        onOpenChange={setIsUpdateDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Quantity</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (selectedPaper) {
-                const quantity = parseInt(updateQuantity);
-                if (!isNaN(quantity) && quantity >= 0) {
-                  handleUpdateQuantity(selectedPaper._id, quantity);
-                } else {
-                  showError(
-                    'Invalid Input',
-                    'Please enter a valid positive number.',
-                  );
-                }
-              }
-            }}
-            className="space-y-4"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="updateQuantity">New Quantity (rolls)</Label>
-              <Input
-                id="updateQuantity"
-                type="number"
-                value={updateQuantity}
-                onChange={(e) => setUpdateQuantity(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsUpdateDialogOpen(false);
-                  setSelectedPaper(null);
-                  setUpdateQuantity('');
-                }}
-                disabled={isUpdating === selectedPaper?._id}
-              >
-                Cancel
-              </Button>
-              <LoadingButton
-                type="submit"
-                loading={isUpdating === selectedPaper?._id}
-                loadingText="Updating..."
-              >
-                Update Quantity
-              </LoadingButton>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Add Inventory Modal */}
+      <AddInventoryModal
+        isOpen={isAddInventoryModalOpen}
+        onClose={() => setIsAddInventoryModalOpen(false)}
+        onSuccess={() => {
+          fetchPapers(true);
+          setIsAddInventoryModalOpen(false);
+        }}
+      />
 
       {/* Delete Confirmation Modal */}
       <Dialog
@@ -354,28 +271,16 @@ function PaperTable({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <LoadingButton
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openUpdateDialog(paper)}
-                        loading={isUpdating === paper._id}
-                        loadingText="Updating..."
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Update
-                      </LoadingButton>
-                      <LoadingButton
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => openDeleteDialog(paper)}
-                        loading={isDeleting === paper._id}
-                        loadingText="Resetting..."
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Reset
-                      </LoadingButton>
-                    </div>
+                    <LoadingButton
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => openDeleteDialog(paper)}
+                      loading={isDeleting === paper._id}
+                      loadingText="Resetting..."
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Reset
+                    </LoadingButton>
                   </TableCell>
                 </TableRow>
               ))}

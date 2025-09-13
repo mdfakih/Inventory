@@ -237,7 +237,6 @@ export default function OrdersPage() {
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [user, setUser] = useState<User | null>(null);
   const [isFinalizing, setIsFinalizing] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState<string | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -322,7 +321,7 @@ export default function OrdersPage() {
     notes: '',
   });
   const { showSuccess, showError } = useSnackbarHelpers();
-  const { loading: authLoading, isAuthenticated } = useAuth();
+  const { loading: authLoading, isAuthenticated, user } = useAuth();
 
   // Helper function to calculate total weight including stones
   const calculateTotalWeight = (
@@ -446,23 +445,10 @@ export default function OrdersPage() {
     }
   };
 
-  const fetchUser = async () => {
-    try {
-      const response = await authenticatedFetch('/api/auth/me');
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      }
-    } catch (error) {
-      console.error('Error fetching user:', error);
-    }
-  };
-
   useEffect(() => {
     // Only fetch data when authentication is ready and user is authenticated
     if (!authLoading && isAuthenticated) {
       fetchData();
-      fetchUser();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated, currentPage, itemsPerPage]); // Include currentPage and itemsPerPage
@@ -489,7 +475,8 @@ export default function OrdersPage() {
           paperUsed: {
             sizeInInch: parseInt(order.paperUsed.sizeInInch),
             quantityInPcs: parseInt(order.paperUsed.quantityInPcs),
-            paperWeightPerPc: order.paperUsed.paperWeightPerPc,
+            paperWeightPerPc:
+              parseFloat(order.paperUsed.paperWeightPerPc.toString()) || 0,
           },
         })),
         modeOfPayment: formData.modeOfPayment,

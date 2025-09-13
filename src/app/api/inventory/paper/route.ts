@@ -14,10 +14,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log('Connecting to database...');
     await dbConnect();
+    console.log('Database connected successfully');
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'internal';
+    const all = searchParams.get('all') === 'true';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
 
@@ -27,6 +30,20 @@ export async function GET(request: NextRequest) {
         { success: false, message: 'Invalid inventory type' },
         { status: 400 },
       );
+    }
+
+    // If all=true, return all papers without pagination
+    if (all) {
+      console.log(`Fetching all papers for type: ${type}`);
+      const papers = await Paper.find({ inventoryType: type }).sort({
+        width: 1,
+      });
+      console.log(`Found ${papers.length} papers`);
+
+      return NextResponse.json({
+        success: true,
+        data: papers,
+      });
     }
 
     // Validate pagination parameters
@@ -60,8 +77,17 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Get papers error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
     return NextResponse.json(
-      { success: false, message: 'Internal server error' },
+      {
+        success: false,
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 },
     );
   }
@@ -92,13 +118,20 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { name, width, quantity, piecesPerRoll, weightPerPiece, inventoryType } = body;
+    const {
+      name,
+      width,
+      quantity,
+      piecesPerRoll,
+      weightPerPiece,
+      inventoryType,
+    } = body;
 
     // Validate required fields
     if (!name || !width || !piecesPerRoll || !weightPerPiece) {
       return NextResponse.json(
         { success: false, message: 'Missing required fields' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -106,35 +139,41 @@ export async function POST(request: NextRequest) {
     if (typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
         { success: false, message: 'Name must be a non-empty string' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (typeof width !== 'number' || width <= 0) {
       return NextResponse.json(
         { success: false, message: 'Width must be a positive number' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (typeof piecesPerRoll !== 'number' || piecesPerRoll <= 0) {
       return NextResponse.json(
-        { success: false, message: 'Pieces per roll must be a positive number' },
-        { status: 400 }
+        {
+          success: false,
+          message: 'Pieces per roll must be a positive number',
+        },
+        { status: 400 },
       );
     }
 
     if (typeof weightPerPiece !== 'number' || weightPerPiece < 0) {
       return NextResponse.json(
-        { success: false, message: 'Weight per piece must be a non-negative number' },
-        { status: 400 }
+        {
+          success: false,
+          message: 'Weight per piece must be a non-negative number',
+        },
+        { status: 400 },
       );
     }
 
     if (inventoryType && !['internal', 'out'].includes(inventoryType)) {
       return NextResponse.json(
         { success: false, message: 'Invalid inventory type' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -150,7 +189,7 @@ export async function POST(request: NextRequest) {
       piecesPerRoll: Number(piecesPerRoll),
       weightPerPiece: Number(weightPerPiece),
       inventoryType: inventoryType || 'internal',
-      updatedBy: user.id,
+      updatedBy: user._id,
     });
 
     await paper.save();
@@ -160,30 +199,46 @@ export async function POST(request: NextRequest) {
       message: 'Paper type created successfully',
       data: paper,
     });
-
   } catch (error: unknown) {
     console.error('Create paper error:', error);
-    
+
     // Handle duplicate key error
-    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 11000
+    ) {
       return NextResponse.json(
-        { success: false, message: 'A paper type with this name already exists for this inventory type' },
-        { status: 400 }
+        {
+          success: false,
+          message:
+            'A paper type with this name already exists for this inventory type',
+        },
+        { status: 400 },
       );
     }
 
     // Handle validation errors
-    if (error && typeof error === 'object' && 'name' in error && error.name === 'ValidationError' && 'errors' in error) {
-      const messages = Object.values(error.errors as Record<string, { message: string }>).map(err => err.message);
+    if (
+      error &&
+      typeof error === 'object' &&
+      'name' in error &&
+      error.name === 'ValidationError' &&
+      'errors' in error
+    ) {
+      const messages = Object.values(
+        error.errors as Record<string, { message: string }>,
+      ).map((err) => err.message);
       return NextResponse.json(
         { success: false, message: messages.join(', ') },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { success: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

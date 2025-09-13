@@ -72,7 +72,8 @@ export async function PUT(
       return NextResponse.json(
         {
           success: false,
-          message: 'Stone with this name and number already exists for this inventory type',
+          message:
+            'Stone with this name and number already exists for this inventory type',
         },
         { status: 400 },
       );
@@ -88,7 +89,7 @@ export async function PUT(
         size,
         unit,
         inventoryType,
-        updatedBy: user.id,
+        updatedBy: user._id,
       },
       { new: true },
     );
@@ -126,12 +127,15 @@ export async function PATCH(
     const body = await request.json();
     const { quantity } = body;
 
-    if (quantity === undefined || quantity < 0) {
+    if (quantity === undefined || quantity < 0.1) {
       return NextResponse.json(
-        { success: false, message: 'Valid quantity is required' },
+        { success: false, message: 'Stone quantity must be at least 0.1g' },
         { status: 400 },
       );
     }
+
+    // Round to 2 decimal places
+    const roundedQuantity = Math.round(quantity * 100) / 100;
 
     // First get the old value
     const existingStone = await Stone.findById(id);
@@ -145,14 +149,14 @@ export async function PATCH(
     const stone = await Stone.findByIdAndUpdate(
       id,
       {
-        quantity,
-        updatedBy: user.id,
+        quantity: roundedQuantity,
+        updatedBy: user._id,
         $push: {
           updateHistory: {
             field: 'quantity',
             oldValue: existingStone.quantity,
-            newValue: quantity,
-            updatedBy: user.id,
+            newValue: roundedQuantity,
+            updatedBy: user._id,
             updatedAt: new Date(),
           },
         },
@@ -203,13 +207,13 @@ export async function DELETE(
       id,
       {
         quantity: 0,
-        updatedBy: user.id,
+        updatedBy: user._id,
         $push: {
           updateHistory: {
             field: 'quantity',
             oldValue: stone.quantity,
             newValue: 0,
-            updatedBy: user.id,
+            updatedBy: user._id,
             updatedAt: new Date(),
           },
         },

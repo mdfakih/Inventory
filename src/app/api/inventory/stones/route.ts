@@ -14,10 +14,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log('Connecting to database...');
     await dbConnect();
+    console.log('Database connected successfully');
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'internal';
+    const all = searchParams.get('all') === 'true';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
 
@@ -27,6 +30,20 @@ export async function GET(request: NextRequest) {
         { success: false, message: 'Invalid inventory type' },
         { status: 400 },
       );
+    }
+
+    // If all=true, return all stones without pagination
+    if (all) {
+      console.log(`Fetching all stones for type: ${type}`);
+      const stones = await Stone.find({ inventoryType: type }).sort({
+        name: 1,
+      });
+      console.log(`Found ${stones.length} stones`);
+
+      return NextResponse.json({
+        success: true,
+        data: stones,
+      });
     }
 
     // Validate pagination parameters
@@ -60,8 +77,17 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Get stones error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
     return NextResponse.json(
-      { success: false, message: 'Internal server error' },
+      {
+        success: false,
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 },
     );
   }
@@ -128,6 +154,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate stone quantity
+    if (quantity < 0.1) {
+      return NextResponse.json(
+        { success: false, message: 'Stone quantity must be at least 0.1g' },
+        { status: 400 },
+      );
+    }
+
+    // Round quantity to 2 decimal places
+    const roundedQuantity = Math.round(quantity * 100) / 100;
+
     // Check if stone with same name and number already exists
     const existingStone = await Stone.findOne({
       name,
@@ -152,10 +189,10 @@ export async function POST(request: NextRequest) {
       color,
       size,
       unit,
-      quantity,
+      quantity: roundedQuantity,
       inventoryType,
       weightPerPiece: 0, // Default value since it's not collected in the form
-      createdBy: user.id,
+      createdBy: user._id,
     });
 
     await stone.save();
