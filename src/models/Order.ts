@@ -1,4 +1,80 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface IOrder extends Document {
+  _id: mongoose.Types.ObjectId;
+  type: 'internal' | 'out';
+  customerName: string;
+  phone: string;
+  customerId?: mongoose.Types.ObjectId;
+  gstNumber?: string;
+  designOrders: Array<{
+    designId: mongoose.Types.ObjectId;
+    stonesUsed: Array<{
+      stoneId: mongoose.Types.ObjectId;
+      quantity: number;
+    }>;
+    paperUsed: {
+      sizeInInch: number;
+      quantityInPcs: number;
+      paperWeightPerPc: number;
+      customPaperWeight?: number;
+    };
+    otherItemsUsed?: Array<{
+      itemType: 'plastic' | 'tape' | 'other';
+      itemId: mongoose.Types.ObjectId;
+      quantity: number;
+      unit?: string;
+    }>;
+    calculatedWeight?: number;
+    finalWeight?: number;
+    unitPrice?: number;
+    totalPrice?: number;
+  }>;
+  // Legacy fields
+  designId?: mongoose.Types.ObjectId;
+  stonesUsed?: Array<{
+    stoneId: mongoose.Types.ObjectId;
+    quantity: number;
+  }>;
+  paperUsed?: {
+    sizeInInch?: number;
+    quantityInPcs?: number;
+    paperWeightPerPc?: number;
+    customPaperWeight?: number;
+  };
+  otherItemsUsed?: Array<{
+    itemType: 'plastic' | 'tape' | 'other';
+    itemId: mongoose.Types.ObjectId;
+    quantity: number;
+    unit?: string;
+  }>;
+  modeOfPayment: 'cash' | 'UPI' | 'card';
+  paymentStatus: 'pending' | 'partial' | 'completed' | 'overdue';
+  discountType: 'percentage' | 'flat';
+  discountValue: number;
+  totalCost: number;
+  discountedAmount: number;
+  finalAmount: number;
+  notes?: string;
+  finalTotalWeight?: number;
+  calculatedWeight?: number;
+  weightDiscrepancy?: number;
+  discrepancyPercentage?: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  isFinalized?: boolean;
+  finalizedAt?: Date;
+  createdBy: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  updateHistory: Array<{
+    field: string;
+    oldValue: unknown;
+    newValue: unknown;
+    updatedBy: mongoose.Types.ObjectId;
+    updatedAt: Date;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const orderSchema = new mongoose.Schema(
   {
@@ -318,12 +394,12 @@ orderSchema.pre('save', function (next) {
 });
 
 // Use a more robust model export for production stability
-let Order: mongoose.Model<any>;
+let Order: mongoose.Model<IOrder>;
 
 try {
-  Order = mongoose.model('Order');
-} catch (error) {
-  Order = mongoose.model('Order', orderSchema);
+  Order = mongoose.model<IOrder>('Order');
+} catch {
+  Order = mongoose.model<IOrder>('Order', orderSchema);
 }
 
 export default Order;

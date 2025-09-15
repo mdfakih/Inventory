@@ -1,4 +1,19 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface ISupplier extends Document {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  isActive: boolean;
+  createdBy: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const supplierSchema = new mongoose.Schema(
   {
@@ -43,12 +58,12 @@ const supplierSchema = new mongoose.Schema(
 supplierSchema.index({ name: 1 }, { unique: true });
 
 // Use a more robust model export for production stability
-let Supplier: mongoose.Model<any>;
+let Supplier: mongoose.Model<ISupplier>;
 
 try {
-  Supplier = mongoose.model('Supplier');
-} catch (error) {
-  Supplier = mongoose.model('Supplier', supplierSchema);
+  Supplier = mongoose.model<ISupplier>('Supplier');
+} catch {
+  Supplier = mongoose.model<ISupplier>('Supplier', supplierSchema);
 }
 
 export default Supplier;

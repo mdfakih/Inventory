@@ -1,4 +1,23 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface IPaper extends Document {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  width: number;
+  length: number;
+  quantity: number;
+  totalPieces: number;
+  piecesPerRoll: number;
+  weightPerPiece: number;
+  inventoryType: 'internal' | 'out';
+  supplier?: string;
+  cost?: number;
+  notes?: string;
+  createdBy: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const paperSchema = new mongoose.Schema(
   {
@@ -74,12 +93,12 @@ const paperSchema = new mongoose.Schema(
 paperSchema.index({ name: 1, inventoryType: 1 }, { unique: true });
 
 // Use a more robust model export for production stability
-let Paper: mongoose.Model<any>;
+let Paper: mongoose.Model<IPaper>;
 
 try {
-  Paper = mongoose.model('Paper');
-} catch (error) {
-  Paper = mongoose.model('Paper', paperSchema);
+  Paper = mongoose.model<IPaper>('Paper');
+} catch {
+  Paper = mongoose.model<IPaper>('Paper', paperSchema);
 }
 
 export default Paper;

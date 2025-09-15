@@ -1,4 +1,18 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface ITape extends Document {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  quantity: number;
+  unit: string;
+  supplier?: string;
+  cost?: number;
+  notes?: string;
+  createdBy: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const tapeSchema = new mongoose.Schema(
   {
@@ -28,12 +42,12 @@ const tapeSchema = new mongoose.Schema(
 tapeSchema.index({ name: 1 }, { unique: true });
 
 // Use a more robust model export for production stability
-let Tape: mongoose.Model<any>;
+let Tape: mongoose.Model<ITape>;
 
 try {
-  Tape = mongoose.model('Tape');
-} catch (error) {
-  Tape = mongoose.model('Tape', tapeSchema);
+  Tape = mongoose.model<ITape>('Tape');
+} catch {
+  Tape = mongoose.model<ITape>('Tape', tapeSchema);
 }
 
 export default Tape;

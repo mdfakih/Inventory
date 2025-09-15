@@ -1,4 +1,30 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface IDesign extends Document {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  number: string;
+  imageUrl?: string;
+  prices: Array<{
+    currency: '₹' | '$';
+    price: number;
+  }>;
+  defaultStones: Array<{
+    stoneId: mongoose.Types.ObjectId;
+    quantity: number;
+  }>;
+  createdBy: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  updateHistory: Array<{
+    field: string;
+    oldValue: unknown;
+    newValue: unknown;
+    updatedBy: mongoose.Types.ObjectId;
+    updatedAt: Date;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const designSchema = new mongoose.Schema(
   {
@@ -77,12 +103,12 @@ const designSchema = new mongoose.Schema(
 );
 
 // Use a more robust model export for production stability
-let Design: mongoose.Model<any>;
+let Design: mongoose.Model<IDesign>;
 
 try {
-  Design = mongoose.model('Design');
-} catch (error) {
-  Design = mongoose.model('Design', designSchema);
+  Design = mongoose.model<IDesign>('Design');
+} catch {
+  Design = mongoose.model<IDesign>('Design', designSchema);
 }
 
 export default Design;

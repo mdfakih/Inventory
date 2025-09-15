@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Customer from '@/models/Customer';
-import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {

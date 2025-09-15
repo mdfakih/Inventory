@@ -1,4 +1,37 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface ICustomer extends Document {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+  };
+  company?: string;
+  gstNumber?: string;
+  customerType: 'retail' | 'wholesale' | 'corporate';
+  creditLimit: number;
+  paymentTerms: 'immediate' | '7days' | '15days' | '30days' | '45days';
+  isActive: boolean;
+  notes?: string;
+  tags: string[];
+  createdBy: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  updateHistory: Array<{
+    field: string;
+    oldValue: unknown;
+    newValue: unknown;
+    updatedBy: mongoose.Types.ObjectId;
+    updatedAt: Date;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const customerSchema = new mongoose.Schema(
   {
@@ -105,12 +138,12 @@ customerSchema.index({
 });
 
 // Use a more robust model export for production stability
-let Customer: mongoose.Model<any>;
+let Customer: mongoose.Model<ICustomer>;
 
 try {
-  Customer = mongoose.model('Customer');
-} catch (error) {
-  Customer = mongoose.model('Customer', customerSchema);
+  Customer = mongoose.model<ICustomer>('Customer');
+} catch {
+  Customer = mongoose.model<ICustomer>('Customer', customerSchema);
 }
 
 export default Customer;

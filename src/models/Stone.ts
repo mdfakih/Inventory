@@ -1,4 +1,20 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface IStone extends Document {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  number: string;
+  quantity: number;
+  unit: string;
+  inventoryType: 'internal' | 'out';
+  supplier?: string;
+  cost?: number;
+  notes?: string;
+  createdBy: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const stoneSchema = new mongoose.Schema(
   {
@@ -56,12 +72,12 @@ const stoneSchema = new mongoose.Schema(
 stoneSchema.index({ number: 1, inventoryType: 1 }, { unique: true });
 
 // Use a more robust model export for production stability
-let Stone: mongoose.Model<any>;
+let Stone: mongoose.Model<IStone>;
 
 try {
-  Stone = mongoose.model('Stone');
-} catch (error) {
-  Stone = mongoose.model('Stone', stoneSchema);
+  Stone = mongoose.model<IStone>('Stone');
+} catch {
+  Stone = mongoose.model<IStone>('Stone', stoneSchema);
 }
 
 export default Stone;

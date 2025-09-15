@@ -1,4 +1,18 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface IInventoryEntry extends Document {
+  _id: mongoose.Types.ObjectId;
+  entryType: 'in' | 'out';
+  itemType: 'paper' | 'plastic' | 'tape' | 'stone' | 'other';
+  itemId: mongoose.Types.ObjectId;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  notes?: string;
+  enteredBy: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const inventoryEntrySchema = new mongoose.Schema(
   {
@@ -103,12 +117,15 @@ inventoryEntrySchema.index({ supplier: 1, createdAt: -1 });
 inventoryEntrySchema.index({ enteredBy: 1, createdAt: -1 });
 
 // Use a more robust model export for production stability
-let InventoryEntry: mongoose.Model<any>;
+let InventoryEntry: mongoose.Model<IInventoryEntry>;
 
 try {
-  InventoryEntry = mongoose.model('InventoryEntry');
-} catch (error) {
-  InventoryEntry = mongoose.model('InventoryEntry', inventoryEntrySchema);
+  InventoryEntry = mongoose.model<IInventoryEntry>('InventoryEntry');
+} catch {
+  InventoryEntry = mongoose.model<IInventoryEntry>(
+    'InventoryEntry',
+    inventoryEntrySchema,
+  );
 }
 
 export default InventoryEntry;

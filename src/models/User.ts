@@ -1,4 +1,25 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
+
+interface IUser extends Document {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'manager' | 'employee';
+  status: 'active' | 'blocked';
+  isActive: boolean;
+  passwordResetRequest?: {
+    requested: boolean;
+    requestedAt?: Date | null;
+    approved: boolean;
+    approvedAt?: Date | null;
+    approvedBy?: mongoose.Types.ObjectId | null;
+  };
+  createdBy?: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
 import { hashPassword } from '@/lib/auth';
 
 const userSchema = new mongoose.Schema(
@@ -64,12 +85,12 @@ userSchema.pre('save', async function (next) {
 });
 
 // Use a more robust model export for production stability
-let User: mongoose.Model<any>;
+let User: mongoose.Model<IUser>;
 
 try {
-  User = mongoose.model('User');
-} catch (error) {
-  User = mongoose.model('User', userSchema);
+  User = mongoose.model<IUser>('User');
+} catch {
+  User = mongoose.model<IUser>('User', userSchema);
 }
 
 export default User;
