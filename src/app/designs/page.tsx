@@ -204,9 +204,7 @@ export default function DesignsPage() {
       } catch (error) {
         console.error('Error fetching designs:', error);
         // Only show error if it's not an auth-related issue
-        if (!error.message?.includes('401')) {
-          showError('Data Loading Error', 'Failed to load designs data.');
-        }
+        showError('Data Loading Error', 'Failed to load designs data.');
       } finally {
         setLoading(false);
         if (isRefresh) {
@@ -249,9 +247,7 @@ export default function DesignsPage() {
     } catch (error) {
       console.error('Error fetching stones:', error);
       // Only show error if it's not an auth-related issue
-      if (!error.message?.includes('401')) {
-        showError('Data Loading Error', 'Failed to load stones data.');
-      }
+      showError('Data Loading Error', 'Failed to load stones data.');
     }
   }, [showError]);
 
