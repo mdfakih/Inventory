@@ -203,7 +203,10 @@ export default function DesignsPage() {
         }
       } catch (error) {
         console.error('Error fetching designs:', error);
-        showError('Data Loading Error', 'Failed to load designs data.');
+        // Only show error if it's not an auth-related issue
+        if (!error.message?.includes('401')) {
+          showError('Data Loading Error', 'Failed to load designs data.');
+        }
       } finally {
         setLoading(false);
         if (isRefresh) {
@@ -245,7 +248,10 @@ export default function DesignsPage() {
       setStones(allStones);
     } catch (error) {
       console.error('Error fetching stones:', error);
-      showError('Data Loading Error', 'Failed to load stones data.');
+      // Only show error if it's not an auth-related issue
+      if (!error.message?.includes('401')) {
+        showError('Data Loading Error', 'Failed to load stones data.');
+      }
     }
   }, [showError]);
 
@@ -322,6 +328,7 @@ export default function DesignsPage() {
       setStones([]);
       setUser(null);
     }
+    // Functions are stable due to useCallback with proper dependencies
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     authLoading,

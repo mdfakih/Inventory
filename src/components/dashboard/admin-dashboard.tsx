@@ -11,6 +11,13 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SpinnerPage } from '@/components/ui/spinner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuth } from '@/lib/auth-context';
 import { authenticatedFetch } from '@/lib/utils';
 import type {
@@ -49,6 +56,7 @@ function AdminDashboard() {
     recentOrders: [],
   });
   const [loading, setLoading] = useState(true);
+  const [stoneWeightUnit, setStoneWeightUnit] = useState<'kg' | 'g'>('kg');
   const { isAuthenticated, loading: authLoading } = useAuth();
 
   useEffect(() => {
@@ -60,22 +68,42 @@ function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [stonesRes, papersRes, ordersRes] = await Promise.all([
-        authenticatedFetch('/api/inventory/stones'),
-        authenticatedFetch('/api/inventory/paper'),
+      const [
+        internalStonesRes,
+        outStonesRes,
+        internalPapersRes,
+        outPapersRes,
+        ordersRes,
+      ] = await Promise.all([
+        authenticatedFetch('/api/inventory/stones?type=internal&all=true'),
+        authenticatedFetch('/api/inventory/stones?type=out&all=true'),
+        authenticatedFetch('/api/inventory/paper?type=internal&all=true'),
+        authenticatedFetch('/api/inventory/paper?type=out&all=true'),
         authenticatedFetch('/api/orders'),
       ]);
 
-      const stones = await stonesRes.json();
-      const papers = await papersRes.json();
+      const internalStones = await internalStonesRes.json();
+      const outStones = await outStonesRes.json();
+      const internalPapers = await internalPapersRes.json();
+      const outPapers = await outPapersRes.json();
       const orders = await ordersRes.json();
+
+      // Combine internal and out inventory
+      const allStones = [
+        ...(internalStones.data || []),
+        ...(outStones.data || []),
+      ];
+      const allPapers = [
+        ...(internalPapers.data || []),
+        ...(outPapers.data || []),
+      ];
 
       // Ensure orders have all required fields populated
       const ordersWithDetails = orders.data || [];
 
       setData({
-        stones: stones.data || [],
-        papers: papers.data || [],
+        stones: allStones,
+        papers: allPapers,
         orders: ordersWithDetails,
         recentOrders: ordersWithDetails.slice(0, 5),
       });
@@ -135,6 +163,21 @@ function AdminDashboard() {
         .length,
     };
   }, [data.orders]);
+
+  const totalStoneWeight = useMemo(() => {
+    const totalInGrams = data.stones.reduce((sum, stone) => {
+      // Convert stone quantity to grams based on its unit
+      const weightInGrams =
+        stone.unit === 'kg' ? stone.quantity * 1000 : stone.quantity;
+      return sum + weightInGrams;
+    }, 0);
+
+    // Convert to display unit
+    if (stoneWeightUnit === 'kg') {
+      return totalInGrams / 1000;
+    }
+    return totalInGrams;
+  }, [data.stones, stoneWeightUnit]);
 
   if (loading) {
     return <SpinnerPage />;
@@ -214,14 +257,32 @@ function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Stones</CardTitle>
-            <Badge variant="secondary">{data.stones.length}</Badge>
+            <div className="flex items-center gap-2">
+              <Select
+                value={stoneWeightUnit}
+                onValueChange={(value: 'kg' | 'g') => setStoneWeightUnit(value)}
+              >
+                <SelectTrigger className="w-16 h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kg">kg</SelectItem>
+                  <SelectItem value="g">g</SelectItem>
+                </SelectContent>
+              </Select>
+              <Badge variant="secondary">{data.stones.length}</Badge>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {data.stones.reduce((sum, stone) => sum + stone.quantity, 0)}
+              {totalStoneWeight.toLocaleString(undefined, {
+                minimumFractionDigits: stoneWeightUnit === 'kg' ? 2 : 0,
+                maximumFractionDigits: stoneWeightUnit === 'kg' ? 2 : 0,
+              })}{' '}
+              {stoneWeightUnit}
             </div>
             <p className="text-xs text-muted-foreground">
-              Total quantity in stock
+              Total weight in stock
             </p>
           </CardContent>
         </Card>

@@ -284,7 +284,7 @@ function StonesTable({ inventoryType = 'internal' }: StonesTableProps) {
                   <TableCell>{stone.quantity}</TableCell>
                   <TableCell>{stone.unit}</TableCell>
                   <TableCell>
-                    {user?.role === 'admin' && (
+                    {user?.role === 'admin' && stone.quantity > 0 && (
                       <LoadingButton
                         variant="destructive"
                         size="sm"

@@ -271,16 +271,18 @@ function PaperTable({ inventoryType = 'internal' }: PaperTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <LoadingButton
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => openDeleteDialog(paper)}
-                      loading={isDeleting === paper._id}
-                      loadingText="Resetting..."
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Reset
-                    </LoadingButton>
+                    {paper.quantity > 0 && (
+                      <LoadingButton
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openDeleteDialog(paper)}
+                        loading={isDeleting === paper._id}
+                        loadingText="Resetting..."
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Reset
+                      </LoadingButton>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

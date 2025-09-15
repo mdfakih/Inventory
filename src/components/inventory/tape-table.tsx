@@ -264,16 +264,18 @@ export default function TapeTable() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <LoadingButton
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => openDeleteDialog(tape)}
-                      loading={isDeleting === tape._id}
-                      loadingText="Resetting..."
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Reset
-                    </LoadingButton>
+                    {tape.quantity > 0 && (
+                      <LoadingButton
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openDeleteDialog(tape)}
+                        loading={isDeleting === tape._id}
+                        loadingText="Resetting..."
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Reset
+                      </LoadingButton>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

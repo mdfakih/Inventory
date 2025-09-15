@@ -269,16 +269,18 @@ export default function PlasticTable() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <LoadingButton
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => openDeleteDialog(plastic)}
-                        loading={isDeleting === plastic._id}
-                        loadingText="Resetting..."
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Reset
-                      </LoadingButton>
+                      {plastic.quantity > 0 && (
+                        <LoadingButton
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => openDeleteDialog(plastic)}
+                          loading={isDeleting === plastic._id}
+                          loadingText="Resetting..."
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Reset
+                        </LoadingButton>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
