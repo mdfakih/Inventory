@@ -7,6 +7,7 @@ import Plastic from '@/models/Plastic';
 import Tape from '@/models/Tape';
 import Design from '@/models/Design';
 import Customer from '@/models/Customer';
+import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 // Updated interface for creating orders with multiple designs

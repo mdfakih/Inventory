@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
+import User from '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 interface DesignUpdateData {
