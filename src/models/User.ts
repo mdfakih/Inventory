@@ -63,4 +63,13 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
-export default mongoose.models.User || mongoose.model('User', userSchema);
+// Use a more robust model export for production stability
+let User: mongoose.Model<any>;
+
+try {
+  User = mongoose.model('User');
+} catch (error) {
+  User = mongoose.model('User', userSchema);
+}
+
+export default User;

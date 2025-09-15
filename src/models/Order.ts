@@ -317,4 +317,13 @@ orderSchema.pre('save', function (next) {
   next();
 });
 
-export default mongoose.models.Order || mongoose.model('Order', orderSchema);
+// Use a more robust model export for production stability
+let Order: mongoose.Model<any>;
+
+try {
+  Order = mongoose.model('Order');
+} catch (error) {
+  Order = mongoose.model('Order', orderSchema);
+}
+
+export default Order;

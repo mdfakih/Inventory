@@ -5,7 +5,19 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    await dbConnect();
+    const dbConnection = await dbConnect();
+
+    // Verify database connection is ready
+    if (!dbConnection || dbConnection.connection.readyState !== 1) {
+      console.error(
+        'Database connection not ready, readyState:',
+        dbConnection?.connection.readyState,
+      );
+      return NextResponse.json(
+        { success: false, message: 'Database connection not ready' },
+        { status: 500 },
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');

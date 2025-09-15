@@ -73,4 +73,13 @@ const paperSchema = new mongoose.Schema(
 // Ensure unique name per inventory type
 paperSchema.index({ name: 1, inventoryType: 1 }, { unique: true });
 
-export default mongoose.models.Paper || mongoose.model('Paper', paperSchema);
+// Use a more robust model export for production stability
+let Paper: mongoose.Model<any>;
+
+try {
+  Paper = mongoose.model('Paper');
+} catch (error) {
+  Paper = mongoose.model('Paper', paperSchema);
+}
+
+export default Paper;

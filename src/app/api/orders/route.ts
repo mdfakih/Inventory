@@ -52,7 +52,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await dbConnect();
+    const dbConnection = await dbConnect();
+
+    // Verify database connection is ready
+    if (!dbConnection || dbConnection.connection.readyState !== 1) {
+      console.error(
+        'Database connection not ready, readyState:',
+        dbConnection?.connection.readyState,
+      );
+      return NextResponse.json(
+        { success: false, message: 'Database connection not ready' },
+        { status: 500 },
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -387,7 +399,7 @@ export async function POST(request: NextRequest) {
       if (design.defaultStones && design.defaultStones.length > 0) {
         for (const designStone of design.defaultStones) {
           const stone = designStone.stoneId;
-          
+
           // Validate design stone quantity meets minimum requirement
           if (designStone.quantity < 0.1) {
             inventoryErrors.push(
@@ -395,7 +407,7 @@ export async function POST(request: NextRequest) {
             );
             continue;
           }
-          
+
           const requiredQuantity =
             designStone.quantity * paperUsed.quantityInPcs; // Total stones needed for all pieces
 

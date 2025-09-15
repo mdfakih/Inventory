@@ -102,5 +102,13 @@ inventoryEntrySchema.index({ inventoryType: 1, createdAt: -1 });
 inventoryEntrySchema.index({ supplier: 1, createdAt: -1 });
 inventoryEntrySchema.index({ enteredBy: 1, createdAt: -1 });
 
-export default mongoose.models.InventoryEntry ||
-  mongoose.model('InventoryEntry', inventoryEntrySchema);
+// Use a more robust model export for production stability
+let InventoryEntry: mongoose.Model<any>;
+
+try {
+  InventoryEntry = mongoose.model('InventoryEntry');
+} catch (error) {
+  InventoryEntry = mongoose.model('InventoryEntry', inventoryEntrySchema);
+}
+
+export default InventoryEntry;

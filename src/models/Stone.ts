@@ -55,4 +55,13 @@ const stoneSchema = new mongoose.Schema(
 // Ensure unique number per inventory type
 stoneSchema.index({ number: 1, inventoryType: 1 }, { unique: true });
 
-export default mongoose.models.Stone || mongoose.model('Stone', stoneSchema);
+// Use a more robust model export for production stability
+let Stone: mongoose.Model<any>;
+
+try {
+  Stone = mongoose.model('Stone');
+} catch (error) {
+  Stone = mongoose.model('Stone', stoneSchema);
+}
+
+export default Stone;

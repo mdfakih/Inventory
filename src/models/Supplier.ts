@@ -42,5 +42,13 @@ const supplierSchema = new mongoose.Schema(
 // Ensure unique supplier name
 supplierSchema.index({ name: 1 }, { unique: true });
 
-export default mongoose.models.Supplier ||
-  mongoose.model('Supplier', supplierSchema);
+// Use a more robust model export for production stability
+let Supplier: mongoose.Model<any>;
+
+try {
+  Supplier = mongoose.model('Supplier');
+} catch (error) {
+  Supplier = mongoose.model('Supplier', supplierSchema);
+}
+
+export default Supplier;

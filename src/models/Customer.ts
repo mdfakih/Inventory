@@ -104,4 +104,13 @@ customerSchema.index({
   company: 'text',
 });
 
-export default mongoose.models.Customer || mongoose.model('Customer', customerSchema);
+// Use a more robust model export for production stability
+let Customer: mongoose.Model<any>;
+
+try {
+  Customer = mongoose.model('Customer');
+} catch (error) {
+  Customer = mongoose.model('Customer', customerSchema);
+}
+
+export default Customer;

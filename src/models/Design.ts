@@ -76,4 +76,13 @@ const designSchema = new mongoose.Schema(
   },
 );
 
-export default mongoose.models.Design || mongoose.model('Design', designSchema);
+// Use a more robust model export for production stability
+let Design: mongoose.Model<any>;
+
+try {
+  Design = mongoose.model('Design');
+} catch (error) {
+  Design = mongoose.model('Design', designSchema);
+}
+
+export default Design;
