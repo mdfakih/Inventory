@@ -3,13 +3,9 @@ import mongoose, { Document } from 'mongoose';
 interface IPlastic extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
+  width: number;
   quantity: number;
   unit: string;
-  supplier?: string;
-  cost?: number;
-  notes?: string;
-  createdBy: mongoose.Types.ObjectId;
-  updatedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +32,25 @@ const plasticSchema = new mongoose.Schema(
       type: String,
       default: 'pcs',
     },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    updateHistory: [
+      {
+        field: String,
+        oldValue: mongoose.Schema.Types.Mixed,
+        newValue: mongoose.Schema.Types.Mixed,
+        updatedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+        updatedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

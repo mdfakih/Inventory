@@ -21,7 +21,6 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value;
 
   if (!token) {
-    console.log('No auth token found for path:', pathname);
     // Redirect to login if no token
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -32,7 +31,6 @@ export function middleware(request: NextRequest) {
   // Verify token
   const payload = verifyToken(token);
   if (!payload) {
-    console.log('Token verification failed for path:', pathname);
     // Clear invalid cookie
     const response = pathname.startsWith('/api/')
       ? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -47,15 +45,15 @@ export function middleware(request: NextRequest) {
   // API routes protection
   if (pathname.startsWith('/api/')) {
     // Admin routes
-    if (pathname.startsWith('/api/masters/') && role !== 'admin') {
+    if (pathname.startsWith('/api/masters') && role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Manager and Admin routes
     if (
-      pathname.startsWith('/api/inventory/') ||
-      pathname.startsWith('/api/designs/') ||
-      pathname.startsWith('/api/orders/')
+      pathname.startsWith('/api/inventory') ||
+      pathname.startsWith('/api/designs') ||
+      pathname.startsWith('/api/orders')
     ) {
       if (role === 'employee') {
         // Employees can only read

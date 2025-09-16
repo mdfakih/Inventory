@@ -2,14 +2,29 @@ import mongoose, { Document } from 'mongoose';
 
 interface IInventoryEntry extends Document {
   _id: mongoose.Types.ObjectId;
-  entryType: 'in' | 'out';
-  itemType: 'paper' | 'plastic' | 'tape' | 'stone' | 'other';
-  itemId: mongoose.Types.ObjectId;
-  itemName: string;
-  quantity: number;
-  unit: string;
+  entryType: 'purchase' | 'return' | 'adjustment';
+  inventoryType: 'paper' | 'plastic' | 'stones' | 'tape' | 'mixed';
+  supplier?: mongoose.Types.ObjectId;
+  billNumber?: string;
+  billDate?: Date;
+  items: Array<{
+    itemId: mongoose.Types.ObjectId;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    piecesPerRoll?: number;
+    weightPerPiece?: number;
+    width?: number;
+  }>;
+  totalAmount?: number;
   notes?: string;
+  source?: 'order' | 'other';
+  sourceOrderId?: mongoose.Types.ObjectId;
+  sourceDescription?: string;
   enteredBy: mongoose.Types.ObjectId;
+  status: 'pending' | 'approved' | 'rejected';
+  approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

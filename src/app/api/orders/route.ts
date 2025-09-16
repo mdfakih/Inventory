@@ -665,46 +665,44 @@ export async function POST(request: NextRequest) {
       order = new Order(orderData);
       await order.save();
     } catch (error) {
-      // Rollback inventory changes if order creation failed
-      if (order) {
-        try {
-          // Restore paper inventory to original state
-          for (const { paper, requiredPieces } of inventoryPapers) {
-            const restoredTotalPieces = paper.totalPieces + requiredPieces;
-            const restoredQuantity = Math.floor(
-              restoredTotalPieces / paper.piecesPerRoll,
-            );
-            await Paper.findByIdAndUpdate(paper._id, {
-              totalPieces: restoredTotalPieces,
-              quantity: restoredQuantity,
-            });
-          }
-
-          // Restore stone inventory to original state
-          for (const stoneDeduction of stonesToDeduct) {
-            await Stone.findByIdAndUpdate(stoneDeduction.stoneId, {
-              quantity: stoneDeduction.currentQuantity,
-            });
-          }
-
-          // Restore other inventory items to original state
-          for (const itemDeduction of inventoryOtherItems) {
-            switch (itemDeduction.itemType) {
-              case 'plastic':
-                await Plastic.findByIdAndUpdate(itemDeduction.itemId, {
-                  quantity: itemDeduction.currentQuantity,
-                });
-                break;
-              case 'tape':
-                await Tape.findByIdAndUpdate(itemDeduction.itemId, {
-                  quantity: itemDeduction.currentQuantity,
-                });
-                break;
-            }
-          }
-        } catch (rollbackError) {
-          console.error('Failed to rollback inventory changes:', rollbackError);
+      // Rollback inventory changes if any step failed
+      try {
+        // Restore paper inventory to original state
+        for (const { paper, requiredPieces } of inventoryPapers) {
+          const restoredTotalPieces = paper.totalPieces + requiredPieces;
+          const restoredQuantity = Math.floor(
+            restoredTotalPieces / paper.piecesPerRoll,
+          );
+          await Paper.findByIdAndUpdate(paper._id, {
+            totalPieces: restoredTotalPieces,
+            quantity: restoredQuantity,
+          });
         }
+
+        // Restore stone inventory to original state
+        for (const stoneDeduction of stonesToDeduct) {
+          await Stone.findByIdAndUpdate(stoneDeduction.stoneId, {
+            quantity: stoneDeduction.currentQuantity,
+          });
+        }
+
+        // Restore other inventory items to original state
+        for (const itemDeduction of inventoryOtherItems) {
+          switch (itemDeduction.itemType) {
+            case 'plastic':
+              await Plastic.findByIdAndUpdate(itemDeduction.itemId, {
+                quantity: itemDeduction.currentQuantity,
+              });
+              break;
+            case 'tape':
+              await Tape.findByIdAndUpdate(itemDeduction.itemId, {
+                quantity: itemDeduction.currentQuantity,
+              });
+              break;
+          }
+        }
+      } catch (rollbackError) {
+        console.error('Failed to rollback inventory changes:', rollbackError);
       }
       throw error;
     }

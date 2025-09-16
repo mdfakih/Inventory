@@ -411,29 +411,55 @@ export default function OrdersPage() {
       const tapesData = await tapesRes.json();
 
       if (ordersData.success) {
-        setOrders(ordersData.data);
-        setTotalPages(ordersData.pagination.pages);
-        setTotalItems(ordersData.pagination.total);
+        const ordersArray = Array.isArray(ordersData.data)
+          ? ordersData.data
+          : [];
+        setOrders(ordersArray);
+        if (ordersData.pagination) {
+          setTotalPages(ordersData.pagination.pages || 1);
+          setTotalItems(ordersData.pagination.total || ordersArray.length);
+        } else {
+          setTotalPages(1);
+          setTotalItems(ordersArray.length);
+        }
+      } else {
+        setOrders([]);
+        setTotalPages(1);
+        setTotalItems(0);
       }
-      if (designsData.success) setDesigns(designsData.data);
+      if (designsData.success) {
+        setDesigns(Array.isArray(designsData.data) ? designsData.data : []);
+      } else {
+        setDesigns([]);
+      }
 
       // Combine both internal and out papers
-      const allPapers = [];
-      if (internalPapersData.success)
+      const allPapers: Paper[] = [];
+      if (internalPapersData.success && Array.isArray(internalPapersData.data))
         allPapers.push(...internalPapersData.data);
-      if (outPapersData.success) allPapers.push(...outPapersData.data);
+      if (outPapersData.success && Array.isArray(outPapersData.data))
+        allPapers.push(...outPapersData.data);
       setPapers(allPapers);
 
       // Combine both internal and out stones
-      const allStones = [];
-      if (internalStonesData.success)
+      const allStones: Stone[] = [];
+      if (internalStonesData.success && Array.isArray(internalStonesData.data))
         allStones.push(...internalStonesData.data);
-      if (outStonesData.success) allStones.push(...outStonesData.data);
+      if (outStonesData.success && Array.isArray(outStonesData.data))
+        allStones.push(...outStonesData.data);
       // setStones(allStones);
 
       // Set plastics and tapes data
-      if (plasticsData.success) setPlastics(plasticsData.data);
-      if (tapesData.success) setTapes(tapesData.data);
+      if (plasticsData.success) {
+        setPlastics(Array.isArray(plasticsData.data) ? plasticsData.data : []);
+      } else {
+        setPlastics([]);
+      }
+      if (tapesData.success) {
+        setTapes(Array.isArray(tapesData.data) ? tapesData.data : []);
+      } else {
+        setTapes([]);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       showError('Data Loading Error', 'Failed to load orders data.');
@@ -455,7 +481,7 @@ export default function OrdersPage() {
 
   // Update filtered orders when orders change
   useEffect(() => {
-    setFilteredOrders(orders);
+    setFilteredOrders(Array.isArray(orders) ? orders : []);
   }, [orders]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
