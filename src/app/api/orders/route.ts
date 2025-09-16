@@ -302,6 +302,24 @@ export async function POST(request: NextRequest) {
     const inventoryErrors = [];
     const stonesToDeduct = [];
 
+    // Define interfaces and type guards at the top level
+    interface PopulatedStone {
+      _id: mongoose.Types.ObjectId | string;
+      name: string;
+      inventoryType: string;
+    }
+
+    // Type guard to check if stone is populated
+    function isPopulatedStone(obj: unknown): obj is PopulatedStone {
+      return (
+        obj !== null &&
+        typeof obj === 'object' &&
+        'name' in obj &&
+        'inventoryType' in obj &&
+        '_id' in obj
+      );
+    }
+
     for (const designOrder of designOrders) {
       const { designId, paperUsed } = designOrder;
 
@@ -361,17 +379,21 @@ export async function POST(request: NextRequest) {
           }
 
           // Check if stone is available in the correct inventory type
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if ((stone as any).inventoryType !== inventoryType) {
+          if (!isPopulatedStone(stone)) {
             return NextResponse.json(
               {
                 success: false,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                message: `Design not applicable for ${type} orders. Stone "${
-                  (stone as any).name
-                }" is only available in ${
-                  (stone as any).inventoryType
-                } inventory.`,
+                message: 'Design contains unpopulated stone references',
+              },
+              { status: 400 },
+            );
+          }
+
+          if (stone.inventoryType !== inventoryType) {
+            return NextResponse.json(
+              {
+                success: false,
+                message: `Design not applicable for ${type} orders. Stone "${stone.name}" is only available in ${stone.inventoryType} inventory.`,
               },
               { status: 400 },
             );
@@ -408,11 +430,11 @@ export async function POST(request: NextRequest) {
 
           // Validate design stone quantity meets minimum requirement
           if (designStone.quantity < 0.1) {
+            const stoneName = isPopulatedStone(stone)
+              ? stone.name
+              : 'Unknown Stone';
             inventoryErrors.push(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              `Invalid stone quantity in design: ${(stone as any).name} (${
-                designStone.quantity
-              }g) - must be at least 0.1g`,
+              `Invalid stone quantity in design: ${stoneName} (${designStone.quantity}g) - must be at least 0.1g`,
             );
             continue;
           }
@@ -427,20 +449,18 @@ export async function POST(request: NextRequest) {
           });
 
           if (!inventoryStone) {
+            const stoneName = isPopulatedStone(stone)
+              ? stone.name
+              : 'Unknown Stone';
             inventoryErrors.push(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              `Stone "${
-                (stone as any).name
-              }" not found in ${inventoryType} inventory`,
+              `Stone "${stoneName}" not found in ${inventoryType} inventory`,
             );
           } else if (inventoryStone.quantity < requiredQuantity) {
+            const stoneName = isPopulatedStone(stone)
+              ? stone.name
+              : 'Unknown Stone';
             inventoryErrors.push(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              `Insufficient stone stock: ${(stone as any).name} (available: ${
-                inventoryStone.quantity
-              }${inventoryStone.unit}, required: ${requiredQuantity}${
-                inventoryStone.unit
-              })`,
+              `Insufficient stone stock: ${stoneName} (available: ${inventoryStone.quantity}${inventoryStone.unit}, required: ${requiredQuantity}${inventoryStone.unit})`,
             );
           } else {
             stonesToDeduct.push({
@@ -503,16 +523,17 @@ export async function POST(request: NextRequest) {
       }
 
       // Prepare stones used data for this design order
+      interface DesignStone {
+        stoneId: PopulatedStone | mongoose.Types.ObjectId | string;
+        quantity: number;
+      }
       const stonesUsed = design.defaultStones
-        ? design.defaultStones.map(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (designStone: any) => ({
-              stoneId:
-                designStone.stoneId?._id?.toString() ||
-                designStone.stoneId.toString(),
-              quantity: designStone.quantity * paperUsed.quantityInPcs,
-            }),
-          )
+        ? design.defaultStones.map((designStone: DesignStone) => ({
+            stoneId: isPopulatedStone(designStone.stoneId)
+              ? designStone.stoneId._id.toString()
+              : designStone.stoneId.toString(),
+            quantity: designStone.quantity * paperUsed.quantityInPcs,
+          }))
         : [];
 
       // Calculate pricing for this design order
