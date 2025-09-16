@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
+// Ensure referenced models are registered for population in serverless runtime
+import '@/models/Stone';
+import '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';

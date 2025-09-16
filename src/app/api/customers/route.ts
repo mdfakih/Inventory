@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Customer from '@/models/Customer';
+// Ensure referenced models are registered when populating
+import '@/models/User';
 import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -18,15 +20,21 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    // Build query
+    // Build query (avoid $text to prevent index requirements in prod)
     const query: {
-      $text?: { $search: string };
+      $or?: Array<Record<string, unknown>>;
       customerType?: string;
       isActive?: boolean;
     } = {};
 
     if (search) {
-      query.$text = { $search: search };
+      const regex = new RegExp(search, 'i');
+      query.$or = [
+        { name: regex },
+        { phone: regex },
+        { email: regex },
+        { company: regex },
+      ];
     }
 
     if (customerType) {
