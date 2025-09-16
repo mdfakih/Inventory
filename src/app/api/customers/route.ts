@@ -3,6 +3,8 @@ import dbConnect from '@/lib/db';
 import Customer from '@/models/Customer';
 import { getCurrentUser } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     await dbConnect();
@@ -44,18 +46,22 @@ export async function GET(request: NextRequest) {
       .skip(skip)
       .limit(limit)
       .populate('createdBy', 'name')
-      .populate('updatedBy', 'name');
+      .populate('updatedBy', 'name')
+      .lean();
 
-    return NextResponse.json({
-      success: true,
-      data: customers,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        success: true,
+        data: customers,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
       },
-    });
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error) {
     console.error('Error fetching customers:', error);
     return NextResponse.json(

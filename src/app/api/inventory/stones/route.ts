@@ -14,9 +14,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('Connecting to database...');
     await dbConnect();
-    console.log('Database connected successfully');
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'internal';
@@ -34,11 +32,11 @@ export async function GET(request: NextRequest) {
 
     // If all=true, return all stones without pagination
     if (all) {
-      console.log(`Fetching all stones for type: ${type}`);
-      const stones = await Stone.find({ inventoryType: type }).sort({
-        name: 1,
-      });
-      console.log(`Found ${stones.length} stones`);
+      const stones = await Stone.find({ inventoryType: type })
+        .sort({
+          name: 1,
+        })
+        .lean();
 
       return NextResponse.json({
         success: true,
@@ -63,7 +61,8 @@ export async function GET(request: NextRequest) {
     const stones = await Stone.find({ inventoryType: type })
       .sort({ name: 1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     return NextResponse.json({
       success: true,

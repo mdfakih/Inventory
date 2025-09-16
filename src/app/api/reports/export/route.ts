@@ -8,6 +8,8 @@ import Paper from '@/models/Paper';
 import Plastic from '@/models/Plastic';
 import Tape from '@/models/Tape';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Check authentication and authorization
@@ -91,9 +93,13 @@ export async function GET(request: NextRequest) {
 
       case 'orders':
         const orders = await Order.find(dateFilter)
+          .select(
+            'type customerName phone designId stonesUsed finalTotalWeight createdAt',
+          )
           .populate('designId', 'name number')
           .populate('stonesUsed.stoneId', 'name')
-          .sort({ createdAt: -1 });
+          .sort({ createdAt: -1 })
+          .lean();
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data = orders.map((order: any) => ({
@@ -154,13 +160,13 @@ export async function GET(request: NextRequest) {
           allTapes,
         ] = await Promise.all([
           Order.find(dateFilter)
-            .populate('designId', 'name number')
-            .populate('stonesUsed.stoneId', 'name'),
-          User.find({}).select('-password'),
-          Stone.find({}),
-          Paper.find({}),
-          Plastic.find({}),
-          Tape.find({}),
+            .select('type finalTotalWeight createdAt')
+            .lean(),
+          User.find({}).select('name email role createdAt').lean(),
+          Stone.find({}).select('name number color size quantity unit').lean(),
+          Paper.find({}).select('width quantity piecesPerRoll').lean(),
+          Plastic.find({}).select('name width quantity').lean(),
+          Tape.find({}).select('name quantity').lean(),
         ]);
 
         // Create summary data
@@ -233,6 +239,7 @@ export async function GET(request: NextRequest) {
         'Content-Disposition': `attachment; filename="report-${type}-${
           new Date().toISOString().split('T')[0]
         }.${format}"`,
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {

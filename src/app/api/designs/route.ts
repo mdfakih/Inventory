@@ -3,21 +3,11 @@ import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
 import { getCurrentUser } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
-    const dbConnection = await dbConnect();
-
-    // Verify database connection is ready
-    if (!dbConnection || dbConnection.connection.readyState !== 1) {
-      console.error(
-        'Database connection not ready, readyState:',
-        dbConnection?.connection.readyState,
-      );
-      return NextResponse.json(
-        { success: false, message: 'Database connection not ready' },
-        { status: 500 },
-      );
-    }
+    await dbConnect();
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -30,12 +20,13 @@ export async function GET(request: NextRequest) {
         .populate('defaultStones.stoneId')
         .populate('createdBy', 'name email')
         .populate('updatedBy', 'name email')
-        .sort({ name: 1 }); // Sort by name for dropdowns
+        .sort({ name: 1 })
+        .lean();
 
-      return NextResponse.json({
-        success: true,
-        data: designs,
-      });
+      return NextResponse.json(
+        { success: true, data: designs },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
     // Validate pagination parameters
@@ -58,18 +49,22 @@ export async function GET(request: NextRequest) {
       .populate('updatedBy', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
-    return NextResponse.json({
-      success: true,
-      data: designs,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        success: true,
+        data: designs,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
       },
-    });
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error) {
     console.error('Get designs error:', error);
     return NextResponse.json(

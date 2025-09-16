@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
+export const dynamic = 'force-dynamic';
 import Stone from '@/models/Stone';
 import Paper from '@/models/Paper';
 import Plastic from '@/models/Plastic';
@@ -52,19 +53,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const dbConnection = await dbConnect();
-
-    // Verify database connection is ready
-    if (!dbConnection || dbConnection.connection.readyState !== 1) {
-      console.error(
-        'Database connection not ready, readyState:',
-        dbConnection?.connection.readyState,
-      );
-      return NextResponse.json(
-        { success: false, message: 'Database connection not ready' },
-        { status: 500 },
-      );
-    }
+    await dbConnect();
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -85,23 +74,25 @@ export async function GET(request: NextRequest) {
 
     // Get orders with pagination
     const orders = await Order.find()
-      .populate('designId')
-      .populate('createdBy', 'name email')
-      .populate('updatedBy', 'name email')
+      .select('-updateHistory')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
-    return NextResponse.json({
-      success: true,
-      data: orders,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        success: true,
+        data: orders,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
       },
-    });
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error) {
     console.error('Get orders error:', error);
 
