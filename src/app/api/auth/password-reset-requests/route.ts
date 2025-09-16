@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import User from '@/models/User';
 import { generateRandomPassword } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 export async function GET() {
   try {
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
         requestedAt: null,
         approved: true,
         approvedAt: new Date(),
-        approvedBy: adminId,
+        approvedBy: adminId ? new mongoose.Types.ObjectId(adminId) : null,
       };
 
       await user.save();

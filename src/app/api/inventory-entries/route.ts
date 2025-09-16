@@ -7,6 +7,7 @@ import Paper from '@/models/Paper';
 import Plastic from '@/models/Plastic';
 import Stone from '@/models/Stone';
 import Tape from '@/models/Tape';
+import mongoose from 'mongoose';
 
 export async function GET(request: NextRequest) {
   try {
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
             phone: '',
             email: '',
             address: '',
-            createdBy: user._id,
+            createdBy: new mongoose.Types.ObjectId(user._id),
           });
           await supplier.save();
         }
@@ -295,7 +296,7 @@ export async function POST(request: NextRequest) {
         entryType === 'return' && source === 'other'
           ? sourceDescription
           : undefined,
-      enteredBy: user._id,
+      enteredBy: new mongoose.Types.ObjectId(user._id),
     });
 
     await inventoryEntry.save();
@@ -304,13 +305,13 @@ export async function POST(request: NextRequest) {
     for (const update of inventoryUpdates) {
       const updateData: Record<string, unknown> = {
         quantity: update.newQuantity,
-        updatedBy: user._id,
+        updatedBy: new mongoose.Types.ObjectId(user._id),
         $push: {
           updateHistory: {
             field: 'quantity',
             oldValue: update.newQuantity - update.item.quantity,
             newValue: update.newQuantity,
-            updatedBy: user._id,
+            updatedBy: new mongoose.Types.ObjectId(user._id),
             updatedAt: new Date(),
             reason: `${entryType} entry - ${inventoryEntry._id}`,
           },
@@ -322,7 +323,20 @@ export async function POST(request: NextRequest) {
         updateData.totalPieces = update.newQuantity * update.item.piecesPerRoll;
       }
 
-      await update.model.findByIdAndUpdate(update.id, updateData);
+      switch (update.inventoryType) {
+        case 'paper':
+          await Paper.findByIdAndUpdate(update.id, updateData);
+          break;
+        case 'plastic':
+          await Plastic.findByIdAndUpdate(update.id, updateData);
+          break;
+        case 'stones':
+          await Stone.findByIdAndUpdate(update.id, updateData);
+          break;
+        case 'tape':
+          await Tape.findByIdAndUpdate(update.id, updateData);
+          break;
+      }
     }
 
     // Populate the response

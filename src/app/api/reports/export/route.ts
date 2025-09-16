@@ -45,14 +45,8 @@ export async function GET(request: NextRequest) {
         // Combine all inventory data
         data = [
           ...stones.map(
-            (stone: {
-              name: string;
-              number: string;
-              color: string;
-              size: string;
-              quantity: number;
-              unit: string;
-            }) => ({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (stone: any) => ({
               type: 'Stone',
               name: stone.name,
               number: stone.number,
@@ -62,25 +56,22 @@ export async function GET(request: NextRequest) {
               unit: stone.unit,
             }),
           ),
-          ...papers.map(
-            (paper: {
-              width: number;
-              quantity: number;
-              piecesPerRoll: number;
-            }) => ({
-              type: 'Paper',
-              width: `${paper.width}"`,
-              quantity: paper.quantity,
-              piecesPerRoll: paper.piecesPerRoll,
-              totalPieces: paper.quantity * paper.piecesPerRoll,
-            }),
-          ),
-          ...plastics.map((plastic: { width: number; quantity: number }) => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...papers.map((paper: any) => ({
+            type: 'Paper',
+            width: `${paper.width}"`,
+            quantity: paper.quantity,
+            piecesPerRoll: paper.piecesPerRoll,
+            totalPieces: paper.quantity * paper.piecesPerRoll,
+          })),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...plastics.map((plastic: any) => ({
             type: 'Plastic',
             width: `${plastic.width}"`,
             quantity: plastic.quantity,
           })),
-          ...tapes.map((tape: { quantity: number }) => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...tapes.map((tape: any) => ({
             type: 'Tape',
             quantity: tape.quantity,
           })),
@@ -104,32 +95,22 @@ export async function GET(request: NextRequest) {
           .populate('stonesUsed.stoneId', 'name')
           .sort({ createdAt: -1 });
 
-        data = orders.map(
-          (order: {
-            _id: string;
-            type: string;
-            customerName: string;
-            phone: string;
-            designId: { name: string };
-            finalTotalWeight: number;
-            createdAt: Date;
-            stonesUsed: Array<{ stoneId: { name: string }; quantity: number }>;
-          }) => ({
-            orderId: order._id.toString().slice(-6),
-            type: order.type,
-            customerName: order.customerName,
-            phone: order.phone,
-            design: order.designId?.name || 'N/A',
-            totalWeight: order.finalTotalWeight,
-            date: new Date(order.createdAt).toLocaleDateString(),
-            stonesUsed: order.stonesUsed
-              .map(
-                (s: { stoneId: { name: string }; quantity: number }) =>
-                  `${s.stoneId?.name} (${s.quantity})`,
-              )
-              .join(', '),
-          }),
-        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data = orders.map((order: any) => ({
+          orderId: order._id.toString().slice(-6),
+          type: order.type,
+          customerName: order.customerName,
+          phone: order.phone,
+          design: order.designId?.name || 'N/A',
+          totalWeight: order.finalTotalWeight,
+          date: new Date(order.createdAt).toLocaleDateString(),
+          stonesUsed: order.stonesUsed
+            .map(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (s: any) => `${s.stoneId?.name} (${s.quantity})`,
+            )
+            .join(', '),
+        }));
         headers = [
           'orderId',
           'type',
@@ -187,29 +168,26 @@ export async function GET(request: NextRequest) {
           {
             category: 'Orders',
             total: allOrders.length,
-            internal: allOrders.filter(
-              (o: { type: string }) => o.type === 'internal',
-            ).length,
-            external: allOrders.filter(
-              (o: { type: string }) => o.type === 'out',
-            ).length,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            internal: allOrders.filter((o: any) => o.type === 'internal')
+              .length,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            external: allOrders.filter((o: any) => o.type === 'out').length,
             totalWeight: allOrders.reduce(
-              (sum: number, o: { finalTotalWeight: number }) =>
-                sum + (o.finalTotalWeight || 0),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (sum: number, o: any) => sum + (o.finalTotalWeight || 0),
               0,
             ),
           },
           {
             category: 'Users',
             total: allUsers.length,
-            admin: allUsers.filter((u: { role: string }) => u.role === 'admin')
-              .length,
-            manager: allUsers.filter(
-              (u: { role: string }) => u.role === 'manager',
-            ).length,
-            employee: allUsers.filter(
-              (u: { role: string }) => u.role === 'employee',
-            ).length,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            admin: allUsers.filter((u: any) => u.role === 'admin').length,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            manager: allUsers.filter((u: any) => u.role === 'manager').length,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            employee: allUsers.filter((u: any) => u.role === 'employee').length,
           },
           {
             category: 'Inventory',

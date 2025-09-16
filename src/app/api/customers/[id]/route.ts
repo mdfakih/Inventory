@@ -100,10 +100,10 @@ export async function PUT(
     // Track changes for update history
     const updateHistory = [];
     for (const [key, value] of Object.entries(body)) {
-      if (key !== 'updateHistory' && customer[key] !== value) {
+      if (key !== 'updateHistory' && customer.get(key) !== value) {
         updateHistory.push({
           field: key,
-          oldValue: customer[key],
+          oldValue: customer.get(key),
           newValue: value,
           updatedBy: user._id,
           updatedAt: new Date(),

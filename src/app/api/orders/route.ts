@@ -8,6 +8,7 @@ import Tape from '@/models/Tape';
 import Design from '@/models/Design';
 import Customer from '@/models/Customer';
 import { getCurrentUser } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 // Updated interface for creating orders with multiple designs
 interface CreateOrderData {
@@ -37,7 +38,7 @@ interface CreateOrderData {
   discountedAmount: number;
   finalAmount: number;
   notes?: string;
-  createdBy: string;
+  createdBy: mongoose.Types.ObjectId;
 }
 
 export async function GET(request: NextRequest) {
@@ -216,18 +217,18 @@ export async function POST(request: NextRequest) {
 
         if (customer) {
           // Update customer if new information is provided
-          const updates: {
-            name?: string;
-            gstNumber?: string;
-            updatedBy?: string;
-            updateHistory?: Array<{
+          const updates: Partial<{
+            name: string;
+            gstNumber: string;
+            updatedBy: mongoose.Types.ObjectId;
+            updateHistory: Array<{
               field: string;
-              oldValue: string | null;
-              newValue: string;
-              updatedBy: string;
+              oldValue: unknown;
+              newValue: unknown;
+              updatedBy: mongoose.Types.ObjectId;
               updatedAt: Date;
             }>;
-          } = {};
+          }> = {};
           let hasUpdates = false;
 
           if (customerName && customerName !== customer.name) {
@@ -241,14 +242,14 @@ export async function POST(request: NextRequest) {
           }
 
           if (hasUpdates) {
-            updates.updatedBy = user._id;
+            updates.updatedBy = new mongoose.Types.ObjectId(user._id);
             updates.updateHistory = [
               ...(customer.updateHistory || []),
               {
                 field: 'order_update',
                 oldValue: 'Customer updated via order',
                 newValue: 'Customer updated via order',
-                updatedBy: user._id,
+                updatedBy: new mongoose.Types.ObjectId(user._id),
                 updatedAt: new Date(),
               },
             ];
@@ -259,7 +260,7 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          finalCustomerId = customer._id;
+          finalCustomerId = customer?._id;
         } else {
           // Create new customer
           const newCustomer = new Customer({
@@ -270,13 +271,13 @@ export async function POST(request: NextRequest) {
             creditLimit: 0,
             paymentTerms: 'immediate',
             isActive: true,
-            createdBy: user._id,
+            createdBy: new mongoose.Types.ObjectId(user._id),
             updateHistory: [
               {
                 field: 'created',
                 oldValue: null,
                 newValue: 'Customer created via order',
-                updatedBy: user._id,
+                updatedBy: new mongoose.Types.ObjectId(user._id),
                 updatedAt: new Date(),
               },
             ],
@@ -360,11 +361,17 @@ export async function POST(request: NextRequest) {
           }
 
           // Check if stone is available in the correct inventory type
-          if (stone.inventoryType !== inventoryType) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((stone as any).inventoryType !== inventoryType) {
             return NextResponse.json(
               {
                 success: false,
-                message: `Design not applicable for ${type} orders. Stone "${stone.name}" is only available in ${stone.inventoryType} inventory.`,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                message: `Design not applicable for ${type} orders. Stone "${
+                  (stone as any).name
+                }" is only available in ${
+                  (stone as any).inventoryType
+                } inventory.`,
               },
               { status: 400 },
             );
@@ -402,7 +409,10 @@ export async function POST(request: NextRequest) {
           // Validate design stone quantity meets minimum requirement
           if (designStone.quantity < 0.1) {
             inventoryErrors.push(
-              `Invalid stone quantity in design: ${stone.name} (${designStone.quantity}g) - must be at least 0.1g`,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              `Invalid stone quantity in design: ${(stone as any).name} (${
+                designStone.quantity
+              }g) - must be at least 0.1g`,
             );
             continue;
           }
@@ -418,11 +428,19 @@ export async function POST(request: NextRequest) {
 
           if (!inventoryStone) {
             inventoryErrors.push(
-              `Stone "${stone.name}" not found in ${inventoryType} inventory`,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              `Stone "${
+                (stone as any).name
+              }" not found in ${inventoryType} inventory`,
             );
           } else if (inventoryStone.quantity < requiredQuantity) {
             inventoryErrors.push(
-              `Insufficient stone stock: ${stone.name} (available: ${inventoryStone.quantity}${inventoryStone.unit}, required: ${requiredQuantity}${inventoryStone.unit})`,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              `Insufficient stone stock: ${(stone as any).name} (available: ${
+                inventoryStone.quantity
+              }${inventoryStone.unit}, required: ${requiredQuantity}${
+                inventoryStone.unit
+              })`,
             );
           } else {
             stonesToDeduct.push({
@@ -476,7 +494,7 @@ export async function POST(request: NextRequest) {
           } else {
             otherItemsToDeduct.push({
               itemType: item.itemType,
-              itemId: inventoryItem._id,
+              itemId: inventoryItem._id.toString(),
               currentQuantity: inventoryItem.quantity,
               requiredQuantity: item.quantity,
             });
@@ -487,8 +505,11 @@ export async function POST(request: NextRequest) {
       // Prepare stones used data for this design order
       const stonesUsed = design.defaultStones
         ? design.defaultStones.map(
-            (designStone: { stoneId: { _id: string }; quantity: number }) => ({
-              stoneId: designStone.stoneId._id,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (designStone: any) => ({
+              stoneId:
+                designStone.stoneId?._id?.toString() ||
+                designStone.stoneId.toString(),
               quantity: designStone.quantity * paperUsed.quantityInPcs,
             }),
           )
@@ -506,7 +527,7 @@ export async function POST(request: NextRequest) {
 
       // Add to processed design orders
       processedDesignOrders.push({
-        designId: design._id,
+        designId: design._id.toString(),
         quantity: paperUsed.quantityInPcs,
         stonesUsed,
         otherItemsUsed: designOrder.otherItemsUsed || [],
@@ -521,7 +542,12 @@ export async function POST(request: NextRequest) {
 
       // Store paper for inventory deduction
       inventoryPapers.push({
-        paper,
+        paper: {
+          _id: paper._id.toString(),
+          totalPieces: paper.totalPieces,
+          piecesPerRoll: paper.piecesPerRoll,
+          weightPerPiece: paper.weightPerPiece,
+        },
         requiredPieces: paperUsed.quantityInPcs,
       });
 
@@ -570,7 +596,7 @@ export async function POST(request: NextRequest) {
       discountedAmount,
       finalAmount,
       notes,
-      createdBy: user._id,
+      createdBy: new mongoose.Types.ObjectId(user._id),
     };
 
     // Deduct materials from inventory

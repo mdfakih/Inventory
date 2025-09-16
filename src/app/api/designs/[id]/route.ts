@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Design from '@/models/Design';
 import { getCurrentUser } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 interface DesignUpdateData {
   name: string;
@@ -9,12 +10,12 @@ interface DesignUpdateData {
   imageUrl: string;
   prices: Array<{ currency: string; price: number }>;
   defaultStones: Array<{ stoneId: string; quantity: number }>;
-  updatedBy: string;
+  updatedBy: mongoose.Types.ObjectId;
   updateHistory: Array<{
     field: string;
     oldValue: unknown;
     newValue: unknown;
-    updatedBy: string;
+    updatedBy: mongoose.Types.ObjectId;
     updatedAt: Date;
   }>;
 }
@@ -153,7 +154,7 @@ export async function PUT(
         field: 'name',
         oldValue: oldValues.name,
         newValue: name,
-        updatedBy: user._id,
+        updatedBy: new mongoose.Types.ObjectId(user._id),
         updatedAt: new Date(),
       });
     }
@@ -163,7 +164,7 @@ export async function PUT(
         field: 'number',
         oldValue: oldValues.number,
         newValue: number,
-        updatedBy: user._id,
+        updatedBy: new mongoose.Types.ObjectId(user._id),
         updatedAt: new Date(),
       });
     }
@@ -173,7 +174,7 @@ export async function PUT(
         field: 'imageUrl',
         oldValue: oldValues.imageUrl,
         newValue: imageUrl,
-        updatedBy: user._id,
+        updatedBy: new mongoose.Types.ObjectId(user._id),
         updatedAt: new Date(),
       });
     }
@@ -183,7 +184,7 @@ export async function PUT(
         field: 'prices',
         oldValue: oldValues.prices,
         newValue: prices,
-        updatedBy: user._id,
+        updatedBy: new mongoose.Types.ObjectId(user._id),
         updatedAt: new Date(),
       });
     }
@@ -195,7 +196,7 @@ export async function PUT(
         field: 'defaultStones',
         oldValue: oldValues.defaultStones,
         newValue: defaultStones,
-        updatedBy: user._id,
+        updatedBy: new mongoose.Types.ObjectId(user._id),
         updatedAt: new Date(),
       });
     }
@@ -207,7 +208,7 @@ export async function PUT(
       imageUrl: imageUrl || '',
       prices: prices || [],
       defaultStones: defaultStones || [],
-      updatedBy: user._id,
+      updatedBy: new mongoose.Types.ObjectId(user._id),
       updateHistory: [...(design.updateHistory || []), ...updateHistory],
     };
 

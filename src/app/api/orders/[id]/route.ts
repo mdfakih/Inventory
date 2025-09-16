@@ -257,15 +257,11 @@ export async function PUT(
 
         // Prepare stones used data
         const stonesUsed = design.defaultStones
-          ? design.defaultStones.map(
-              (designStone: {
-                stoneId: { _id: string };
-                quantity: number;
-              }) => ({
-                stoneId: designStone.stoneId._id,
-                quantity: designStone.quantity * paperUsed.quantityInPcs,
-              }),
-            )
+          ? design.defaultStones.map((designStone) => ({
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              stoneId: (designStone.stoneId as any)?._id || designStone.stoneId,
+              quantity: designStone.quantity * paperUsed.quantityInPcs,
+            }))
           : [];
 
         processedDesignOrders.push({
