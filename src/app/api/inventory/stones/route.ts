@@ -153,10 +153,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate stone quantity
-    if (quantity < 0.1) {
+    // Validate stone quantity (allow zero for master creation, block negatives)
+    if (quantity < 0) {
       return NextResponse.json(
-        { success: false, message: 'Stone quantity must be at least 0.1g' },
+        { success: false, message: 'Stone quantity cannot be negative' },
         { status: 400 },
       );
     }

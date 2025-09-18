@@ -127,9 +127,9 @@ export async function PATCH(
     const body = await request.json();
     const { quantity } = body;
 
-    if (quantity === undefined || quantity < 0.1) {
+    if (quantity === undefined || quantity < 0) {
       return NextResponse.json(
-        { success: false, message: 'Stone quantity must be at least 0.1g' },
+        { success: false, message: 'Stone quantity cannot be negative' },
         { status: 400 },
       );
     }
