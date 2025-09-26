@@ -296,7 +296,7 @@ function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {data.papers.reduce((sum, paper) => sum + paper.quantity, 0)}
+              {data.papers.reduce((sum, paper) => sum + paper.totalPieces, 0)}
             </div>
             <p className="text-xs text-muted-foreground">
               Total pieces in stock
